@@ -91,6 +91,8 @@ internal sealed class FakeMarketDataClient(FakeClock clock) : IMarketDataClient
 
     public Task<DateTime> GetServerTimeAsync(CancellationToken ct) => Task.FromResult(clock.UtcNow);
 
+    public Task<decimal> GetLastPriceAsync(string symbol, CancellationToken ct) => Task.FromResult(100m);
+
     public Task<IReadOnlyList<KlineDto>> GetKlinesAsync(string symbol, CandleInterval interval,
         DateTime startTimeUtc, int limit, CancellationToken ct)
     {

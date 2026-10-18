@@ -31,6 +31,12 @@ public sealed class BinanceMarketDataClient(HttpClient http, ILogger<BinanceMark
         return FromUnixMs(doc.RootElement.GetProperty("serverTime").GetInt64());
     }
 
+    public async Task<decimal> GetLastPriceAsync(string symbol, CancellationToken ct)
+    {
+        using var doc = await GetJsonAsync($"/api/v3/ticker/price?symbol={Uri.EscapeDataString(symbol)}", ct);
+        return ParseDecimal(doc.RootElement.GetProperty("price"));
+    }
+
     public async Task<IReadOnlyList<KlineDto>> GetKlinesAsync(string symbol, CandleInterval interval,
         DateTime startTimeUtc, int limit, CancellationToken ct)
     {

@@ -1,5 +1,6 @@
 using CryptoBot.Application.Abstractions;
 using CryptoBot.Application.Futures;
+using CryptoBot.Application.LivePrices;
 using CryptoBot.Application.MarketData;
 using CryptoBot.Application.Signals;
 using CryptoBot.Infrastructure.Exchanges.Binance;
@@ -56,6 +57,11 @@ public static class DependencyInjection
             http.BaseAddress = new Uri(o.FuturesMarketDataBaseUrl);
             http.Timeout = o.RequestTimeout;
         });
+
+        // Bảng giá trực tiếp: lấy Spot + Mark mỗi PollInterval để quan sát nguồn dữ liệu.
+        services.AddSingleton(config.GetSection("LivePrices").Get<LivePriceOptions>() ?? new LivePriceOptions());
+        services.AddSingleton<LivePriceHistory>();
+        services.AddScoped<LivePriceSampler>();
 
         return services;
     }

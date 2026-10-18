@@ -193,3 +193,24 @@ export const futuresApi = {
   close: (id: number, commandId: string) =>
     postJson<FuturesPosition>(`/api/paper/futures/positions/${id}/close`, { commandId }),
 };
+
+// ---- Bảng giá trực tiếp (Spot + Mark, mỗi 15s) ----
+
+export interface LiveSample {
+  timeUtc: string;
+  spotPrice: number | null;
+  markPrice: number | null;
+  spotLatencyMs: number | null;
+  markLatencyMs: number | null;
+  error: string | null;
+}
+
+export interface LivePrices {
+  intervalSeconds: number;
+  serverTimeUtc: string;
+  symbols: { symbol: string; samples: LiveSample[] }[];
+}
+
+export const liveApi = {
+  prices: (limit = 60) => getJson<LivePrices>(`/api/live/prices?limit=${limit}`),
+};

@@ -112,13 +112,13 @@ export function TradePanel({ symbol, account }: Props) {
     >
       {account && (
         <Flex wrap gap={16} style={{ marginBottom: 12 }}>
-          <Statistic title="Khả dụng" value={account.availableBalance} precision={2} valueStyle={{ fontSize: 16 }} />
-          <Statistic title="Equity" value={account.equity} precision={2} valueStyle={{ fontSize: 16 }} />
+          <Statistic title="Khả dụng" value={account.availableBalance} precision={2} styles={{ content: { fontSize: 16 } }} />
+          <Statistic title="Equity" value={account.equity} precision={2} styles={{ content: { fontSize: 16 } }} />
           <Statistic
             title="uPnL"
             value={account.unrealizedPnl}
             precision={2}
-            valueStyle={{ fontSize: 16, color: pnlColor(account.unrealizedPnl) }}
+            styles={{ content: { fontSize: 16, color: pnlColor(account.unrealizedPnl) } }}
           />
         </Flex>
       )}
