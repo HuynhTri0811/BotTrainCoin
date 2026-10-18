@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/time.ts","./src/api/client.ts","./src/components/statusbar.tsx","./src/features/futures/positionscard.tsx","./src/features/futures/tradepanel.tsx","./src/features/futures/format.ts","./src/features/market/candlechart.tsx","./src/pages/marketpage.tsx","./vite.config.ts"],"version":"5.9.3"}
