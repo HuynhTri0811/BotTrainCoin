@@ -32,3 +32,13 @@ export function ago(iso: string | null | undefined, nowIso: string): string {
   if (sec < 3600) return `${Math.round(sec / 60)} phút trước`;
   return `${Math.round(sec / 3600)} giờ trước`;
 }
+
+const withSeconds = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: VN_TZ,
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+});
+
+export const formatVnSeconds = (iso: string) => withSeconds.format(new Date(iso));
