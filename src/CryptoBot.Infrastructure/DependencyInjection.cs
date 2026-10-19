@@ -1,5 +1,6 @@
 using CryptoBot.Application.Abstractions;
 using CryptoBot.Application.Futures;
+using CryptoBot.Application.LivePrices;
 using CryptoBot.Application.MarketData;
 using CryptoBot.Application.Signals;
 using CryptoBot.Infrastructure.Exchanges.Binance;
@@ -50,12 +51,20 @@ public static class DependencyInjection
         services.AddSingleton<PaperFuturesLock>();
         services.AddScoped<IPaperFuturesStore, PaperFuturesStore>();
         services.AddScoped<PaperFuturesService>();
+        services.AddSingleton(config.GetSection("AutoOrders").Get<AutoOrderOptions>() ?? new AutoOrderOptions());
+        services.AddScoped<IAutoOrderStore, AutoOrderStore>();
+        services.AddScoped<AutoOrderService>();
         services.AddHttpClient<IMarkPriceClient, BinanceFuturesMarkPriceClient>((sp, http) =>
         {
             var o = sp.GetRequiredService<IOptions<BinanceOptions>>().Value;
             http.BaseAddress = new Uri(o.FuturesMarketDataBaseUrl);
             http.Timeout = o.RequestTimeout;
         });
+
+        // Bảng giá trực tiếp: lấy Spot + Mark mỗi PollInterval để quan sát nguồn dữ liệu.
+        services.AddSingleton(config.GetSection("LivePrices").Get<LivePriceOptions>() ?? new LivePriceOptions());
+        services.AddSingleton<LivePriceHistory>();
+        services.AddScoped<LivePriceSampler>();
 
         return services;
     }

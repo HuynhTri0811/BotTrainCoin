@@ -193,3 +193,78 @@ export const futuresApi = {
   close: (id: number, commandId: string) =>
     postJson<FuturesPosition>(`/api/paper/futures/positions/${id}/close`, { commandId }),
 };
+
+// ---- Quy tắc tự mở lệnh Paper theo mức giá ----
+
+export type TriggerCondition = 'AtOrBelow' | 'AtOrAbove';
+
+export interface AutoRule {
+  id: number;
+  environment: 'Paper';
+  symbol: string;
+  side: PositionSide;
+  condition: TriggerCondition;
+  triggerPrice: number;
+  margin: number;
+  leverage: number;
+  stopLossPercent: number;
+  takeProfitPercent: number | null;
+  status: 'Active' | 'Triggered' | 'Rejected' | 'Cancelled';
+  createdAtUtc: string;
+  triggeredAtUtc: string | null;
+  triggeredMarkPrice: number | null;
+  positionId: number | null;
+  note: string | null;
+}
+
+export interface AutoSummary {
+  rules: AutoRule[];
+  defaults: {
+    margin: number;
+    leverage: number;
+    stopLossPercent: number;
+    takeProfitPercent: number;
+    dailyLossLimitPercent: number;
+    maxActiveRules: number;
+  };
+  risk: { dayStartUtc: string; dayStartEquity: number; todayRealizedPnl: number; lossLimit: number; blocked: boolean };
+}
+
+/** Số tiền/giá gửi dạng chuỗi để không mất chính xác qua JSON number. */
+export interface CreateAutoRule {
+  symbol: string;
+  side: PositionSide;
+  condition: TriggerCondition;
+  triggerPrice: string;
+  margin: string;
+  leverage: number;
+  stopLossPercent: string;
+  takeProfitPercent: string | null;
+}
+
+export const autoApi = {
+  summary: () => getJson<AutoSummary>('/api/paper/futures/auto-rules'),
+  create: (req: CreateAutoRule) => postJson<AutoRule>('/api/paper/futures/auto-rules', req),
+  cancel: (id: number) => postJson<{ cancelled: boolean }>(`/api/paper/futures/auto-rules/${id}/cancel`, {}),
+};
+
+// ---- Bảng giá trực tiếp (Spot + Mark, mỗi 15s) ----
+
+export interface LiveSample {
+  timeUtc: string;
+  spotPrice: number | null;
+  markPrice: number | null;
+  spotLatencyMs: number | null;
+  markLatencyMs: number | null;
+  error: string | null;
+}
+
+export interface LivePrices {
+  intervalSeconds: number;
+  serverTimeUtc: string;
+  symbols: { symbol: string; samples: LiveSample[] }[];
+}
+
+export const liveApi = {
+  prices: (limit = 60) => getJson<LivePrices>(`/api/live/prices?limit=${limit}`),
+};
