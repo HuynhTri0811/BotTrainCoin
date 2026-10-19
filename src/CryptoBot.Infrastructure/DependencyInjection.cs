@@ -50,6 +50,9 @@ public static class DependencyInjection
         services.AddSingleton<PaperFuturesLock>();
         services.AddScoped<IPaperFuturesStore, PaperFuturesStore>();
         services.AddScoped<PaperFuturesService>();
+        services.AddSingleton(config.GetSection("AutoOrders").Get<AutoOrderOptions>() ?? new AutoOrderOptions());
+        services.AddScoped<IAutoOrderStore, AutoOrderStore>();
+        services.AddScoped<AutoOrderService>();
         services.AddHttpClient<IMarkPriceClient, BinanceFuturesMarkPriceClient>((sp, http) =>
         {
             var o = sp.GetRequiredService<IOptions<BinanceOptions>>().Value;
