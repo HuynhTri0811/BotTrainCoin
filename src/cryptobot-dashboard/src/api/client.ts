@@ -194,17 +194,20 @@ export const futuresApi = {
     postJson<FuturesPosition>(`/api/paper/futures/positions/${id}/close`, { commandId }),
 };
 
-// ---- Quy tắc tự mở lệnh Paper theo mức giá ----
+// ---- Quy tắc tự mở lệnh Paper theo mức giá hoặc theo chỉ báo ----
 
 export type TriggerCondition = 'AtOrBelow' | 'AtOrAbove';
+export type RuleTriggerType = 'Price' | 'Indicator';
 
 export interface AutoRule {
   id: number;
   environment: 'Paper';
   symbol: string;
   side: PositionSide;
-  condition: TriggerCondition;
-  triggerPrice: number;
+  triggerType: RuleTriggerType;
+  condition: TriggerCondition | null;
+  triggerPrice: number | null;
+  indicatorName: string | null;
   margin: number;
   leverage: number;
   stopLossPercent: number;
@@ -215,6 +218,7 @@ export interface AutoRule {
   triggeredMarkPrice: number | null;
   positionId: number | null;
   note: string | null;
+  triggerDetail: string | null;
 }
 
 export interface AutoSummary {
@@ -234,8 +238,12 @@ export interface AutoSummary {
 export interface CreateAutoRule {
   symbol: string;
   side: PositionSide;
-  condition: TriggerCondition;
-  triggerPrice: string;
+  triggerType: RuleTriggerType;
+  /** Chỉ với triggerType = 'Price'. */
+  condition: TriggerCondition | null;
+  triggerPrice: string | null;
+  /** Chỉ với triggerType = 'Indicator'. */
+  indicatorName: string | null;
   margin: string;
   leverage: number;
   stopLossPercent: string;
