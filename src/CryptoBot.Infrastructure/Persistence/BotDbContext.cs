@@ -79,9 +79,12 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
             e.Property(x => x.Environment).HasMaxLength(16);
             e.Property(x => x.Symbol).HasMaxLength(32);
             e.Property(x => x.Side).HasConversion<string>().HasMaxLength(8);
+            e.Property(x => x.TriggerType).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.Condition).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.IndicatorName).HasMaxLength(100);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.Note).HasMaxLength(500);
+            e.Property(x => x.TriggerDetail).HasMaxLength(500);
             e.HasIndex(x => x.CommandId).IsUnique();
             e.HasIndex(x => new { x.Environment, x.Status });
         });

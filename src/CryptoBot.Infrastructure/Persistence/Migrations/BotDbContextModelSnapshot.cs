@@ -27,7 +27,6 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Condition")
-                        .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("TEXT");
 
@@ -37,6 +36,10 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                     b.Property<string>("Environment")
                         .IsRequired()
                         .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IndicatorName")
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Leverage")
@@ -75,8 +78,16 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                     b.Property<string>("TakeProfitPercent")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("TriggerDetail")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("TriggerPrice")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TriggerType")
                         .IsRequired()
+                        .HasMaxLength(16)
                         .HasColumnType("TEXT");
 
                     b.Property<long?>("TriggeredAtUtc")
