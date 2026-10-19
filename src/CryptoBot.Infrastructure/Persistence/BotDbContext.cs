@@ -14,6 +14,7 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<TradingSignal> Signals => Set<TradingSignal>();
     public DbSet<FuturesPosition> FuturesPositions => Set<FuturesPosition>();
     public DbSet<PaperLedgerEntry> PaperLedger => Set<PaperLedgerEntry>();
+    public DbSet<AutoOrderRule> AutoOrderRules => Set<AutoOrderRule>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
@@ -70,6 +71,19 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
             // Chống mở trùng khi cùng một lệnh được gửi lại.
             e.HasIndex(x => new { x.Environment, x.OpenCommandId }).IsUnique();
             e.HasIndex(x => new { x.Environment, x.Status, x.Symbol });
+        });
+
+        b.Entity<AutoOrderRule>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Environment).HasMaxLength(16);
+            e.Property(x => x.Symbol).HasMaxLength(32);
+            e.Property(x => x.Side).HasConversion<string>().HasMaxLength(8);
+            e.Property(x => x.Condition).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.HasIndex(x => x.CommandId).IsUnique();
+            e.HasIndex(x => new { x.Environment, x.Status });
         });
 
         b.Entity<PaperLedgerEntry>(e =>

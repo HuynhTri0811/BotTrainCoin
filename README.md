@@ -56,6 +56,20 @@ Bấm mở → backend tính báo giá → hộp xác nhận hiện giá vào, k
 - **Chưa mô phỏng:** funding fee, bậc maintenance margin, order book/partial fill, cross margin, hedge mode.
 - Endpoint: `/api/paper/futures/{account, quote, orders, positions/{id}/close, positions/history}`.
 
+## Tự mở lệnh theo giá (Paper)
+
+Card "Tự mở lệnh theo giá" dưới panel Futures: đặt điều kiện `mark price ≤ / ≥ mức giá`, hướng Long/Short, margin, đòn bẩy, SL %, TP %.
+Khi mark price chạm mức, bot tự mở **một** lệnh Paper qua đúng `PaperFuturesService` (cùng kiểm tra SL/giá thanh lý/số dư/min notional) rồi quy tắc kết thúc.
+Chỉ chạy Paper; không có đường nào tới tiền thật.
+
+- Mặc định thận trọng (`AutoOrders` trong `appsettings.json`): margin 50 USDT, 2x, SL 1%, TP 2%, tối đa 10 quy tắc đang chạy.
+- SL/TP tính theo % so với **mark price lúc kích hoạt**, làm tròn theo tick của symbol.
+- Giới hạn lỗ ngày: nếu lỗ thực hiện (PnL đã chốt + phí) trong ngày UTC ≥ 5% vốn đầu ngày thì quy tắc không kích hoạt (giữ nguyên trạng thái chờ, hiện ghi chú "Bị chặn") cho đến 00:00 UTC.
+- Khi tạo, quy tắc bị từ chối nếu: điều kiện đã đúng ở giá hiện tại (tránh kích hoạt ngay), stop loss nằm sau giá thanh lý, margin × đòn bẩy không đủ một bước khối lượng ở mức giá đặt, hoặc quá số quy tắc tối đa.
+- Lúc kích hoạt nếu engine từ chối (thiếu số dư, đã có vị thế cùng symbol…) quy tắc chuyển "Bị từ chối" kèm lý do và không tự thử lại.
+- Không dùng mark price cũ hơn 10 giây. `commandId` của quy tắc cũng là commandId của lệnh mở nên xử lý lặp (crash/restart) không mở hai vị thế.
+- Endpoint: `GET/POST /api/paper/futures/auto-rules`, `POST /api/paper/futures/auto-rules/{id}/cancel`.
+
 ## Bảng giá trực tiếp (mỗi 15 giây)
 
 Panel trên cùng dashboard: mỗi `LivePrices:PollInterval` (mặc định 15s) backend lấy **Spot** (`/api/v3/ticker/price`) và **Mark Futures** (`/fapi/v1/premiumIndex`) song song cho từng symbol trong `LivePrices:Symbols`.

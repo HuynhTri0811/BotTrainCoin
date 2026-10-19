@@ -35,6 +35,8 @@ public sealed class PaperFuturesWorker(
                 }
 
                 await scope.ServiceProvider.GetRequiredService<PaperFuturesService>().EvaluateTriggersAsync(stoppingToken);
+                // Sau khi xử lý SL/TP/thanh lý của vị thế đang mở mới đến lượt các quy tắc tự mở lệnh.
+                await scope.ServiceProvider.GetRequiredService<AutoOrderService>().EvaluateAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

@@ -188,3 +188,25 @@ public sealed class PaperFuturesStore(BotDbContext db) : IPaperFuturesStore
 
     public Task SaveAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 }
+
+public sealed class AutoOrderStore(BotDbContext db) : IAutoOrderStore
+{
+    private const string Env = "Paper";
+
+    public async Task<IReadOnlyList<AutoOrderRule>> GetActiveAsync(CancellationToken ct) =>
+        await db.AutoOrderRules
+            .Where(r => r.Environment == Env && r.Status == AutoRuleStatus.Active)
+            .OrderBy(r => r.Id).ToListAsync(ct);
+
+    public async Task<IReadOnlyList<AutoOrderRule>> GetRecentAsync(int limit, CancellationToken ct) =>
+        await db.AutoOrderRules.AsNoTracking()
+            .Where(r => r.Environment == Env)
+            .OrderByDescending(r => r.Id).Take(limit).ToListAsync(ct);
+
+    public Task<AutoOrderRule?> GetAsync(long id, CancellationToken ct) =>
+        db.AutoOrderRules.FirstOrDefaultAsync(r => r.Environment == Env && r.Id == id, ct);
+
+    public void Add(AutoOrderRule rule) => db.AutoOrderRules.Add(rule);
+
+    public Task SaveAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
+}

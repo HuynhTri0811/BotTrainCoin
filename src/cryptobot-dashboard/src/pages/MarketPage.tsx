@@ -1,6 +1,7 @@
 import { Card, Col, Empty, Row, Space, Spin, Table, Tag, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { api, futuresApi, type Signal, type Strategy } from '../api/client';
+import { AutoOrdersCard } from '../features/auto/AutoOrdersCard';
 import { LivePricePanel } from '../features/live/LivePricePanel';
 import { PositionsCard } from '../features/futures/PositionsCard';
 import { TradePanel } from '../features/futures/TradePanel';
@@ -83,7 +84,10 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
           </Card>
         </Col>
         <Col xs={24} lg={8}>
-          <TradePanel symbol={strategy.symbol} account={account.data} />
+          <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+            <TradePanel symbol={strategy.symbol} account={account.data} />
+            <AutoOrdersCard symbol={strategy.symbol} account={account.data} />
+          </Space>
         </Col>
       </Row>
 
