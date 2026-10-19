@@ -4,10 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
   autoApi,
+  indicatorApi,
   type AutoRule,
   type CreateAutoRule,
   type FuturesAccount,
   type PositionSide,
+  type RuleTriggerType,
   type TriggerCondition,
 } from '../../api/client';
 import { formatVn } from '../../time';
@@ -20,11 +22,15 @@ const statusTag: Record<AutoRule['status'], { text: string; color: string }> = {
   Cancelled: { text: 'Đã hủy', color: 'default' },
 };
 
-const condText = (c: TriggerCondition) => (c === 'AtOrBelow' ? '≤' : '≥');
+const condText = (c: TriggerCondition | null) => (c === 'AtOrBelow' ? '≤' : '≥');
 
 function describe(r: CreateAutoRule) {
   const tp = r.takeProfitPercent ? `, TP +${r.takeProfitPercent}%` : '';
-  return `Khi mark price ${condText(r.condition)} ${r.triggerPrice}, tự mở ${r.side} ${r.symbol} ${r.leverage}x, ` +
+  const when =
+    r.triggerType === 'Indicator'
+      ? `Khi chỉ báo ${r.indicatorName} báo ${r.side} trên một nến đóng sau lúc này`
+      : `Khi mark price ${condText(r.condition)} ${r.triggerPrice}`;
+  return `${when}, tự mở ${r.side} ${r.symbol} ${r.leverage}x, ` +
     `margin ${r.margin} USDT, SL ${r.stopLossPercent}%${tp}. Chỉ chạy một lần, chỉ tiền giả lập (Paper).`;
 }
 
@@ -33,6 +39,15 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
   const summary = useQuery({ queryKey: ['auto-rules'], queryFn: autoApi.summary, refetchInterval: 3_000 });
   const d = summary.data?.defaults;
 
+  const indicators = useQuery({ queryKey: ['indicators'], queryFn: indicatorApi.list, staleTime: 60_000 });
+  const symbolIndicators = (indicators.data?.indicators ?? []).filter((i) => i.symbol === symbol);
+
+  const [triggerType, setTriggerType] = useState<RuleTriggerType>('Price');
+  const [pickedIndicator, setPickedIndicator] = useState<string | null>(null);
+  const indicatorName =
+    pickedIndicator && symbolIndicators.some((i) => i.name === pickedIndicator)
+      ? pickedIndicator
+      : (symbolIndicators[0]?.name ?? null);
   const [side, setSide] = useState<PositionSide>('Long');
   const [condition, setCondition] = useState<TriggerCondition>('AtOrBelow');
   const [trigger, setTrigger] = useState<string | null>(null);
@@ -47,7 +62,11 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
   const create = useMutation({
     mutationFn: autoApi.create,
     onSuccess: () => {
-      message.success('Đã tạo quy tắc. Bot sẽ theo dõi mark price mỗi 2 giây.');
+      message.success(
+        triggerType === 'Indicator'
+          ? 'Đã tạo quy tắc. Bot kiểm tra chỉ báo mỗi khi có nến mới đóng.'
+          : 'Đã tạo quy tắc. Bot sẽ theo dõi mark price mỗi 2 giây.',
+      );
       setTrigger(null);
       queryClient.invalidateQueries({ queryKey: ['auto-rules'] });
     },
@@ -64,15 +83,22 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
   });
 
   const submit = () => {
-    if (!trigger) {
+    const byIndicator = triggerType === 'Indicator';
+    if (byIndicator && !indicatorName) {
+      message.warning(`Chưa có chỉ báo nào cho ${symbol}. Khai báo trong appsettings.json → Indicators.`);
+      return;
+    }
+    if (!byIndicator && !trigger) {
       message.warning('Nhập giá kích hoạt.');
       return;
     }
     const req: CreateAutoRule = {
       symbol,
       side,
-      condition,
-      triggerPrice: trigger,
+      triggerType,
+      condition: byIndicator ? null : condition,
+      triggerPrice: byIndicator ? null : trigger,
+      indicatorName: byIndicator ? indicatorName : null,
       margin: margin ?? String(d?.margin ?? 50),
       leverage: leverage ?? d?.leverage ?? 2,
       stopLossPercent: sl ?? String(d?.stopLossPercent ?? 1),
@@ -95,7 +121,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
       size="small"
       title={
         <Space size={4}>
-          <span>Tự mở lệnh theo giá</span>
+          <span>Tự mở lệnh theo giá / chỉ báo</span>
           <Tag color="blue">PAPER</Tag>
         </Space>
       }
@@ -117,25 +143,49 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
       </Typography.Text>
 
       <Space orientation="vertical" size="small" style={{ width: '100%', marginTop: 4 }}>
-        <Space.Compact block>
-          <Select<TriggerCondition>
-            value={condition}
-            onChange={setCondition}
-            style={{ width: 150 }}
-            options={[
-              { value: 'AtOrBelow', label: 'Giá ≤ (mua khi giảm)' },
-              { value: 'AtOrAbove', label: 'Giá ≥ (khi tăng)' },
-            ]}
-          />
-          <InputNumber<string>
-            stringMode
-            min="0"
-            value={trigger}
-            onChange={setTrigger}
-            placeholder="giá kích hoạt"
+        <Segmented<RuleTriggerType>
+          block
+          value={triggerType}
+          onChange={setTriggerType}
+          options={[
+            { label: 'Theo giá', value: 'Price' },
+            { label: 'Theo chỉ báo', value: 'Indicator' },
+          ]}
+        />
+
+        {triggerType === 'Indicator' ? (
+          <Select<string>
+            value={indicatorName ?? undefined}
+            onChange={setPickedIndicator}
+            placeholder={`Chưa có chỉ báo cho ${symbol}`}
+            disabled={symbolIndicators.length === 0}
             style={{ width: '100%' }}
+            options={symbolIndicators.map((i) => ({
+              value: i.name,
+              label: `${i.name} · ${i.type} · ${i.interval}`,
+            }))}
           />
-        </Space.Compact>
+        ) : (
+          <Space.Compact block>
+            <Select<TriggerCondition>
+              value={condition}
+              onChange={setCondition}
+              style={{ width: 150 }}
+              options={[
+                { value: 'AtOrBelow', label: 'Giá ≤ (mua khi giảm)' },
+                { value: 'AtOrAbove', label: 'Giá ≥ (khi tăng)' },
+              ]}
+            />
+            <InputNumber<string>
+              stringMode
+              min="0"
+              value={trigger}
+              onChange={setTrigger}
+              placeholder="giá kích hoạt"
+              style={{ width: '100%' }}
+            />
+          </Space.Compact>
+        )}
 
         <Segmented
           block
@@ -191,7 +241,8 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
       </Space>
 
       <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '8px 0' }}>
-        Chạy một lần khi mark price chạm mức. SL/TP tính theo % so với mark lúc kích hoạt. Mặc định thận trọng: tối đa{' '}
+        Chạy một lần khi mark price chạm mức, hoặc khi chỉ báo phát tín hiệu cùng hướng (Long/Short) trên nến
+        đóng sau lúc tạo quy tắc. SL/TP tính theo % so với mark lúc kích hoạt. Mặc định thận trọng: tối đa{' '}
         {d?.maxActiveRules ?? 10} quy tắc, một vị thế mỗi symbol, dừng khi lỗ trong ngày quá {d?.dailyLossLimitPercent ?? 5}%.
       </Typography.Paragraph>
 
@@ -209,7 +260,16 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
             key: 'rule',
             render: (_, r) => (
               <span>
-                {r.symbol} {condText(r.condition)} {fmtPrice(r.triggerPrice)} →{' '}
+                {r.triggerType === 'Indicator' ? (
+                  <>
+                    {r.symbol} <Tag color="purple">{r.indicatorName}</Tag>
+                  </>
+                ) : (
+                  <>
+                    {r.symbol} {condText(r.condition)} {fmtPrice(r.triggerPrice)}
+                  </>
+                )}{' '}
+                →{' '}
                 <Tag color={r.side === 'Long' ? 'green' : 'red'}>
                   {r.side} {r.leverage}x
                 </Tag>
@@ -225,6 +285,11 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
                 {r.note && (
                   <Typography.Text type={r.status === 'Rejected' ? 'danger' : 'warning'} style={{ fontSize: 12 }}>
                     {r.note}
+                  </Typography.Text>
+                )}
+                {r.triggerDetail && (
+                  <Typography.Text type="secondary" style={{ fontSize: 12, maxWidth: 260 }}>
+                    {r.triggerDetail}
                   </Typography.Text>
                 )}
                 {r.triggeredAtUtc && (

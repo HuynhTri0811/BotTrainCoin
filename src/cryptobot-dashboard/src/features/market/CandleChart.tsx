@@ -12,14 +12,18 @@ import {
   type IPriceLine,
   type ISeriesApi,
   type ISeriesMarkersPluginApi,
+  type SeriesMarker,
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts';
-import type { ChartPoint, FuturesPosition, Signal } from '../../api/client';
+import type { ChartPoint, FuturesPosition, IndicatorChart, Signal } from '../../api/client';
 import { formatVnTick, formatVnUnix } from '../../time';
 
 const FAST_COLOR = '#d97706';
 const SLOW_COLOR = '#2563eb';
+export const INDICATOR_MARKER_COLOR = '#7c3aed';
+const CHART_HEIGHT = 480;
+const INDICATOR_PANE_HEIGHT = 160;
 
 interface Props {
   candles: ChartPoint[];
@@ -28,6 +32,8 @@ interface Props {
   slowLabel: string;
   /** Vị thế paper futures đang mở trên symbol này: vẽ Entry/SL/TP/Thanh lý. */
   position?: FuturesPosition;
+  /** Chỉ báo tự viết cùng symbol/khung nến: đường overlay vẽ trên nến, còn lại vẽ ở khung bên dưới. */
+  indicator?: IndicatorChart;
 }
 
 interface Handles {
@@ -38,11 +44,16 @@ interface Handles {
   markers: ISeriesMarkersPluginApi<Time>;
 }
 
-export function CandleChart({ candles, signals, fastLabel, slowLabel, position }: Props) {
+export function CandleChart({ candles, signals, fastLabel, slowLabel, position, indicator }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const handles = useRef<Handles | null>(null);
   const fitted = useRef(false);
   const priceLines = useRef<IPriceLine[]>([]);
+  const indicatorSeries = useRef(new Map<string, ISeriesApi<'Line'>>());
+
+  // Chỉ tạo lại series khi danh sách đường thay đổi, không phải mỗi lần dữ liệu được làm mới.
+  const linesKey = JSON.stringify(indicator?.indicator.lines ?? []);
+  const hasPane = (indicator?.indicator.lines ?? []).some((l) => !l.overlay);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -105,20 +116,66 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position }
     h.slow.setData(
       candles.filter((c) => c.slowEma !== null).map((c) => ({ time: c.time as UTCTimestamp, value: c.slowEma! })),
     );
-    h.markers.setMarkers(
-      signals.map((s) =>
-        s.action === 'Buy'
-          ? { time: s.time as UTCTimestamp, position: 'belowBar', color: '#16a34a', shape: 'arrowUp', text: 'BUY' }
-          : { time: s.time as UTCTimestamp, position: 'aboveBar', color: '#dc2626', shape: 'arrowDown', text: 'SELL' },
-      ),
-    );
-
     if (!fitted.current && candles.length > 0) {
       fitted.current = true;
       // autoSize đo kích thước bất đồng bộ; fit sau frame kế tiếp để dùng đúng chiều rộng.
       requestAnimationFrame(() => handles.current?.chart.timeScale().fitContent());
     }
-  }, [candles, signals]);
+  }, [candles]);
+
+  useEffect(() => {
+    const h = handles.current;
+    if (!h) return;
+    const lines = JSON.parse(linesKey) as IndicatorChart['indicator']['lines'];
+    const created = lines.map((l) => {
+      const series = h.chart.addSeries(
+        LineSeries,
+        { color: l.color, lineWidth: 2, title: l.title, priceLineVisible: false },
+        l.overlay ? 0 : 1,
+      );
+      for (const level of l.levels)
+        series.createPriceLine({ price: level, color: '#94a3b8', lineStyle: LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: '' });
+      return [l.key, series] as const;
+    });
+    indicatorSeries.current = new Map(created);
+    if (lines.some((l) => !l.overlay)) h.chart.panes()[1]?.setHeight(INDICATOR_PANE_HEIGHT);
+
+    return () => {
+      // Khi chart bị tạo lại, chart cũ đã bị remove cùng các series.
+      const chart = handles.current?.chart;
+      if (chart) for (const [, series] of created) chart.removeSeries(series);
+      indicatorSeries.current = new Map();
+    };
+  }, [linesKey, fastLabel, slowLabel]);
+
+  useEffect(() => {
+    for (const [key, series] of indicatorSeries.current) {
+      series.setData(
+        (indicator?.points ?? [])
+          .filter((p) => p.values[key] != null)
+          .map((p) => ({ time: p.time as UTCTimestamp, value: p.values[key]! })),
+      );
+    }
+  }, [indicator, linesKey, fastLabel, slowLabel]);
+
+  useEffect(() => {
+    const h = handles.current;
+    if (!h) return;
+    const markers: SeriesMarker<Time>[] = signals.map((s) =>
+      s.action === 'Buy'
+        ? { time: s.time as UTCTimestamp, position: 'belowBar', color: '#16a34a', shape: 'arrowUp', text: 'BUY' }
+        : { time: s.time as UTCTimestamp, position: 'aboveBar', color: '#dc2626', shape: 'arrowDown', text: 'SELL' },
+    );
+    // Tín hiệu của chỉ báo tự viết: chấm tím, khác mũi tên BUY/SELL của chiến lược EMA.
+    for (const m of indicator?.markers ?? [])
+      markers.push(
+        m.signal === 'Long'
+          ? { time: m.time as UTCTimestamp, position: 'belowBar', color: INDICATOR_MARKER_COLOR, shape: 'circle', text: 'L' }
+          : { time: m.time as UTCTimestamp, position: 'aboveBar', color: INDICATOR_MARKER_COLOR, shape: 'circle', text: 'S' },
+      );
+    markers.sort((a, b) => (a.time as number) - (b.time as number));
+    h.markers.setMarkers(markers);
+  }, [signals, indicator, fastLabel, slowLabel]);
 
   useEffect(() => {
     const h = handles.current;
@@ -137,7 +194,12 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position }
     add(position.liquidationPrice, 'Thanh lý', '#9333ea', LineStyle.Dotted);
   }, [position, fastLabel, slowLabel]);
 
-  return <div ref={containerRef} style={{ width: '100%', height: 480 }} />;
+  return (
+    <div
+      ref={containerRef}
+      style={{ width: '100%', height: CHART_HEIGHT + (hasPane ? INDICATOR_PANE_HEIGHT : 0) }}
+    />
+  );
 }
 
 export const EMA_COLORS = { fast: FAST_COLOR, slow: SLOW_COLOR };

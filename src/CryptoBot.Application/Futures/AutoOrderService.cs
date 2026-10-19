@@ -1,5 +1,7 @@
 using CryptoBot.Application.Abstractions;
+using CryptoBot.Application.Indicators;
 using CryptoBot.Domain.Futures;
+using CryptoBot.Domain.Indicators;
 using Microsoft.Extensions.Logging;
 
 namespace CryptoBot.Application.Futures;
@@ -29,12 +31,14 @@ public interface IAutoOrderStore
 public sealed record CreateRuleRequest(
     string Symbol,
     PositionSide Side,
-    TriggerCondition Condition,
-    decimal TriggerPrice,
+    TriggerCondition? Condition,
+    decimal? TriggerPrice,
     decimal Margin,
     int Leverage,
     decimal StopLossPercent,
-    decimal? TakeProfitPercent);
+    decimal? TakeProfitPercent,
+    RuleTriggerType TriggerType = RuleTriggerType.Price,
+    string? IndicatorName = null);
 
 public sealed record CreateRuleResult(AutoOrderRule? Rule, IReadOnlyList<string> Errors);
 
@@ -51,7 +55,7 @@ public sealed record AutoOrderSummary(
     DailyRiskState Risk);
 
 /// <summary>
-/// Quy tắc tự mở lệnh Paper theo mức giá. Mọi lệnh vẫn đi qua <see cref="PaperFuturesService"/>
+/// Quy tắc tự mở lệnh Paper theo mức giá hoặc theo tín hiệu chỉ báo tự viết. Mọi lệnh vẫn đi qua <see cref="PaperFuturesService"/>
 /// (cùng kiểm tra SL/giá thanh lý/số dư/min notional). Chỉ chạy Paper, không có đường tới tiền thật.
 /// </summary>
 public sealed class AutoOrderService(
@@ -59,6 +63,8 @@ public sealed class AutoOrderService(
     IPaperFuturesStore paperStore,
     PaperFuturesService paper,
     MarkPriceCache marks,
+    IndicatorService indicators,
+    IndicatorRegistry indicatorRegistry,
     PaperFuturesOptions paperOptions,
     AutoOrderOptions options,
     IClock clock,
@@ -66,26 +72,59 @@ public sealed class AutoOrderService(
 {
     public async Task<CreateRuleResult> CreateAsync(CreateRuleRequest r, CancellationToken ct)
     {
-        var errors = Validate(r);
         var current = marks.GetFresh(r.Symbol);
-        if (current is null)
-            errors.Add("Chưa có mark price mới; chưa thể tạo quy tắc.");
-        else if (new AutoOrderRule(r.Symbol, r.Side, r.Condition, r.TriggerPrice, r.Margin, r.Leverage,
-                     r.StopLossPercent, r.TakeProfitPercent, clock.UtcNow).IsMet(current.Price))
-            errors.Add($"Giá hiện tại {current.Price} đã thỏa điều kiện; quy tắc sẽ kích hoạt ngay. " +
-                       "Đặt mức giá xa hơn nếu bạn muốn chờ.");
+        var errors = new List<string>();
+        AutoOrderRule? rule = null;
+
+        if (r.TriggerType == RuleTriggerType.Indicator)
+        {
+            if (indicatorRegistry.Find(r.IndicatorName) is not { } ind)
+                errors.Add($"Không có chỉ báo '{r.IndicatorName}' trong cấu hình.");
+            else if (!string.Equals(ind.Key.Symbol, r.Symbol, StringComparison.OrdinalIgnoreCase))
+                errors.Add($"Chỉ báo '{ind.Name}' chạy trên {ind.Key.Symbol}, không phải {r.Symbol}.");
+            if (current is null)
+                errors.Add("Chưa có mark price mới; chưa thể tạo quy tắc.");
+            else
+                // Không có giá kích hoạt: kiểm tra khối lượng/SL theo giá hiện tại (ước tính).
+                errors.AddRange(Validate(r, current.Price));
+            if (errors.Count == 0)
+                rule = AutoOrderRule.ForIndicator(r.Symbol, r.Side, indicatorRegistry.Find(r.IndicatorName)!.Name,
+                    r.Margin, r.Leverage, r.StopLossPercent, r.TakeProfitPercent, clock.UtcNow);
+        }
+        else if (r.TriggerType == RuleTriggerType.Price)
+        {
+            if (r.Condition is not { } cond || !Enum.IsDefined(cond)) errors.Add("Điều kiện không hợp lệ.");
+            if (r.TriggerPrice is not > 0) errors.Add("Giá kích hoạt phải lớn hơn 0.");
+            if (errors.Count == 0)
+            {
+                errors.AddRange(Validate(r, r.TriggerPrice!.Value));
+                rule = new AutoOrderRule(r.Symbol, r.Side, r.Condition!.Value, r.TriggerPrice!.Value, r.Margin,
+                    r.Leverage, r.StopLossPercent, r.TakeProfitPercent, clock.UtcNow);
+                if (current is null)
+                    errors.Add("Chưa có mark price mới; chưa thể tạo quy tắc.");
+                else if (rule.IsMet(current.Price))
+                    errors.Add($"Giá hiện tại {current.Price} đã thỏa điều kiện; quy tắc sẽ kích hoạt ngay. " +
+                               "Đặt mức giá xa hơn nếu bạn muốn chờ.");
+            }
+        }
+        else
+        {
+            errors.Add("Kiểu kích hoạt không hợp lệ.");
+        }
 
         if (errors.Count == 0 && (await store.GetActiveAsync(ct)).Count >= options.MaxActiveRules)
             errors.Add($"Đã có tối đa {options.MaxActiveRules} quy tắc đang chạy. Hủy bớt trước khi tạo mới.");
-        if (errors.Count > 0)
+        if (errors.Count > 0 || rule is null)
             return new CreateRuleResult(null, errors);
 
-        var rule = new AutoOrderRule(r.Symbol, r.Side, r.Condition, r.TriggerPrice, r.Margin, r.Leverage,
-            r.StopLossPercent, r.TakeProfitPercent, clock.UtcNow);
         store.Add(rule);
         await store.SaveAsync(ct);
-        logger.LogInformation("Auto rule #{Id}: khi {Symbol} {Cond} {Price} -> mở {Side} {Lev}x margin {Margin}",
-            rule.Id, rule.Symbol, rule.Condition, rule.TriggerPrice, rule.Side, rule.Leverage, rule.Margin);
+        if (rule.TriggerType == RuleTriggerType.Indicator)
+            logger.LogInformation("Auto rule #{Id}: khi chỉ báo {Indicator} báo {Side} -> mở {Side} {Lev}x margin {Margin}",
+                rule.Id, rule.IndicatorName, rule.Side, rule.Side, rule.Leverage, rule.Margin);
+        else
+            logger.LogInformation("Auto rule #{Id}: khi {Symbol} {Cond} {Price} -> mở {Side} {Lev}x margin {Margin}",
+                rule.Id, rule.Symbol, rule.Condition, rule.TriggerPrice, rule.Side, rule.Leverage, rule.Margin);
         return new CreateRuleResult(rule, []);
     }
 
@@ -109,11 +148,27 @@ public sealed class AutoOrderService(
         DailyRiskState? risk = null;
         var fired = 0;
         var changed = false;
+        var readings = new Dictionary<string, IndicatorReading?>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var rule in active)
         {
-            if (marks.GetFresh(rule.Symbol) is not { } mark || !rule.IsMet(mark.Price))
+            if (marks.GetFresh(rule.Symbol) is not { } mark)
                 continue;
+
+            string? detail = null;
+            if (rule.TriggerType == RuleTriggerType.Indicator)
+            {
+                var name = rule.IndicatorName!;
+                if (!readings.TryGetValue(name, out var reading))
+                    readings[name] = reading = await indicators.GetLatestAsync(name, ct);
+                if (!IndicatorFired(rule, reading))
+                    continue;
+                detail = Describe(reading!);
+            }
+            else if (!rule.IsMet(mark.Price))
+            {
+                continue;
+            }
 
             risk ??= await GetRiskAsync(ct);
             if (risk.Blocked)
@@ -127,14 +182,14 @@ public sealed class AutoOrderService(
             var result = await paper.OpenAsync(request, ct);
             if (result.Position is { } position)
             {
-                rule.MarkTriggered(mark.Price, position.Id, clock.UtcNow);
+                rule.MarkTriggered(mark.Price, position.Id, clock.UtcNow, detail);
                 fired++;
                 logger.LogWarning("Auto rule #{Id} KÍCH HOẠT: {Symbol} mark {Mark} -> {Side} {Qty} @ {Entry}",
                     rule.Id, rule.Symbol, mark.Price, position.Side, position.Quantity, position.EntryPrice);
             }
             else
             {
-                rule.MarkRejected(mark.Price, string.Join(" ", result.Quote.Errors), clock.UtcNow);
+                rule.MarkRejected(mark.Price, string.Join(" ", result.Quote.Errors), clock.UtcNow, detail);
                 logger.LogWarning("Auto rule #{Id} bị từ chối: {Reason}", rule.Id, rule.Note);
             }
 
@@ -144,6 +199,35 @@ public sealed class AutoOrderService(
         if (changed)
             await store.SaveAsync(ct);
         return fired;
+    }
+
+    /// <summary>
+    /// Tín hiệu chỉ được dùng khi: nến đã đóng SAU lúc tạo quy tắc (không ăn tín hiệu cũ), nến là nến mới nhất
+    /// đáng lẽ phải có (dữ liệu không bị trễ quá một khung + biên), và tín hiệu cùng hướng với quy tắc.
+    /// </summary>
+    private bool IndicatorFired(AutoOrderRule rule, IndicatorReading? reading)
+    {
+        if (reading is null || reading.Result.Signal == IndicatorSignal.None)
+            return false;
+        var candle = reading.Candle;
+        if (candle.CloseTimeUtc <= rule.CreatedAtUtc)
+            return false;
+        if (clock.UtcNow - candle.CloseTimeUtc > reading.Indicator.Key.Interval.Duration + IndicatorStaleGrace)
+            return false;
+        return reading.Result.Signal == (rule.Side == PositionSide.Long ? IndicatorSignal.Long : IndicatorSignal.Short);
+    }
+
+    /// <summary>Thời gian chờ đồng bộ nến sau khi nến đóng trước khi coi dữ liệu là trễ.</summary>
+    public static readonly TimeSpan IndicatorStaleGrace = TimeSpan.FromMinutes(2);
+
+    private static string Describe(IndicatorReading r)
+    {
+        var values = string.Join(", ", r.Result.Values.Where(v => v.Value is not null)
+            .Select(v => $"{v.Key}={v.Value:0.####}"));
+        var text = $"{r.Indicator.Name} nến {r.Candle.OpenTimeUtc:yyyy-MM-dd HH:mm} UTC: {r.Result.Reason}";
+        if (values.Length > 0)
+            text += $" [{values}]";
+        return text.Length <= 500 ? text : text[..500];
     }
 
     public async Task<AutoOrderSummary> GetSummaryAsync(CancellationToken ct) =>
@@ -181,7 +265,8 @@ public sealed class AutoOrderService(
         return new OpenPositionRequest(rule.CommandId, rule.Symbol, rule.Side, rule.Leverage, rule.Margin, stop, take);
     }
 
-    private List<string> Validate(CreateRuleRequest r)
+    /// <summary>Kiểm tra margin/đòn bẩy/SL. <paramref name="refPrice"/>: giá kích hoạt, hoặc giá hiện tại với quy tắc chỉ báo.</summary>
+    private List<string> Validate(CreateRuleRequest r, decimal refPrice)
     {
         var errors = new List<string>();
         var rules = paperOptions.FindRules(r.Symbol);
@@ -192,8 +277,6 @@ public sealed class AutoOrderService(
         }
 
         if (!Enum.IsDefined(r.Side)) errors.Add("Hướng lệnh không hợp lệ.");
-        if (!Enum.IsDefined(r.Condition)) errors.Add("Điều kiện không hợp lệ.");
-        if (r.TriggerPrice <= 0) errors.Add("Giá kích hoạt phải lớn hơn 0.");
         if (r.Margin <= 0) errors.Add("Margin phải lớn hơn 0.");
         if (r.Leverage < 1 || r.Leverage > paperOptions.MaxLeverage)
             errors.Add($"Đòn bẩy phải từ 1 đến {paperOptions.MaxLeverage}x.");
@@ -204,17 +287,17 @@ public sealed class AutoOrderService(
         if (errors.Count > 0)
             return errors;
 
-        var qtyAtTrigger = FuturesMath.RoundDown(r.Margin * r.Leverage / r.TriggerPrice, rules.QuantityStep);
+        var qtyAtTrigger = FuturesMath.RoundDown(r.Margin * r.Leverage / refPrice, rules.QuantityStep);
         if (qtyAtTrigger <= 0)
-            errors.Add($"Ở giá {r.TriggerPrice:0.##}, margin × đòn bẩy = {r.Margin * r.Leverage:0.##} USDT không đủ mua " +
+            errors.Add($"Ở giá {refPrice:0.##}, margin × đòn bẩy = {r.Margin * r.Leverage:0.##} USDT không đủ mua " +
                        $"một bước khối lượng ({rules.QuantityStep}). Tăng margin hoặc đòn bẩy.");
         else if (r.Margin * r.Leverage < rules.MinNotional)
             errors.Add($"Margin × đòn bẩy = {r.Margin * r.Leverage:0.##} USDT nhỏ hơn giá trị vị thế tối thiểu {rules.MinNotional} USDT.");
 
         // Stop loss phải nằm trước giá thanh lý (ước tính tại giá kích hoạt).
-        var liq = FuturesMath.LiquidationPrice(r.Side, r.TriggerPrice, r.Leverage, rules.MaintenanceMarginRate);
+        var liq = FuturesMath.LiquidationPrice(r.Side, refPrice, r.Leverage, rules.MaintenanceMarginRate);
         var dir = r.Side == PositionSide.Long ? 1m : -1m;
-        var stop = r.TriggerPrice * (1 - dir * r.StopLossPercent / 100m);
+        var stop = refPrice * (1 - dir * r.StopLossPercent / 100m);
         if (r.Side == PositionSide.Long ? stop <= liq : stop >= liq)
             errors.Add($"Stop loss {r.StopLossPercent}% nằm sau giá thanh lý ước tính {liq:0.##} ở đòn bẩy {r.Leverage}x. " +
                        "Giảm đòn bẩy hoặc giảm % stop loss.");

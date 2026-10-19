@@ -3,7 +3,7 @@ using CryptoBot.Domain.Futures;
 
 namespace CryptoBot.Api.Endpoints;
 
-/// <summary>Quy tắc tự mở lệnh Paper theo mức giá. Môi trường Paper nằm trong đường dẫn.</summary>
+/// <summary>Quy tắc tự mở lệnh Paper theo mức giá hoặc theo chỉ báo. Môi trường Paper nằm trong đường dẫn.</summary>
 public static class AutoOrderEndpoints
 {
     public static void MapAutoOrderEndpoints(this IEndpointRouteBuilder app)
@@ -23,12 +23,21 @@ public static class AutoOrderEndpoints
 
         api.MapPost("", async (CreateRuleDto body, AutoOrderService svc, CancellationToken ct) =>
         {
+            var type = RuleTriggerType.Price;
+            TriggerCondition? cond = null;
             if (!Enum.TryParse<PositionSide>(body.Side, true, out var side) ||
-                !Enum.TryParse<TriggerCondition>(body.Condition, true, out var cond))
-                return Results.BadRequest(new { errors = new[] { "Side hoặc Condition không hợp lệ." } });
+                (body.TriggerType is not null && !Enum.TryParse(body.TriggerType, true, out type)))
+                return Results.BadRequest(new { errors = new[] { "Side hoặc TriggerType không hợp lệ." } });
+            if (type == RuleTriggerType.Price)
+            {
+                if (!Enum.TryParse<TriggerCondition>(body.Condition, true, out var c))
+                    return Results.BadRequest(new { errors = new[] { "Condition không hợp lệ." } });
+                cond = c;
+            }
 
             var result = await svc.CreateAsync(new CreateRuleRequest((body.Symbol ?? "").ToUpperInvariant(), side,
-                cond, body.TriggerPrice, body.Margin, body.Leverage, body.StopLossPercent, body.TakeProfitPercent), ct);
+                cond, body.TriggerPrice, body.Margin, body.Leverage, body.StopLossPercent, body.TakeProfitPercent,
+                type, body.IndicatorName), ct);
             return result.Rule is { } rule
                 ? Results.Ok(ToDto(rule))
                 : Results.UnprocessableEntity(new { errors = result.Errors });
@@ -41,17 +50,20 @@ public static class AutoOrderEndpoints
     }
 
     private static AutoRuleDto ToDto(AutoOrderRule r) => new(r.Id, r.Environment, r.Symbol, r.Side.ToString(),
-        r.Condition.ToString(), r.TriggerPrice, r.Margin, r.Leverage, r.StopLossPercent, r.TakeProfitPercent,
-        r.Status.ToString(), r.CreatedAtUtc, r.TriggeredAtUtc, r.TriggeredMarkPrice, r.PositionId, r.Note);
+        r.TriggerType.ToString(), r.Condition?.ToString(), r.TriggerPrice, r.IndicatorName, r.Margin, r.Leverage,
+        r.StopLossPercent, r.TakeProfitPercent, r.Status.ToString(), r.CreatedAtUtc, r.TriggeredAtUtc,
+        r.TriggeredMarkPrice, r.PositionId, r.Note, r.TriggerDetail);
 }
 
-public sealed record CreateRuleDto(string Symbol, string Side, string Condition, decimal TriggerPrice, decimal Margin,
-    int Leverage, decimal StopLossPercent, decimal? TakeProfitPercent);
+/// <summary>TriggerType: "Price" (mặc định, cần Condition + TriggerPrice) hoặc "Indicator" (cần IndicatorName).</summary>
+public sealed record CreateRuleDto(string Symbol, string Side, string? Condition, decimal? TriggerPrice, decimal Margin,
+    int Leverage, decimal StopLossPercent, decimal? TakeProfitPercent, string? TriggerType = null,
+    string? IndicatorName = null);
 
-public sealed record AutoRuleDto(long Id, string Environment, string Symbol, string Side, string Condition,
-    decimal TriggerPrice, decimal Margin, int Leverage, decimal StopLossPercent, decimal? TakeProfitPercent,
-    string Status, DateTime CreatedAtUtc, DateTime? TriggeredAtUtc, decimal? TriggeredMarkPrice, long? PositionId,
-    string? Note);
+public sealed record AutoRuleDto(long Id, string Environment, string Symbol, string Side, string TriggerType,
+    string? Condition, decimal? TriggerPrice, string? IndicatorName, decimal Margin, int Leverage,
+    decimal StopLossPercent, decimal? TakeProfitPercent, string Status, DateTime CreatedAtUtc,
+    DateTime? TriggeredAtUtc, decimal? TriggeredMarkPrice, long? PositionId, string? Note, string? TriggerDetail);
 
 public sealed record AutoDefaultsDto(decimal Margin, int Leverage, decimal StopLossPercent, decimal TakeProfitPercent,
     decimal DailyLossLimitPercent, int MaxActiveRules);

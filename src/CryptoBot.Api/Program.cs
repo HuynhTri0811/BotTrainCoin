@@ -2,6 +2,7 @@ using System.Globalization;
 using CryptoBot.Api.Endpoints;
 using CryptoBot.Api.Workers;
 using CryptoBot.Application.Futures;
+using CryptoBot.Application.Indicators;
 using CryptoBot.Application.Signals;
 using CryptoBot.Infrastructure;
 using Serilog;
@@ -29,6 +30,8 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 var app = builder.Build();
 
 await DependencyInjection.InitializeDatabaseAsync(app.Services, CancellationToken.None);
+// Tạo registry ngay để lỗi cấu hình chỉ báo hiện trong log lúc khởi động.
+app.Services.GetRequiredService<IndicatorRegistry>();
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var definitions = app.Configuration.GetSection("Strategies").Get<List<StrategyDefinition>>() ?? [];
@@ -48,6 +51,7 @@ app.UseStaticFiles();
 app.MapBotEndpoints();
 app.MapPaperFuturesEndpoints();
 app.MapAutoOrderEndpoints();
+app.MapIndicatorEndpoints();
 app.MapLivePriceEndpoints();
 // API không tồn tại phải là 404 JSON, không bao giờ rơi vào trang SPA.
 app.MapFallback("/api/{**path}", () => Results.NotFound(new { error = "Endpoint không tồn tại" }));

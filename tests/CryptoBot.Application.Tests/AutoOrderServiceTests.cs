@@ -1,4 +1,7 @@
+using CryptoBot.Application.Abstractions;
 using CryptoBot.Application.Futures;
+using CryptoBot.Application.Indicators;
+using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Futures;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -45,6 +48,7 @@ public class AutoOrderServiceTests
     private readonly AutoOrderOptions _options = new();
     private readonly MarkPriceCache _marks;
     private readonly PaperFuturesService _paper;
+    private readonly InMemoryCandleStore _candles = new();
     private readonly AutoOrderService _svc;
 
     public AutoOrderServiceTests()
@@ -52,8 +56,17 @@ public class AutoOrderServiceTests
         _marks = new MarkPriceCache(_clock, _paperOptions);
         _paper = new PaperFuturesService(_paperStore, _marks, new PaperFuturesLock(), _paperOptions, _clock,
             NullLogger<PaperFuturesService>.Instance);
-        _svc = new AutoOrderService(_ruleStore, _paperStore, _paper, _marks, _paperOptions, _options, _clock,
-            NullLogger<AutoOrderService>.Instance);
+        // RSI(2) trên 5 nến 1h: dễ dựng chuỗi giá cắt lên 30 / cắt xuống 70.
+        var registry = new IndicatorRegistry(
+        [
+            new IndicatorDefinition
+            {
+                Name = "rsi-test", Type = "MyRsi", Symbol = "BTCUSDT", Interval = "1h",
+                Parameters = new() { ["Period"] = "2", ["LookbackCandles"] = "5" },
+            },
+        ], NullLogger<IndicatorRegistry>.Instance);
+        _svc = new AutoOrderService(_ruleStore, _paperStore, _paper, _marks, new IndicatorService(registry, _candles),
+            registry, _paperOptions, _options, _clock, NullLogger<AutoOrderService>.Instance);
         SetMark(100_000m);
         _paper.EnsureFundedAsync(default).GetAwaiter().GetResult();
     }
@@ -272,5 +285,121 @@ public class AutoOrderServiceTests
 
         Assert.Null(third.Rule);
         Assert.Contains(third.Errors, e => e.Contains("tối đa 2"));
+    }
+
+    // ── Quy tắc theo chỉ báo ──────────────────────────────────────────────────
+
+    private static readonly decimal[] RsiCrossUp = [100m, 99m, 98m, 97m, 110m];   // RSI 0 → ~92.9: Long
+    private static readonly decimal[] RsiCrossDown = [100m, 101m, 102m, 103m, 90m]; // RSI 100 → ~7.1: Short
+
+    /// <summary>Thêm các nến 1h đã đóng, nến cuối mở lúc <paramref name="lastOpen"/>.</summary>
+    private void AddCandles(DateTime lastOpen, decimal[] closes)
+    {
+        for (var i = 0; i < closes.Length; i++)
+        {
+            var open = lastOpen - TimeSpan.FromHours(closes.Length - 1 - i);
+            _candles.Candles[open] = new Candle("Binance", "BTCUSDT", CandleInterval.H1, open,
+                closes[i], closes[i], closes[i], closes[i], 1m, true, open);
+        }
+    }
+
+    private static CreateRuleRequest OnIndicator(PositionSide side = PositionSide.Long, string name = "rsi-test",
+        string symbol = "BTCUSDT") =>
+        new(symbol, side, null, null, 50m, 2, 1m, 2m, RuleTriggerType.Indicator, name);
+
+    private void AdvanceTo(DateTime now)
+    {
+        _clock.UtcNow = now;
+        SetMark(100_000m);
+    }
+
+    [Fact]
+    public async Task Indicator_rule_fires_on_matching_signal_from_candle_closed_after_creation()
+    {
+        var rule = await CreateRule(OnIndicator());
+        AddCandles(T0, RsiCrossUp);                 // nến mở 12:00, đóng 13:00 (sau lúc tạo 12:00)
+        AdvanceTo(T0.AddHours(1).AddSeconds(30));
+
+        Assert.Equal(1, await _svc.EvaluateAsync(default));
+
+        var p = Assert.Single(_paperStore.Positions);
+        Assert.Equal(PositionSide.Long, p.Side);
+        Assert.Equal(99_000m, p.StopLoss);           // SL/TP theo mark lúc kích hoạt, như quy tắc theo giá
+        Assert.Equal(AutoRuleStatus.Triggered, rule.Status);
+        Assert.Contains("rsi-test", rule.TriggerDetail);
+        Assert.Contains("RSI cắt lên", rule.TriggerDetail);
+    }
+
+    [Fact]
+    public async Task Indicator_rule_ignores_signal_on_candle_closed_before_creation()
+    {
+        AddCandles(T0.AddHours(-1), RsiCrossUp);    // đóng đúng 12:00 = lúc tạo quy tắc
+        await CreateRule(OnIndicator());
+        AdvanceTo(T0.AddMinutes(1));
+
+        Assert.Equal(0, await _svc.EvaluateAsync(default));
+        Assert.Empty(_paperStore.Positions);
+    }
+
+    [Fact]
+    public async Task Indicator_rule_ignores_stale_candles()
+    {
+        await CreateRule(OnIndicator());
+        AddCandles(T0, RsiCrossUp);
+        // Nến 13:00–14:00 đáng lẽ đã đóng và được đồng bộ; dữ liệu đang trễ.
+        AdvanceTo(T0.AddHours(2) + AutoOrderService.IndicatorStaleGrace + TimeSpan.FromSeconds(1));
+
+        Assert.Equal(0, await _svc.EvaluateAsync(default));
+    }
+
+    [Fact]
+    public async Task Indicator_rule_ignores_opposite_signal()
+    {
+        var rule = await CreateRule(OnIndicator(PositionSide.Short));
+        AddCandles(T0, RsiCrossUp);
+        AdvanceTo(T0.AddHours(1).AddSeconds(30));
+
+        Assert.Equal(0, await _svc.EvaluateAsync(default));
+        Assert.Equal(AutoRuleStatus.Active, rule.Status);
+    }
+
+    [Fact]
+    public async Task Indicator_short_rule_fires_on_short_signal()
+    {
+        await CreateRule(OnIndicator(PositionSide.Short));
+        AddCandles(T0, RsiCrossDown);
+        AdvanceTo(T0.AddHours(1).AddSeconds(30));
+
+        Assert.Equal(1, await _svc.EvaluateAsync(default));
+        Assert.Equal(PositionSide.Short, Assert.Single(_paperStore.Positions).Side);
+    }
+
+    [Fact]
+    public async Task Indicator_rule_respects_daily_loss_limit()
+    {
+        var rule = await CreateRule(OnIndicator());
+        _paperStore.Ledger.Add(new PaperLedgerEntry(-60m, LedgerEntryType.RealizedPnl, null, "test", T0));
+        AddCandles(T0, RsiCrossUp);
+        AdvanceTo(T0.AddHours(1).AddSeconds(30));
+
+        Assert.Equal(0, await _svc.EvaluateAsync(default));
+        Assert.Equal(AutoRuleStatus.Active, rule.Status);
+        Assert.Contains("Bị chặn", rule.Note);
+    }
+
+    [Fact]
+    public async Task Create_indicator_rule_validates_indicator_and_symbol()
+    {
+        Assert.Contains((await _svc.CreateAsync(OnIndicator(name: "nope"), default)).Errors,
+            e => e.Contains("Không có chỉ báo"));
+        _paperOptions.Symbols.Add(new FuturesSymbolOptions { Symbol = "ETHUSDT", QuantityStep = 0.01m, TickSize = 0.01m, MinNotional = 20m, MaintenanceMarginRate = 0.005m });
+        _marks.Set(new MarkPrice("ETHUSDT", 3000m, _clock.UtcNow));
+        Assert.Contains((await _svc.CreateAsync(OnIndicator(symbol: "ETHUSDT"), default)).Errors,
+            e => e.Contains("chạy trên BTCUSDT"));
+
+        var ok = await _svc.CreateAsync(OnIndicator(), default);
+        Assert.Empty(ok.Errors);
+        Assert.Equal(RuleTriggerType.Indicator, ok.Rule!.TriggerType);
+        Assert.Null(ok.Rule.TriggerPrice);
     }
 }
