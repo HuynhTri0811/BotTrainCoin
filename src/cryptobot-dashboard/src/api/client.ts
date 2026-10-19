@@ -247,3 +247,24 @@ export const autoApi = {
   create: (req: CreateAutoRule) => postJson<AutoRule>('/api/paper/futures/auto-rules', req),
   cancel: (id: number) => postJson<{ cancelled: boolean }>(`/api/paper/futures/auto-rules/${id}/cancel`, {}),
 };
+
+// ---- Bảng giá trực tiếp (Spot + Mark, mỗi 15s) ----
+
+export interface LiveSample {
+  timeUtc: string;
+  spotPrice: number | null;
+  markPrice: number | null;
+  spotLatencyMs: number | null;
+  markLatencyMs: number | null;
+  error: string | null;
+}
+
+export interface LivePrices {
+  intervalSeconds: number;
+  serverTimeUtc: string;
+  symbols: { symbol: string; samples: LiveSample[] }[];
+}
+
+export const liveApi = {
+  prices: (limit = 60) => getJson<LivePrices>(`/api/live/prices?limit=${limit}`),
+};

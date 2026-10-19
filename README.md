@@ -69,3 +69,9 @@ Chỉ chạy Paper; không có đường nào tới tiền thật.
 - Lúc kích hoạt nếu engine từ chối (thiếu số dư, đã có vị thế cùng symbol…) quy tắc chuyển "Bị từ chối" kèm lý do và không tự thử lại.
 - Không dùng mark price cũ hơn 10 giây. `commandId` của quy tắc cũng là commandId của lệnh mở nên xử lý lặp (crash/restart) không mở hai vị thế.
 - Endpoint: `GET/POST /api/paper/futures/auto-rules`, `POST /api/paper/futures/auto-rules/{id}/cancel`.
+
+## Bảng giá trực tiếp (mỗi 15 giây)
+
+Panel trên cùng dashboard: mỗi `LivePrices:PollInterval` (mặc định 15s) backend lấy **Spot** (`/api/v3/ticker/price`) và **Mark Futures** (`/fapi/v1/premiumIndex`) song song cho từng symbol trong `LivePrices:Symbols`.
+Hiển thị giá, % đổi so với lần trước, chênh lệch Mark − Spot, độ trễ API từng nguồn, trạng thái OK/Lỗi, đếm ngược lần lấy tiếp theo và cảnh báo "Chậm" nếu quá 2 chu kỳ.
+Một nguồn lỗi thì chỉ nguồn đó để trống kèm lý do, không điền giá cũ. Lịch sử (240 mẫu ≈ 1 giờ) giữ trong bộ nhớ, mất khi restart. Endpoint: `GET /api/live/prices?limit=`.

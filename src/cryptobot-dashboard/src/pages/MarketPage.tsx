@@ -2,6 +2,7 @@ import { Card, Col, Empty, Row, Space, Spin, Table, Tag, Typography } from 'antd
 import { useQuery } from '@tanstack/react-query';
 import { api, futuresApi, type Signal, type Strategy } from '../api/client';
 import { AutoOrdersCard } from '../features/auto/AutoOrdersCard';
+import { LivePricePanel } from '../features/live/LivePricePanel';
 import { PositionsCard } from '../features/futures/PositionsCard';
 import { TradePanel } from '../features/futures/TradePanel';
 import { CandleChart, EMA_COLORS } from '../features/market/CandleChart';
@@ -36,6 +37,7 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
 
   return (
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+      <LivePricePanel symbol={strategy.symbol} />
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={16}>
           <Card
