@@ -37,7 +37,7 @@ public static class AutoOrderEndpoints
 
             var result = await svc.CreateAsync(new CreateRuleRequest((body.Symbol ?? "").ToUpperInvariant(), side,
                 cond, body.TriggerPrice, body.Margin, body.Leverage, body.StopLossPercent, body.TakeProfitPercent,
-                type, body.IndicatorName), ct);
+                type, body.IndicatorName, body.CloseOnReverse), ct);
             return result.Rule is { } rule
                 ? Results.Ok(ToDto(rule))
                 : Results.UnprocessableEntity(new { errors = result.Errors });
@@ -52,18 +52,23 @@ public static class AutoOrderEndpoints
     private static AutoRuleDto ToDto(AutoOrderRule r) => new(r.Id, r.Environment, r.Symbol, r.Side.ToString(),
         r.TriggerType.ToString(), r.Condition?.ToString(), r.TriggerPrice, r.IndicatorName, r.Margin, r.Leverage,
         r.StopLossPercent, r.TakeProfitPercent, r.Status.ToString(), r.CreatedAtUtc, r.TriggeredAtUtc,
-        r.TriggeredMarkPrice, r.PositionId, r.Note, r.TriggerDetail);
+        r.TriggeredMarkPrice, r.PositionId, r.Note, r.TriggerDetail, r.CloseOnReverse, r.CloseWatchEndedAtUtc,
+        r.CloseDetail);
 }
 
-/// <summary>TriggerType: "Price" (mặc định, cần Condition + TriggerPrice) hoặc "Indicator" (cần IndicatorName).</summary>
+/// <summary>
+/// TriggerType: "Price" (mặc định, cần Condition + TriggerPrice) hoặc "Indicator" (cần IndicatorName).
+/// CloseOnReverse: chỉ với "Indicator", tự đóng vị thế khi chỉ báo phát tín hiệu ngược hướng.
+/// </summary>
 public sealed record CreateRuleDto(string Symbol, string Side, string? Condition, decimal? TriggerPrice, decimal Margin,
     int Leverage, decimal StopLossPercent, decimal? TakeProfitPercent, string? TriggerType = null,
-    string? IndicatorName = null);
+    string? IndicatorName = null, bool CloseOnReverse = false);
 
 public sealed record AutoRuleDto(long Id, string Environment, string Symbol, string Side, string TriggerType,
     string? Condition, decimal? TriggerPrice, string? IndicatorName, decimal Margin, int Leverage,
     decimal StopLossPercent, decimal? TakeProfitPercent, string Status, DateTime CreatedAtUtc,
-    DateTime? TriggeredAtUtc, decimal? TriggeredMarkPrice, long? PositionId, string? Note, string? TriggerDetail);
+    DateTime? TriggeredAtUtc, decimal? TriggeredMarkPrice, long? PositionId, string? Note, string? TriggerDetail,
+    bool CloseOnReverse, DateTime? CloseWatchEndedAtUtc, string? CloseDetail);
 
 public sealed record AutoDefaultsDto(decimal Margin, int Leverage, decimal StopLossPercent, decimal TakeProfitPercent,
     decimal DailyLossLimitPercent, int MaxActiveRules);
