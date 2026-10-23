@@ -297,6 +297,9 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                     b.Property<long>("OpenTimeUtc")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("QuoteVolume")
+                        .HasColumnType("TEXT");
+
                     b.Property<long>("ReceivedAtUtc")
                         .HasColumnType("INTEGER");
 
@@ -304,6 +307,9 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("TEXT");
+
+                    b.Property<long?>("TradeCount")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Volume")
                         .IsRequired()

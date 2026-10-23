@@ -50,7 +50,8 @@ public static class BotEndpoints
                 ToDto(data.Instance),
                 data.Points.Select(p => new ChartPointDto(
                     ToUnixSeconds(p.Candle.OpenTimeUtc), p.Candle.Open, p.Candle.High, p.Candle.Low,
-                    p.Candle.Close, p.Candle.Volume, p.Candle.IsClosed, p.FastEma, p.SlowEma)).ToList(),
+                    p.Candle.Close, p.Candle.Volume, p.Candle.QuoteVolume, p.Candle.TradeCount, p.Candle.IsClosed,
+                    p.FastEma, p.SlowEma)).ToList(),
                 data.Signals.Select(ToDto).ToList()));
         });
 
@@ -69,7 +70,7 @@ public static class BotEndpoints
             var list = await candles.GetLatestAsync(new CandleKey("Binance", symbol.ToUpperInvariant(), iv), null,
                 Math.Clamp(limit ?? 300, 1, 1000), closedOnly: false, ct);
             return Results.Ok(list.Select(c => new ChartPointDto(ToUnixSeconds(c.OpenTimeUtc), c.Open, c.High,
-                c.Low, c.Close, c.Volume, c.IsClosed, null, null)));
+                c.Low, c.Close, c.Volume, c.QuoteVolume, c.TradeCount, c.IsClosed, null, null)));
         });
 
         app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
@@ -101,9 +102,12 @@ public sealed record StrategyDto(int Id, string Name, string Type, int Version, 
 
 public sealed record ChartDto(StrategyDto Strategy, IReadOnlyList<ChartPointDto> Candles, IReadOnlyList<SignalDto> Signals);
 
-/// <summary>Time là Unix seconds (định dạng của Lightweight Charts). Số chỉ để hiển thị.</summary>
+/// <summary>
+/// Time là Unix seconds (định dạng của Lightweight Charts). Số chỉ để hiển thị.
+/// QuoteVolume (USDT) và TradeCount là null với nến lưu trước khi có hai cột này.
+/// </summary>
 public sealed record ChartPointDto(long Time, decimal Open, decimal High, decimal Low, decimal Close,
-    decimal Volume, bool IsClosed, decimal? FastEma, decimal? SlowEma);
+    decimal Volume, decimal? QuoteVolume, long? TradeCount, bool IsClosed, decimal? FastEma, decimal? SlowEma);
 
 public sealed record SignalDto(long Id, int StrategyInstanceId, int ConfigVersion, string Symbol, string Interval,
     DateTime CandleOpenTimeUtc, long Time, string Action, string Reason, decimal CandleClose, decimal FastEma,

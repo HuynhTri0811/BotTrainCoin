@@ -48,14 +48,16 @@ public sealed class BinanceMarketDataClient(HttpClient http, ILogger<BinanceMark
         var result = new List<KlineDto>(doc.RootElement.GetArrayLength());
         foreach (var k in doc.RootElement.EnumerateArray())
         {
-            // [openTime, open, high, low, close, volume, closeTime, ...]
+            // [openTime, open, high, low, close, volume, closeTime, quoteVolume, numberOfTrades, ...]
             result.Add(new KlineDto(
                 FromUnixMs(k[0].GetInt64()),
                 ParseDecimal(k[1]),
                 ParseDecimal(k[2]),
                 ParseDecimal(k[3]),
                 ParseDecimal(k[4]),
-                ParseDecimal(k[5])));
+                ParseDecimal(k[5]),
+                ParseDecimal(k[7]),
+                k[8].GetInt64()));
         }
 
         return result;

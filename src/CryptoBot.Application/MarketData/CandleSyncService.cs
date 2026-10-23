@@ -43,7 +43,13 @@ public sealed class CandleSyncService(
     {
         var serverTime = await client.GetServerTimeAsync(ct);
         var latest = await store.GetLatestOpenTimeAsync(key, ct);
-        var start = latest ?? AlignDown(serverTime - key.Interval.Duration * options.BootstrapCandles, key.Interval);
+        var windowStart = AlignDown(serverTime - key.Interval.Duration * options.BootstrapCandles, key.Interval);
+        var start = latest ?? windowStart;
+        // Nến lưu trước khi có số giao dịch/khối lượng USDT: tải lại từ nến thiếu sớm nhất trong cửa sổ
+        // gần đây để bổ sung (nến đã đóng chỉ được điền thêm, giá không đổi).
+        if (latest is not null &&
+            await store.GetFirstMissingStatsOpenTimeAsync(key, windowStart, ct) is { } missing && missing < start)
+            start = missing;
 
         var inserted = 0;
         var updated = 0;
@@ -60,7 +66,7 @@ public sealed class CandleSyncService(
                 .Select(k => new Candle(key.Exchange, key.Symbol, key.Interval, k.OpenTimeUtc,
                     k.Open, k.High, k.Low, k.Close, k.Volume,
                     isClosed: serverTime >= k.OpenTimeUtc + key.Interval.Duration,
-                    receivedAtUtc: serverTime))
+                    receivedAtUtc: serverTime, quoteVolume: k.QuoteVolume, tradeCount: k.TradeCount))
                 .ToList();
 
             var batchIssues = CandleSeriesValidator.Validate(candles, key.Interval);

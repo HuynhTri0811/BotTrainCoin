@@ -85,4 +85,42 @@ public class CandleTests
 
         Assert.Throws<InvalidOperationException>(() => s.MarkEvaluated(TestCandles.T0));
     }
+
+    private static Candle WithStats(bool closed, decimal close = 10, long? trades = 5) =>
+        new("Binance", "BTCUSDT", CandleInterval.H1, TestCandles.T0, 10, Math.Max(10, close), Math.Min(10, close),
+            close, 1, closed, TestCandles.T0, quoteVolume: trades is null ? null : 10m, tradeCount: trades);
+
+    [Fact]
+    public void Closed_candle_without_stats_is_filled_from_same_candle()
+    {
+        var stored = WithStats(closed: true, trades: null);
+
+        Assert.True(stored.ApplyUpdate(WithStats(closed: true, trades: 42)));
+        Assert.Equal(42, stored.TradeCount);
+        Assert.Equal(10m, stored.QuoteVolume);
+    }
+
+    [Fact]
+    public void Closed_candle_keeps_stats_when_exchange_returns_different_prices()
+    {
+        var stored = WithStats(closed: true, trades: null);
+
+        Assert.False(stored.ApplyUpdate(WithStats(closed: true, close: 11, trades: 42)));
+        Assert.Null(stored.TradeCount);
+    }
+
+    [Fact]
+    public void Running_candle_takes_latest_stats()
+    {
+        var stored = WithStats(closed: false, trades: 5);
+
+        Assert.True(stored.ApplyUpdate(WithStats(closed: true, trades: 9)));
+        Assert.Equal(9, stored.TradeCount);
+    }
+
+    [Fact]
+    public void Negative_trade_count_is_invalid()
+    {
+        Assert.Equal("Số giao dịch âm.", WithStats(closed: true, trades: -1).Validate());
+    }
 }

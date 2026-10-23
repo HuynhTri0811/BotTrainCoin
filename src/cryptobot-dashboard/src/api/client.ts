@@ -47,6 +47,10 @@ export interface ChartPoint {
   low: number;
   close: number;
   volume: number;
+  /** Khối lượng quy ra USDT; null với nến lưu trước khi có dữ liệu này. */
+  quoteVolume: number | null;
+  /** Số giao dịch khớp trong nến; null với nến lưu trước khi có dữ liệu này. */
+  tradeCount: number | null;
   isClosed: boolean;
   fastEma: number | null;
   slowEma: number | null;
