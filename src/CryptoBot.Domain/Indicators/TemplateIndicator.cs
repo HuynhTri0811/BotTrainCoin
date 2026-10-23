@@ -32,11 +32,11 @@ public sealed class TemplateIndicator : ICustomIndicator
             return IndicatorResult.None("Chưa đủ nến.");
 
         // TODO: công thức của bạn. closedCandles[^1] là nến vừa đóng; mỗi nến có Open/High/Low/Close/Volume.
-        var current = closedCandles[^1];
-        var previous = closedCandles.Skip(closedCandles.Count - 1 - Period).Take(Period).ToList();
-        var highest = previous.Max(c => c.High);
+        Candle current = closedCandles[^1];
+        List<Candle> previous = closedCandles.Skip(closedCandles.Count - 1 - Period).Take(Period).ToList();
+        decimal highest = previous.Max(c => c.High);
 
-        var values = new Dictionary<string, decimal?> { ["high"] = highest };
+        Dictionary<string, decimal?> values = new Dictionary<string, decimal?> { ["high"] = highest };
         if (current.Close > highest)
             return new IndicatorResult(values, IndicatorSignal.Long, $"Đóng cửa {current.Close} vượt đỉnh {Period} nến {highest}.");
         return IndicatorResult.None("Chưa vượt đỉnh.", values);

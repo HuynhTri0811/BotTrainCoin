@@ -89,11 +89,11 @@ public sealed class MyRsiIndicator : ICustomIndicator
             return IndicatorResult.None($"Warm-up: có {closedCandles.Count}/{LookbackCandles} nến.");
 
         // Lấy giá đóng cửa của đúng LookbackCandles nến cuối.
-        var closes = IndicatorWindow.LastCloses(closedCandles, LookbackCandles);
-        var rsi = ReadRsi(closes);          // 4a: RSI ở nến trước và nến vừa đóng
-        var ema = ReadTrendEma(closes);     // 4b: EMA xu hướng (null nếu tắt bộ lọc)
-        var close = closes[^1];             // giá đóng cửa của nến vừa đóng (^1 = phần tử cuối)
-        var values = BuildValues(rsi.Now, ema); // 4c: số liệu để vẽ
+        decimal[] closes = IndicatorWindow.LastCloses(closedCandles, LookbackCandles);
+        RsiPair rsi = ReadRsi(closes);         // 4a: RSI ở nến trước và nến vừa đóng
+        decimal? ema = ReadTrendEma(closes);   // 4b: EMA xu hướng (null nếu tắt bộ lọc)
+        decimal close = closes[^1];            // giá đóng cửa của nến vừa đóng (^1 = phần tử cuối)
+        Dictionary<string, decimal?> values = BuildValues(rsi.Now, ema); // 4c: số liệu để vẽ
 
         // RSI vừa vượt LÊN mức quá bán (ví dụ 28 → 31 qua mốc 30) → xét phát Long.
         if (Crossover.UpThrough(rsi.Prev, rsi.Now, Oversold))
@@ -112,7 +112,7 @@ public sealed class MyRsiIndicator : ICustomIndicator
     //     Cần cả RSI của nến trước để biết RSI "vừa" cắt qua mức, chứ không phải đã ở bên kia từ lâu.
     private RsiPair ReadRsi(decimal[] closes)
     {
-        var (prev, now) = Rsi.LastTwo(closes, Period);
+        (decimal prev, decimal now) = Rsi.LastTwo(closes, Period);
         return new RsiPair(prev, now);
     }
 
@@ -125,7 +125,7 @@ public sealed class MyRsiIndicator : ICustomIndicator
     //     RSI được làm tròn 2 chữ số cho dễ đọc trên chart; EMA giữ nguyên.
     private static Dictionary<string, decimal?> BuildValues(decimal rsiNow, decimal? ema)
     {
-        var values = new Dictionary<string, decimal?> { ["rsi"] = Math.Round(rsiNow, 2) };
+        Dictionary<string, decimal?> values = new Dictionary<string, decimal?> { ["rsi"] = Math.Round(rsiNow, 2) };
         if (ema is not null)
             values["ema"] = ema;
         return values;
