@@ -61,6 +61,7 @@ public sealed class MyRsiIndicator : ICustomIndicator
             : [new("rsi", $"RSI {Period}", "#7c3aed", Overlay: false, Levels: [Oversold, Overbought])];
 
     // ── 4. CÔNG THỨC ───────────────────────────────────────────────────────────
+    // Compute chỉ ghép các bước nhỏ bên dưới; mỗi bước làm một việc nên dễ đọc, dễ sửa, dễ test.
     public IndicatorResult Compute(IReadOnlyList<Candle> closedCandles)
     {
         if (closedCandles.Count < LookbackCandles)
@@ -68,38 +69,50 @@ public sealed class MyRsiIndicator : ICustomIndicator
 
         // Lấy giá đóng cửa của đúng LookbackCandles nến cuối.
         var closes = IndicatorWindow.LastCloses(closedCandles, LookbackCandles);
-        var rsi = Rsi.Calculate(closes, Period);
-        var last = closes.Length - 1;
+        var rsi = ReadRsi(closes);
+        var ema = ReadTrendEma(closes);
+        var close = closes[^1];
+        var values = BuildValues(rsi.Now, ema);
 
-        var rsiNow = rsi[last]!.Value;      // RSI tại nến vừa đóng
-        var rsiPrev = rsi[last - 1]!.Value; // RSI tại nến trước đó
-
-        var values = new Dictionary<string, decimal?> { ["rsi"] = Math.Round(rsiNow, 2) };
-        decimal? ema = null;
-        if (TrendEmaPeriod > 0)
-        {
-            ema = Ema.Calculate(closes, TrendEmaPeriod)[last];
-            values["ema"] = ema;
-        }
-
-        // "Cắt lên": nến trước còn ở dưới/bằng mức, nến này đã lên trên mức.
-        if (rsiPrev <= Oversold && rsiNow > Oversold)
-        {
-            if (ema is { } e && closes[last] < e)
-                return IndicatorResult.None($"RSI cắt lên {Oversold} nhưng giá dưới EMA{TrendEmaPeriod}.", values);
-            return new IndicatorResult(values, IndicatorSignal.Long,
-                $"RSI cắt lên {Oversold}: {rsiPrev:0.##} → {rsiNow:0.##}.");
-        }
-
-        // "Cắt xuống": nến trước còn ở trên/bằng mức, nến này đã xuống dưới mức.
-        if (rsiPrev >= Overbought && rsiNow < Overbought)
-        {
-            if (ema is { } e && closes[last] > e)
-                return IndicatorResult.None($"RSI cắt xuống {Overbought} nhưng giá trên EMA{TrendEmaPeriod}.", values);
-            return new IndicatorResult(values, IndicatorSignal.Short,
-                $"RSI cắt xuống {Overbought}: {rsiPrev:0.##} → {rsiNow:0.##}.");
-        }
-
-        return IndicatorResult.None($"RSI {rsiNow:0.##}, không cắt mức.", values);
+        if (Crossover.UpThrough(rsi.Prev, rsi.Now, Oversold))
+            return LongSignal(rsi, close, ema, values);
+        if (Crossover.DownThrough(rsi.Prev, rsi.Now, Overbought))
+            return ShortSignal(rsi, close, ema, values);
+        return IndicatorResult.None($"RSI {rsi.Now:0.##}, không cắt mức.", values);
     }
+
+    /// <summary>RSI tại nến trước (Prev) và nến vừa đóng (Now).</summary>
+    private readonly record struct RsiPair(decimal Prev, decimal Now);
+
+    // 4a. Tính RSI: chỉ cần 2 giá trị cuối nên dùng Rsi.LastTwo (không tạo mảng cho cả cửa sổ).
+    private RsiPair ReadRsi(decimal[] closes)
+    {
+        var (prev, now) = Rsi.LastTwo(closes, Period);
+        return new RsiPair(prev, now);
+    }
+
+    // 4b. EMA lọc xu hướng tại nến vừa đóng; null khi tắt bộ lọc (TrendEmaPeriod = 0).
+    private decimal? ReadTrendEma(decimal[] closes) =>
+        TrendEmaPeriod > 0 ? Ema.LastTwo(closes, TrendEmaPeriod).Last : null;
+
+    // 4c. Giá trị để vẽ: khoá phải trùng với Lines ở bước 3.
+    private static Dictionary<string, decimal?> BuildValues(decimal rsiNow, decimal? ema)
+    {
+        var values = new Dictionary<string, decimal?> { ["rsi"] = Math.Round(rsiNow, 2) };
+        if (ema is not null)
+            values["ema"] = ema;
+        return values;
+    }
+
+    // 4d. RSI cắt lên mức quá bán → Long, trừ khi giá đang dưới EMA xu hướng.
+    private IndicatorResult LongSignal(RsiPair rsi, decimal close, decimal? ema, Dictionary<string, decimal?> values) =>
+        ema is { } e && close < e
+            ? IndicatorResult.None($"RSI cắt lên {Oversold} nhưng giá dưới EMA{TrendEmaPeriod}.", values)
+            : new IndicatorResult(values, IndicatorSignal.Long, $"RSI cắt lên {Oversold}: {rsi.Prev:0.##} → {rsi.Now:0.##}.");
+
+    // 4e. RSI cắt xuống mức quá mua → Short, trừ khi giá đang trên EMA xu hướng.
+    private IndicatorResult ShortSignal(RsiPair rsi, decimal close, decimal? ema, Dictionary<string, decimal?> values) =>
+        ema is { } e && close > e
+            ? IndicatorResult.None($"RSI cắt xuống {Overbought} nhưng giá trên EMA{TrendEmaPeriod}.", values)
+            : new IndicatorResult(values, IndicatorSignal.Short, $"RSI cắt xuống {Overbought}: {rsi.Prev:0.##} → {rsi.Now:0.##}.");
 }

@@ -35,64 +35,86 @@ public sealed class EmaCrossStrategy : IStrategy
 
     public int RequiredCandles => _p.LookbackCandles;
 
+    /// <summary>Kiểm tra đầu vào → tính EMA → quyết định theo giao cắt và vị thế hiện có.</summary>
     public StrategyDecision Evaluate(StrategyContext context)
     {
-        var candles = context.ClosedCandles;
-        if (candles.Count == 0)
-            return StrategyDecision.Hold("Không có nến.");
-        if (candles.Any(c => !c.IsClosed))
-            throw new ArgumentException("Chiến lược chỉ nhận nến đã đóng.", nameof(context));
-        if (candles.Count < _p.LookbackCandles)
-            return StrategyDecision.Hold($"Warm-up: có {candles.Count}/{_p.LookbackCandles} nến.");
+        if (CheckInput(context.ClosedCandles) is { } hold)
+            return hold;
 
-        var indicators = ComputeLast(candles);
-        var (fastPrev, slowPrev, fast, slow) = indicators;
-
-        var crossedUp = fastPrev <= slowPrev && fast > slow;
-        var crossedDown = fastPrev >= slowPrev && fast < slow;
-
-        if (crossedUp)
-        {
-            if (context.HasPosition || context.HasPendingEntry)
-                return StrategyDecision.Hold("Giao cắt lên nhưng đã có vị thế/pending entry.", indicators);
-            return new StrategyDecision(SignalAction.Buy,
-                $"EMA{_p.FastPeriod} cắt lên EMA{_p.SlowPeriod}.", indicators);
-        }
-
-        if (crossedDown)
-        {
-            if (!context.HasPosition)
-                return StrategyDecision.Hold("Giao cắt xuống nhưng không có vị thế để bán.", indicators);
-            return new StrategyDecision(SignalAction.Sell,
-                $"EMA{_p.FastPeriod} cắt xuống EMA{_p.SlowPeriod}.", indicators);
-        }
-
-        return StrategyDecision.Hold("Không có giao cắt.", indicators);
+        var indicators = ComputeLast(LastCloses(context.ClosedCandles));
+        return Decide(indicators, context);
     }
 
     /// <summary>
     /// Giá trị EMA fast/slow tại nến cuối của cửa sổ (dùng cả cho hiển thị),
     /// theo đúng quy tắc cửa sổ của <see cref="Evaluate"/>. Trả null nếu thiếu nến.
     /// </summary>
-    public (decimal Fast, decimal Slow)? ComputeAt(IReadOnlyList<Candle> window)
+    public (decimal Fast, decimal Slow)? ComputeAt(IReadOnlyList<Candle> window) =>
+        window.Count < _p.LookbackCandles ? null : ComputeAt(LastCloses(window));
+
+    /// <summary>
+    /// Như <see cref="ComputeAt(IReadOnlyList{Candle})"/> nhưng nhận thẳng giá đóng cửa (đoạn kết thúc tại nến
+    /// cần tính), để vòng lặp vẽ chart không phải sao chép cửa sổ cho từng nến.
+    /// </summary>
+    public (decimal Fast, decimal Slow)? ComputeAt(ReadOnlySpan<decimal> closes)
     {
-        if (window.Count < _p.LookbackCandles)
+        if (closes.Length < _p.LookbackCandles)
             return null;
-        var v = ComputeLast(window);
+        var v = ComputeLast(closes[^_p.LookbackCandles..]);
         return (v.Fast, v.Slow);
     }
 
-    private IndicatorValues ComputeLast(IReadOnlyList<Candle> candles)
+    // ── Các bước nhỏ ───────────────────────────────────────────────────────────
+
+    /// <summary>Trả về Hold nếu chưa đủ dữ liệu; ném lỗi nếu nhận nến chưa đóng.</summary>
+    private StrategyDecision? CheckInput(IReadOnlyList<Candle> candles)
+    {
+        if (candles.Count == 0)
+            return StrategyDecision.Hold("Không có nến.");
+        for (var i = 0; i < candles.Count; i++)
+            if (!candles[i].IsClosed)
+                throw new ArgumentException("Chiến lược chỉ nhận nến đã đóng.", nameof(candles));
+        if (candles.Count < _p.LookbackCandles)
+            return StrategyDecision.Hold($"Warm-up: có {candles.Count}/{_p.LookbackCandles} nến.");
+        return null;
+    }
+
+    /// <summary>Giá đóng cửa của đúng <see cref="EmaCrossParameters.LookbackCandles"/> nến cuối.</summary>
+    private decimal[] LastCloses(IReadOnlyList<Candle> candles)
     {
         var closes = new decimal[_p.LookbackCandles];
         var offset = candles.Count - _p.LookbackCandles;
         for (var i = 0; i < closes.Length; i++)
             closes[i] = candles[offset + i].Close;
-
-        var fast = Ema.Calculate(closes, _p.FastPeriod);
-        var slow = Ema.Calculate(closes, _p.SlowPeriod);
-        var last = closes.Length - 1;
-
-        return new IndicatorValues(fast[last - 1]!.Value, slow[last - 1]!.Value, fast[last]!.Value, slow[last]!.Value);
+        return closes;
     }
+
+    /// <summary>EMA fast/slow tại nến trước và nến cuối của cửa sổ.</summary>
+    private IndicatorValues ComputeLast(ReadOnlySpan<decimal> closes)
+    {
+        var (fastPrev, fast) = Ema.LastTwo(closes, _p.FastPeriod);
+        var (slowPrev, slow) = Ema.LastTwo(closes, _p.SlowPeriod);
+        return new IndicatorValues(fastPrev, slowPrev, fast, slow);
+    }
+
+    private StrategyDecision Decide(IndicatorValues v, StrategyContext context)
+    {
+        if (Crossover.Up(v.FastPrev, v.SlowPrev, v.Fast, v.Slow))
+            return OnCrossUp(v, context);
+        if (Crossover.Down(v.FastPrev, v.SlowPrev, v.Fast, v.Slow))
+            return OnCrossDown(v, context);
+        return StrategyDecision.Hold("Không có giao cắt.", v);
+    }
+
+    /// <summary>Giao cắt lên → BUY, trừ khi đã có vị thế hoặc lệnh vào đang chờ.</summary>
+    private StrategyDecision OnCrossUp(IndicatorValues v, StrategyContext context) =>
+        context.HasPosition || context.HasPendingEntry
+            ? StrategyDecision.Hold("Giao cắt lên nhưng đã có vị thế/pending entry.", v)
+            : new StrategyDecision(SignalAction.Buy, $"EMA{_p.FastPeriod} cắt lên EMA{_p.SlowPeriod}.", v);
+
+    /// <summary>Giao cắt xuống → SELL, chỉ khi đang giữ vị thế (long-only).</summary>
+    private StrategyDecision OnCrossDown(IndicatorValues v, StrategyContext context) =>
+        context.HasPosition
+            ? new StrategyDecision(SignalAction.Sell, $"EMA{_p.FastPeriod} cắt xuống EMA{_p.SlowPeriod}.", v)
+            : StrategyDecision.Hold("Giao cắt xuống nhưng không có vị thế để bán.", v);
 }
