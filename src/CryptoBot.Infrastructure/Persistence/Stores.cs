@@ -198,6 +198,12 @@ public sealed class AutoOrderStore(BotDbContext db) : IAutoOrderStore
             .Where(r => r.Environment == Env && r.Status == AutoRuleStatus.Active)
             .OrderBy(r => r.Id).ToListAsync(ct);
 
+    public async Task<IReadOnlyList<AutoOrderRule>> GetWatchingCloseAsync(CancellationToken ct) =>
+        await db.AutoOrderRules
+            .Where(r => r.Environment == Env && r.CloseOnReverse && r.Status == AutoRuleStatus.Triggered &&
+                        r.CloseWatchEndedAtUtc == null)
+            .OrderBy(r => r.Id).ToListAsync(ct);
+
     public async Task<IReadOnlyList<AutoOrderRule>> GetRecentAsync(int limit, CancellationToken ct) =>
         await db.AutoOrderRules.AsNoTracking()
             .Where(r => r.Environment == Env)

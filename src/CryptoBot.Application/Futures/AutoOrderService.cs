@@ -22,6 +22,9 @@ public sealed class AutoOrderOptions
 public interface IAutoOrderStore
 {
     Task<IReadOnlyList<AutoOrderRule>> GetActiveAsync(CancellationToken ct);
+
+    /// <summary>Quy tắc đã mở lệnh và đang chờ chỉ báo đảo chiều để tự đóng.</summary>
+    Task<IReadOnlyList<AutoOrderRule>> GetWatchingCloseAsync(CancellationToken ct);
     Task<IReadOnlyList<AutoOrderRule>> GetRecentAsync(int limit, CancellationToken ct);
     Task<AutoOrderRule?> GetAsync(long id, CancellationToken ct);
     void Add(AutoOrderRule rule);
@@ -38,7 +41,8 @@ public sealed record CreateRuleRequest(
     decimal StopLossPercent,
     decimal? TakeProfitPercent,
     RuleTriggerType TriggerType = RuleTriggerType.Price,
-    string? IndicatorName = null);
+    string? IndicatorName = null,
+    bool CloseOnReverse = false);
 
 public sealed record CreateRuleResult(AutoOrderRule? Rule, IReadOnlyList<string> Errors);
 
@@ -55,7 +59,8 @@ public sealed record AutoOrderSummary(
     DailyRiskState Risk);
 
 /// <summary>
-/// Quy tắc tự mở lệnh Paper theo mức giá hoặc theo tín hiệu chỉ báo tự viết. Mọi lệnh vẫn đi qua <see cref="PaperFuturesService"/>
+/// Quy tắc tự mở lệnh Paper theo mức giá hoặc theo tín hiệu chỉ báo tự viết; quy tắc theo chỉ báo có thể tự đóng
+/// vị thế khi chỉ báo đảo chiều. Mọi lệnh vẫn đi qua <see cref="PaperFuturesService"/>
 /// (cùng kiểm tra SL/giá thanh lý/số dư/min notional). Chỉ chạy Paper, không có đường tới tiền thật.
 /// </summary>
 public sealed class AutoOrderService(
@@ -89,12 +94,13 @@ public sealed class AutoOrderService(
                 errors.AddRange(Validate(r, current.Price));
             if (errors.Count == 0)
                 rule = AutoOrderRule.ForIndicator(r.Symbol, r.Side, indicatorRegistry.Find(r.IndicatorName)!.Name,
-                    r.Margin, r.Leverage, r.StopLossPercent, r.TakeProfitPercent, clock.UtcNow);
+                    r.Margin, r.Leverage, r.StopLossPercent, r.TakeProfitPercent, clock.UtcNow, r.CloseOnReverse);
         }
         else if (r.TriggerType == RuleTriggerType.Price)
         {
             if (r.Condition is not { } cond || !Enum.IsDefined(cond)) errors.Add("Điều kiện không hợp lệ.");
             if (r.TriggerPrice is not > 0) errors.Add("Giá kích hoạt phải lớn hơn 0.");
+            if (r.CloseOnReverse) errors.Add("Tự đóng khi đảo chiều chỉ dùng với quy tắc theo chỉ báo.");
             if (errors.Count == 0)
             {
                 errors.AddRange(Validate(r, r.TriggerPrice!.Value));
@@ -120,8 +126,9 @@ public sealed class AutoOrderService(
         store.Add(rule);
         await store.SaveAsync(ct);
         if (rule.TriggerType == RuleTriggerType.Indicator)
-            logger.LogInformation("Auto rule #{Id}: khi chỉ báo {Indicator} báo {Side} -> mở {Side} {Lev}x margin {Margin}",
-                rule.Id, rule.IndicatorName, rule.Side, rule.Side, rule.Leverage, rule.Margin);
+            logger.LogInformation("Auto rule #{Id}: khi chỉ báo {Indicator} báo {Side} -> mở {Side} {Lev}x margin {Margin}, " +
+                                  "tự đóng khi đảo chiều: {CloseOnReverse}",
+                rule.Id, rule.IndicatorName, rule.Side, rule.Side, rule.Leverage, rule.Margin, rule.CloseOnReverse);
         else
             logger.LogInformation("Auto rule #{Id}: khi {Symbol} {Cond} {Price} -> mở {Side} {Lev}x margin {Margin}",
                 rule.Id, rule.Symbol, rule.Condition, rule.TriggerPrice, rule.Side, rule.Leverage, rule.Margin);
@@ -138,8 +145,19 @@ public sealed class AutoOrderService(
         return true;
     }
 
-    /// <summary>Kiểm tra các quy tắc đang chạy theo mark price mới. Trả về số quy tắc đã kích hoạt.</summary>
+    /// <summary>
+    /// Kiểm tra các quy tắc theo mark price và chỉ báo mới: mở lệnh cho quy tắc đang chờ, rồi tự đóng vị thế
+    /// của quy tắc có chỉ báo vừa đảo chiều. Trả về số lệnh đã mở + đã đóng.
+    /// </summary>
     public async Task<int> EvaluateAsync(CancellationToken ct)
+    {
+        var readings = new Dictionary<string, IndicatorReading?>(StringComparer.OrdinalIgnoreCase);
+        var opened = await EvaluateOpensAsync(readings, ct);
+        return opened + await EvaluateClosesAsync(readings, ct);
+    }
+
+    /// <summary>Mở lệnh cho các quy tắc đang chờ khi điều kiện xảy ra. Trả về số quy tắc đã kích hoạt.</summary>
+    private async Task<int> EvaluateOpensAsync(Dictionary<string, IndicatorReading?> readings, CancellationToken ct)
     {
         var active = await store.GetActiveAsync(ct);
         if (active.Count == 0)
@@ -148,7 +166,6 @@ public sealed class AutoOrderService(
         DailyRiskState? risk = null;
         var fired = 0;
         var changed = false;
-        var readings = new Dictionary<string, IndicatorReading?>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var rule in active)
         {
@@ -158,10 +175,8 @@ public sealed class AutoOrderService(
             string? detail = null;
             if (rule.TriggerType == RuleTriggerType.Indicator)
             {
-                var name = rule.IndicatorName!;
-                if (!readings.TryGetValue(name, out var reading))
-                    readings[name] = reading = await indicators.GetLatestAsync(name, ct);
-                if (!IndicatorFired(rule, reading))
+                var reading = await ReadIndicatorAsync(rule.IndicatorName!, readings, ct);
+                if (!SignalAfter(reading, rule.CreatedAtUtc, rule.Side))
                     continue;
                 detail = Describe(reading!);
             }
@@ -202,19 +217,88 @@ public sealed class AutoOrderService(
     }
 
     /// <summary>
-    /// Tín hiệu chỉ được dùng khi: nến đã đóng SAU lúc tạo quy tắc (không ăn tín hiệu cũ), nến là nến mới nhất
-    /// đáng lẽ phải có (dữ liệu không bị trễ quá một khung + biên), và tín hiệu cùng hướng với quy tắc.
+    /// Tự đóng vị thế của các quy tắc bật <see cref="AutoOrderRule.CloseOnReverse"/> khi chỉ báo phát tín hiệu
+    /// ngược hướng trên nến đóng sau lúc mở lệnh. Không bị chặn bởi giới hạn lỗ ngày (đóng lệnh chỉ giảm rủi ro).
+    /// Trả về số vị thế đã đóng.
     /// </summary>
-    private bool IndicatorFired(AutoOrderRule rule, IndicatorReading? reading)
+    private async Task<int> EvaluateClosesAsync(Dictionary<string, IndicatorReading?> readings, CancellationToken ct)
+    {
+        var watching = await store.GetWatchingCloseAsync(ct);
+        if (watching.Count == 0)
+            return 0;
+
+        var closed = 0;
+        var changed = false;
+        foreach (var rule in watching)
+        {
+            var position = await paperStore.GetAsync(rule.PositionId!.Value, ct);
+            // Đã đóng bằng chính lệnh đóng của quy tắc (ví dụ lần trước lưu vị thế xong nhưng chưa lưu quy tắc).
+            if (position is { Status: not PositionStatus.Open } && position.CloseCommandId == rule.CloseCommandId)
+            {
+                rule.EndCloseWatch("Đã tự đóng khi chỉ báo đảo chiều.", clock.UtcNow);
+                changed = true;
+                continue;
+            }
+
+            // SL/TP/thanh lý/đóng tay đến trước: không còn gì để đóng.
+            if (position is not { Status: PositionStatus.Open })
+            {
+                rule.EndCloseWatch($"Vị thế đã kết thúc trước ({position?.CloseReason?.ToString() ?? "không tìm thấy"}).",
+                    clock.UtcNow);
+                changed = true;
+                continue;
+            }
+
+            var reading = await ReadIndicatorAsync(rule.IndicatorName!, readings, ct);
+            var opposite = rule.Side == PositionSide.Long ? PositionSide.Short : PositionSide.Long;
+            if (!SignalAfter(reading, rule.TriggeredAtUtc!.Value, opposite))
+                continue;
+
+            var result = await paper.CloseAsync(position.Id, rule.CloseCommandId!.Value, CloseReason.Signal, ct);
+            if (!result.Ok)
+            {
+                // Ví dụ chưa có mark price mới: giữ theo dõi, thử lại ở lần kiểm tra sau.
+                logger.LogWarning("Auto rule #{Id} chưa tự đóng được vị thế {PositionId}: {Error}",
+                    rule.Id, position.Id, result.Error);
+                continue;
+            }
+
+            rule.EndCloseWatch(Describe(reading!), clock.UtcNow);
+            changed = true;
+            closed++;
+            logger.LogWarning("Auto rule #{Id} TỰ ĐÓNG {Side} {Symbol} vị thế {PositionId} @ {Exit}: chỉ báo đảo chiều",
+                rule.Id, position.Side, position.Symbol, position.Id, position.ExitPrice);
+        }
+
+        if (changed)
+            await store.SaveAsync(ct);
+        return closed;
+    }
+
+    /// <summary>Đọc kết quả mới nhất của chỉ báo, mỗi chỉ báo chỉ tính một lần trong một lượt kiểm tra.</summary>
+    private async Task<IndicatorReading?> ReadIndicatorAsync(string name, Dictionary<string, IndicatorReading?> readings,
+        CancellationToken ct)
+    {
+        if (!readings.TryGetValue(name, out var reading))
+            readings[name] = reading = await indicators.GetLatestAsync(name, ct);
+        return reading;
+    }
+
+    /// <summary>
+    /// Tín hiệu chỉ được dùng khi: nến đã đóng SAU <paramref name="afterUtc"/> (lúc tạo quy tắc khi mở, lúc mở lệnh
+    /// khi đóng; không ăn tín hiệu cũ), nến là nến mới nhất đáng lẽ phải có (dữ liệu không bị trễ quá một khung + biên),
+    /// và tín hiệu cùng hướng <paramref name="side"/>.
+    /// </summary>
+    private bool SignalAfter(IndicatorReading? reading, DateTime afterUtc, PositionSide side)
     {
         if (reading is null || reading.Result.Signal == IndicatorSignal.None)
             return false;
         var candle = reading.Candle;
-        if (candle.CloseTimeUtc <= rule.CreatedAtUtc)
+        if (candle.CloseTimeUtc <= afterUtc)
             return false;
         if (clock.UtcNow - candle.CloseTimeUtc > reading.Indicator.Key.Interval.Duration + IndicatorStaleGrace)
             return false;
-        return reading.Result.Signal == (rule.Side == PositionSide.Long ? IndicatorSignal.Long : IndicatorSignal.Short);
+        return reading.Result.Signal == (side == PositionSide.Long ? IndicatorSignal.Long : IndicatorSignal.Short);
     }
 
     /// <summary>Thời gian chờ đồng bộ nến sau khi nến đóng trước khi coi dữ liệu là trễ.</summary>
