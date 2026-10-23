@@ -6,24 +6,49 @@ namespace CryptoBot.Domain.MarketData;
 /// </summary>
 public sealed class Candle
 {
+    /// <summary>Khóa chính do database cấp.</summary>
     public long Id { get; private set; }
+
+    /// <summary>Sàn lấy dữ liệu, ví dụ "Binance".</summary>
     public string Exchange { get; private set; } = null!;
+
+    /// <summary>Cặp giao dịch, ví dụ "BTCUSDT".</summary>
     public string Symbol { get; private set; } = null!;
+
+    /// <summary>Mã khung nến, ví dụ "15m" hoặc "1h".</summary>
     public string Interval { get; private set; } = null!;
+
+    /// <summary>Thời điểm mở nến (UTC); cùng Exchange/Symbol/Interval tạo thành khóa duy nhất của nến.</summary>
     public DateTime OpenTimeUtc { get; private set; }
+
+    /// <summary>Thời điểm kết thúc nến (UTC) = OpenTimeUtc + độ dài khung.</summary>
     public DateTime CloseTimeUtc { get; private set; }
+
+    /// <summary>Giá mở cửa.</summary>
     public decimal Open { get; private set; }
+
+    /// <summary>Giá cao nhất trong nến.</summary>
     public decimal High { get; private set; }
+
+    /// <summary>Giá thấp nhất trong nến.</summary>
     public decimal Low { get; private set; }
+
+    /// <summary>Giá đóng cửa (với nến đang chạy là giá gần nhất).</summary>
     public decimal Close { get; private set; }
+
+    /// <summary>Khối lượng giao dịch (đơn vị coin).</summary>
     public decimal Volume { get; private set; }
+
+    /// <summary>True khi nến đã kết thúc theo giờ server của sàn; chiến lược chỉ dùng nến đã đóng.</summary>
     public bool IsClosed { get; private set; }
 
     /// <summary>Thời điểm hệ thống nhận/cập nhật nến lần cuối, dùng phát hiện dữ liệu stale.</summary>
     public DateTime ReceivedAtUtc { get; private set; }
 
+    /// <summary>Dành cho EF Core khi đọc từ database.</summary>
     private Candle() { }
 
+    /// <summary>Tạo nến mới. Mọi timestamp phải là UTC; CloseTimeUtc được tính từ khung nến.</summary>
     public Candle(
         string exchange,
         string symbol,
@@ -97,6 +122,7 @@ public sealed class Candle
         return null;
     }
 
+    /// <summary>Từ chối DateTime không phải UTC để tránh lệch giờ khi lưu và so sánh.</summary>
     private static void EnsureUtc(DateTime value, string name)
     {
         if (value.Kind != DateTimeKind.Utc)
