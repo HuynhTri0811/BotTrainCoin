@@ -5,6 +5,7 @@ import {
   createChart,
   createSeriesMarkers,
   CrosshairMode,
+  HistogramSeries,
   LineSeries,
   LineStyle,
   TickMarkType,
@@ -39,6 +40,7 @@ interface Props {
 interface Handles {
   chart: IChartApi;
   candles: ISeriesApi<'Candlestick'>;
+  volume: ISeriesApi<'Histogram'>;
   fast: ISeriesApi<'Line'>;
   slow: ISeriesApi<'Line'>;
   markers: ISeriesMarkersPluginApi<Time>;
@@ -81,11 +83,19 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
       wickDownColor: '#dc2626',
       borderVisible: false,
     });
+    // Cột khối lượng ở đáy khung giá, thang riêng (không có trục) để không đè lên nến.
+    const volume = chart.addSeries(HistogramSeries, {
+      priceScaleId: 'volume',
+      priceFormat: { type: 'volume' },
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+    volume.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 }, visible: false });
     const fast = chart.addSeries(LineSeries, { color: FAST_COLOR, lineWidth: 2, title: fastLabel, priceLineVisible: false });
     const slow = chart.addSeries(LineSeries, { color: SLOW_COLOR, lineWidth: 2, title: slowLabel, priceLineVisible: false });
     const markers = createSeriesMarkers(candleSeries, []);
 
-    handles.current = { chart, candles: candleSeries, fast, slow, markers };
+    handles.current = { chart, candles: candleSeries, volume, fast, slow, markers };
     fitted.current = false;
 
     return () => {
@@ -108,6 +118,13 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
         close: c.close,
         // Nến đang chạy hiển thị nhạt hơn: chiến lược chưa dùng nến này.
         ...(c.isClosed ? {} : { color: '#94a3b8', wickColor: '#94a3b8' }),
+      })),
+    );
+    h.volume.setData(
+      candles.map((c) => ({
+        time: c.time as UTCTimestamp,
+        value: c.volume,
+        color: !c.isClosed ? '#cbd5e1' : c.close >= c.open ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.35)',
       })),
     );
     h.fast.setData(
