@@ -57,9 +57,9 @@ public sealed class StrategyInstance
     public bool Configure(string strategyType, string parametersJson, string exchange,
         string symbol, string interval, bool enabled)
     {
-        var definitionChanged = strategyType != StrategyType || parametersJson != ParametersJson ||
+        bool definitionChanged = strategyType != StrategyType || parametersJson != ParametersJson ||
                                 exchange != Exchange || symbol != Symbol || interval != Interval;
-        var changed = definitionChanged || enabled != Enabled;
+        bool changed = definitionChanged || enabled != Enabled;
 
         if (definitionChanged)
         {

@@ -32,7 +32,7 @@ public sealed class ListSlice<T> : IReadOnlyList<T>
 
     public IEnumerator<T> GetEnumerator()
     {
-        for (var i = 0; i < Count; i++)
+        for (int i = 0; i < Count; i++)
             yield return _source[_start + i];
     }
 

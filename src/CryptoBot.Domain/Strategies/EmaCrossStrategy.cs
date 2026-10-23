@@ -73,7 +73,7 @@ public sealed class EmaCrossStrategy : IStrategy
 
         // Bước 2: lấy giá đóng cửa của 300 nến cuối rồi tính 4 con số:
         // EMA nhanh/chậm ở nến trước và ở nến vừa đóng.
-        var indicators = ComputeLast(LastCloses(context.ClosedCandles));
+        IndicatorValues indicators = ComputeLast(LastCloses(context.ClosedCandles));
 
         // Bước 3: so sánh 4 con số đó để ra BUY, SELL hoặc Hold.
         return Decide(indicators, context);
@@ -96,7 +96,7 @@ public sealed class EmaCrossStrategy : IStrategy
         if (closes.Length < _p.LookbackCandles)
             return null;
         // closes[^N..] = N phần tử cuối của mảng (cú pháp "từ cuối đếm ngược" của C#).
-        var v = ComputeLast(closes[^_p.LookbackCandles..]);
+        IndicatorValues v = ComputeLast(closes[^_p.LookbackCandles..]);
         return (v.Fast, v.Slow);
     }
 
@@ -110,7 +110,7 @@ public sealed class EmaCrossStrategy : IStrategy
 
         // Nến đang chạy thì giá đóng cửa còn thay đổi; dùng nó để quyết định là "nhìn trước tương lai".
         // Đây là lỗi lập trình ở nơi gọi, nên ném lỗi thay vì lặng lẽ bỏ qua.
-        for (var i = 0; i < candles.Count; i++)
+        for (int i = 0; i < candles.Count; i++)
             if (!candles[i].IsClosed)
                 throw new ArgumentException("Chiến lược chỉ nhận nến đã đóng.", nameof(candles));
 
@@ -125,10 +125,10 @@ public sealed class EmaCrossStrategy : IStrategy
     /// <summary>Giá đóng cửa của đúng <see cref="EmaCrossParameters.LookbackCandles"/> nến cuối.</summary>
     private decimal[] LastCloses(IReadOnlyList<Candle> candles)
     {
-        var closes = new decimal[_p.LookbackCandles];
+        decimal[] closes = new decimal[_p.LookbackCandles];
         // Nếu được đưa nhiều hơn 300 nến thì bỏ phần đầu, chỉ lấy 300 nến mới nhất.
-        var offset = candles.Count - _p.LookbackCandles;
-        for (var i = 0; i < closes.Length; i++)
+        int offset = candles.Count - _p.LookbackCandles;
+        for (int i = 0; i < closes.Length; i++)
             closes[i] = candles[offset + i].Close;
         return closes;
     }
@@ -137,8 +137,8 @@ public sealed class EmaCrossStrategy : IStrategy
     private IndicatorValues ComputeLast(ReadOnlySpan<decimal> closes)
     {
         // Cần cả giá trị ở "nến trước" để biết hai đường vừa cắt nhau hay đã nằm như vậy từ trước.
-        var (fastPrev, fast) = Ema.LastTwo(closes, _p.FastPeriod);
-        var (slowPrev, slow) = Ema.LastTwo(closes, _p.SlowPeriod);
+        (decimal fastPrev, decimal fast) = Ema.LastTwo(closes, _p.FastPeriod);
+        (decimal slowPrev, decimal slow) = Ema.LastTwo(closes, _p.SlowPeriod);
         return new IndicatorValues(fastPrev, slowPrev, fast, slow);
     }
 

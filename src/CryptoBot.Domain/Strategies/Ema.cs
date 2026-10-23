@@ -25,18 +25,18 @@ public static class Ema
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(period, 1);
 
-        var result = new decimal?[values.Count];
+        decimal?[] result = new decimal?[values.Count];
         // Chưa đủ period giá thì chưa có EMA nào: trả về toàn null.
         if (values.Count < period)
             return result;
 
         ReadOnlySpan<decimal> span = values as decimal[] ?? values.ToArray();
-        var ema = Seed(span, period);
+        decimal ema = Seed(span, period);
         result[period - 1] = ema;
 
-        var (alpha, keep) = Weights(period);
+        (decimal alpha, decimal keep) = Weights(period);
         // Từ giá thứ period trở đi, mỗi giá mới cập nhật EMA một lần.
-        for (var i = period; i < span.Length; i++)
+        for (int i = period; i < span.Length; i++)
         {
             ema = Step(ema, span[i], alpha, keep);
             result[i] = ema;
@@ -57,10 +57,10 @@ public static class Ema
         if (values.Length < period + 1)
             throw new ArgumentException($"Cần ít nhất {period + 1} giá trị, có {values.Length}.", nameof(values));
 
-        var ema = Seed(values, period);
-        var prev = ema;
-        var (alpha, keep) = Weights(period);
-        for (var i = period; i < values.Length; i++)
+        decimal ema = Seed(values, period);
+        decimal prev = ema;
+        (decimal alpha, decimal keep) = Weights(period);
+        for (int i = period; i < values.Length; i++)
         {
             // Giữ lại giá trị trước khi cập nhật: khi vòng lặp kết thúc, prev là EMA của nến trước.
             prev = ema;
@@ -73,8 +73,8 @@ public static class Ema
     /// <summary>Giá trị EMA đầu tiên: trung bình cộng của <paramref name="period"/> giá đầu tiên.</summary>
     private static decimal Seed(ReadOnlySpan<decimal> values, int period)
     {
-        var sum = 0m;
-        for (var i = 0; i < period; i++)
+        decimal sum = 0m;
+        for (int i = 0; i < period; i++)
             sum += values[i];
         return sum / period;
     }
@@ -82,7 +82,7 @@ public static class Ema
     /// <summary>alpha = 2 / (period + 1); keep = 1 − alpha (tính một lần thay vì mỗi vòng lặp).</summary>
     private static (decimal Alpha, decimal Keep) Weights(int period)
     {
-        var alpha = 2m / (period + 1);
+        decimal alpha = 2m / (period + 1);
         return (alpha, 1 - alpha);
     }
 

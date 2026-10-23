@@ -24,17 +24,17 @@ public static class Rsi
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(period, 1);
 
-        var result = new decimal?[values.Count];
+        decimal?[] result = new decimal?[values.Count];
         // Cần period thay đổi giá, tức period + 1 giá, mới tính được RSI đầu tiên.
         if (values.Count <= period)
             return result;
 
         ReadOnlySpan<decimal> span = values as decimal[] ?? values.ToArray();
-        var avg = Seed(span, period);
+        Averages avg = Seed(span, period);
         // RSI đầu tiên nằm ở vị trí period (giá thứ period + 1).
         result[period] = ToRsi(avg);
 
-        for (var i = period + 1; i < span.Length; i++)
+        for (int i = period + 1; i < span.Length; i++)
         {
             avg = Smooth(avg, span[i] - span[i - 1], period);
             result[i] = ToRsi(avg);
@@ -54,13 +54,13 @@ public static class Rsi
         if (values.Length < period + 2)
             throw new ArgumentException($"Cần ít nhất {period + 2} giá trị, có {values.Length}.", nameof(values));
 
-        var avg = Seed(values, period);
+        Averages avg = Seed(values, period);
         // Làm mượt lần lượt đến nến áp chót (dừng trước nến cuối)...
-        for (var i = period + 1; i < values.Length - 1; i++)
+        for (int i = period + 1; i < values.Length - 1; i++)
             avg = Smooth(avg, values[i] - values[i - 1], period);
 
         // ...để lấy RSI của nến trước, rồi làm mượt thêm một lần với thay đổi giá của nến cuối.
-        var prev = ToRsi(avg);
+        decimal prev = ToRsi(avg);
         avg = Smooth(avg, values[^1] - values[^2], period);
         return (prev, ToRsi(avg));
     }
@@ -72,9 +72,9 @@ public static class Rsi
     private static Averages Seed(ReadOnlySpan<decimal> values, int period)
     {
         decimal gain = 0, loss = 0;
-        for (var i = 1; i <= period; i++)
+        for (int i = 1; i <= period; i++)
         {
-            var change = values[i] - values[i - 1];
+            decimal change = values[i] - values[i - 1];
             if (change > 0) gain += change;   // nến tăng: cộng vào lãi
             else loss -= change;              // nến giảm: change âm, trừ đi để cộng phần dương vào lỗ
         }

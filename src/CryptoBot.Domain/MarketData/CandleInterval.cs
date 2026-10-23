@@ -24,7 +24,7 @@ public sealed record CandleInterval
 
     public static bool TryParse(string? code, out CandleInterval interval)
     {
-        if (code is not null && All.TryGetValue(code, out var found))
+        if (code is not null && All.TryGetValue(code, out CandleInterval found))
         {
             interval = found;
             return true;
@@ -35,7 +35,7 @@ public sealed record CandleInterval
     }
 
     public static CandleInterval Parse(string code) =>
-        TryParse(code, out var interval)
+        TryParse(code, out CandleInterval interval)
             ? interval
             : throw new ArgumentException($"Interval không được hỗ trợ: '{code}'.", nameof(code));
 

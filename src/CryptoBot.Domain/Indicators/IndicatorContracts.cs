@@ -69,9 +69,9 @@ public static class IndicatorWindow
     {
         if (candles.Count < count)
             throw new ArgumentException($"Cần {count} nến, chỉ có {candles.Count}.", nameof(candles));
-        var closes = new decimal[count];
-        var offset = candles.Count - count;
-        for (var i = 0; i < count; i++)
+        decimal[] closes = new decimal[count];
+        int offset = candles.Count - count;
+        for (int i = 0; i < count; i++)
             closes[i] = candles[offset + i].Close;
         return closes;
     }
