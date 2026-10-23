@@ -70,6 +70,38 @@ Chỉ chạy Paper; không có đường nào tới tiền thật.
 - Không dùng mark price cũ hơn 10 giây. `commandId` của quy tắc cũng là commandId của lệnh mở nên xử lý lặp (crash/restart) không mở hai vị thế.
 - Endpoint: `GET/POST /api/paper/futures/auto-rules`, `POST /api/paper/futures/auto-rules/{id}/cancel`.
 
+## Chỉ báo tự viết (C#)
+
+Viết công thức của riêng bạn, xem nó trên chart và dùng nó để tự mở lệnh Paper.
+
+**Cách viết một chỉ báo mới**
+1. Copy `src/CryptoBot.Domain/Indicators/TemplateIndicator.cs` thành file mới (ví dụ `MyBreakoutIndicator.cs`), đổi tên class.
+   Ví dụ đầy đủ có chú thích từng bước: `MyRsiIndicator.cs`.
+2. Thêm `[Indicator("MyBreakout", Description = "...")]` trên class.
+3. Tham số = property public có setter. `Lines` = các đường vẽ (`Overlay: true` vẽ trên nến, `false` vẽ ở khung bên dưới, `Levels` là mức ngang như 30/70).
+   `Compute(nến đã đóng)` trả `Values` (khóa trùng `Lines.Key`) + `Signal` (`None/Long/Short`) + `Reason`.
+4. Khai báo trong `appsettings.json` → `Indicators` (tên tham số không phân biệt hoa thường, số dùng dấu chấm):
+   ```json
+   { "Name": "btc-1h-myrsi", "Type": "MyRsi", "Symbol": "BTCUSDT", "Interval": "1h",
+     "Parameters": { "Period": 14, "Oversold": 30, "Overbought": 70 } }
+   ```
+5. Restart API. Cấu hình sai (loại/tham số/interval) bị bỏ qua và hiện cảnh báo trên dashboard + log.
+
+**Quy ước**: chỉ dùng nến đã đóng, tính trên cửa sổ cố định `RequiredCandles` nến → chart và lệnh tự động ra cùng giá trị.
+Cửa sổ thiếu nến → không tín hiệu. Lỗi trong `Compute` được bắt lại và hiện thành lý do, không làm dừng bot.
+Nến của symbol/khung trong `Indicators` được đồng bộ kể cả khi không có chiến lược nào dùng.
+
+**Trên chart**: chọn chỉ báo cùng symbol và khung nến ở góc phải card chart. Chấm tím `L`/`S` là tín hiệu của chỉ báo.
+
+**Tự mở lệnh theo chỉ báo**: trong card "Tự mở lệnh", chọn *Theo chỉ báo* → chọn chỉ báo và hướng Long/Short.
+Quy tắc kích hoạt khi chỉ báo báo cùng hướng trên **nến đóng sau lúc tạo quy tắc**, và nến đó là nến mới nhất
+(trễ quá 1 khung + 2 phút coi như dữ liệu cũ, bỏ qua). Sau đó đi đúng đường của quy tắc theo giá: giới hạn lỗ ngày,
+SL/TP theo % mark price lúc kích hoạt, một lần duy nhất. Giá trị chỉ báo lúc kích hoạt lưu ở `TriggerDetail`.
+Chỉ xét nến đóng mới nhất ở mỗi vòng 2 giây, nên nếu bot tắt đúng lúc có tín hiệu thì tín hiệu đó bị bỏ lỡ.
+
+Endpoint: `GET /api/indicators`, `GET /api/indicators/{name}/chart?limit=`; tạo quy tắc: `POST /api/paper/futures/auto-rules`
+với `"triggerType": "Indicator", "indicatorName": "..."`.
+
 ## Bảng giá trực tiếp (mỗi 15 giây)
 
 Panel trên cùng dashboard: mỗi `LivePrices:PollInterval` (mặc định 15s) backend lấy **Spot** (`/api/v3/ticker/price`) và **Mark Futures** (`/fapi/v1/premiumIndex`) song song cho từng symbol trong `LivePrices:Symbols`.

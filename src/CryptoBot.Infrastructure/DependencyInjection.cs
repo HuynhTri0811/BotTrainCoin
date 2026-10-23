@@ -1,5 +1,6 @@
 using CryptoBot.Application.Abstractions;
 using CryptoBot.Application.Futures;
+using CryptoBot.Application.Indicators;
 using CryptoBot.Application.LivePrices;
 using CryptoBot.Application.MarketData;
 using CryptoBot.Application.Signals;
@@ -8,6 +9,7 @@ using CryptoBot.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace CryptoBot.Infrastructure;
@@ -44,6 +46,12 @@ public static class DependencyInjection
         services.AddScoped<SignalEvaluationService>();
         services.AddScoped<StrategyConfigurator>();
         services.AddScoped<ChartQueryService>();
+
+        // Chỉ báo tự viết: class có [Indicator] trong CryptoBot.Domain + cấu hình "Indicators".
+        services.AddSingleton(sp => new IndicatorRegistry(
+            config.GetSection("Indicators").Get<List<IndicatorDefinition>>() ?? [],
+            sp.GetRequiredService<ILogger<IndicatorRegistry>>()));
+        services.AddScoped<IndicatorService>();
 
         // Paper futures: mark price công khai từ Binance USDⓈ-M, khớp lệnh giả lập trong ứng dụng.
         services.AddSingleton(config.GetSection("PaperFutures").Get<PaperFuturesOptions>() ?? new PaperFuturesOptions());

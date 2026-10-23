@@ -1,4 +1,5 @@
 using CryptoBot.Application.Abstractions;
+using CryptoBot.Domain.Futures;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Strategies;
 using CryptoBot.Infrastructure.Persistence;
@@ -139,6 +140,30 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
             var stored = await new SignalStore(db).GetLastAsync(instanceId, 1, default);
             Assert.Equal(SignalAction.Buy, stored!.Action);
             Assert.Equal(100.5m, stored.CandleClose);
+        }
+    }
+
+    [Fact]
+    public async Task Indicator_auto_rule_round_trips_with_nullable_price_fields()
+    {
+        await using (var db = NewContext())
+        {
+            db.AutoOrderRules.Add(AutoOrderRule.ForIndicator("BTCUSDT", PositionSide.Short, "btc-15m-myrsi",
+                50m, 2, 1m, 2m, T0));
+            db.AutoOrderRules.Add(new AutoOrderRule("BTCUSDT", PositionSide.Long, TriggerCondition.AtOrBelow,
+                98_000.5m, 50m, 2, 1m, null, T0));
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = NewContext())
+        {
+            var rules = await db.AutoOrderRules.OrderBy(r => r.Id).ToListAsync();
+            Assert.Equal(RuleTriggerType.Indicator, rules[0].TriggerType);
+            Assert.Equal("btc-15m-myrsi", rules[0].IndicatorName);
+            Assert.Null(rules[0].TriggerPrice);
+            Assert.Null(rules[0].Condition);
+            Assert.Equal(RuleTriggerType.Price, rules[1].TriggerType);
+            Assert.Equal(98_000.5m, rules[1].TriggerPrice);
         }
     }
 

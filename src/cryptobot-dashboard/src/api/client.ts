@@ -194,17 +194,20 @@ export const futuresApi = {
     postJson<FuturesPosition>(`/api/paper/futures/positions/${id}/close`, { commandId }),
 };
 
-// ---- Quy tắc tự mở lệnh Paper theo mức giá ----
+// ---- Quy tắc tự mở lệnh Paper theo mức giá hoặc theo chỉ báo ----
 
 export type TriggerCondition = 'AtOrBelow' | 'AtOrAbove';
+export type RuleTriggerType = 'Price' | 'Indicator';
 
 export interface AutoRule {
   id: number;
   environment: 'Paper';
   symbol: string;
   side: PositionSide;
-  condition: TriggerCondition;
-  triggerPrice: number;
+  triggerType: RuleTriggerType;
+  condition: TriggerCondition | null;
+  triggerPrice: number | null;
+  indicatorName: string | null;
   margin: number;
   leverage: number;
   stopLossPercent: number;
@@ -215,6 +218,7 @@ export interface AutoRule {
   triggeredMarkPrice: number | null;
   positionId: number | null;
   note: string | null;
+  triggerDetail: string | null;
 }
 
 export interface AutoSummary {
@@ -234,8 +238,12 @@ export interface AutoSummary {
 export interface CreateAutoRule {
   symbol: string;
   side: PositionSide;
-  condition: TriggerCondition;
-  triggerPrice: string;
+  triggerType: RuleTriggerType;
+  /** Chỉ với triggerType = 'Price'. */
+  condition: TriggerCondition | null;
+  triggerPrice: string | null;
+  /** Chỉ với triggerType = 'Indicator'. */
+  indicatorName: string | null;
   margin: string;
   leverage: number;
   stopLossPercent: string;
@@ -246,6 +254,60 @@ export const autoApi = {
   summary: () => getJson<AutoSummary>('/api/paper/futures/auto-rules'),
   create: (req: CreateAutoRule) => postJson<AutoRule>('/api/paper/futures/auto-rules', req),
   cancel: (id: number) => postJson<{ cancelled: boolean }>(`/api/paper/futures/auto-rules/${id}/cancel`, {}),
+};
+
+// ---- Chỉ báo tự viết (CryptoBot.Domain/Indicators, cấu hình "Indicators") ----
+
+export type IndicatorSignal = 'None' | 'Long' | 'Short';
+
+export interface IndicatorLine {
+  key: string;
+  title: string;
+  color: string;
+  /** true: vẽ chung với nến; false: khung riêng bên dưới. */
+  overlay: boolean;
+  levels: number[];
+}
+
+export interface Indicator {
+  name: string;
+  type: string;
+  description: string;
+  symbol: string;
+  interval: string;
+  requiredCandles: number;
+  lines: IndicatorLine[];
+}
+
+export interface IndicatorList {
+  indicators: Indicator[];
+  errors: { name: string; error: string }[];
+  availableTypes: string[];
+}
+
+export interface IndicatorPoint {
+  time: number; // Unix seconds, open time của nến đã đóng
+  values: Record<string, number | null>;
+  signal: IndicatorSignal;
+}
+
+export interface IndicatorMarker {
+  time: number;
+  signal: Exclude<IndicatorSignal, 'None'>;
+  reason: string;
+}
+
+export interface IndicatorChart {
+  indicator: Indicator;
+  points: IndicatorPoint[];
+  markers: IndicatorMarker[];
+  latestReason: string | null;
+}
+
+export const indicatorApi = {
+  list: () => getJson<IndicatorList>('/api/indicators'),
+  chart: (name: string, limit = 300) =>
+    getJson<IndicatorChart>(`/api/indicators/${encodeURIComponent(name)}/chart?limit=${limit}`),
 };
 
 // ---- Bảng giá trực tiếp (Spot + Mark, mỗi 15s) ----

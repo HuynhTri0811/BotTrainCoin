@@ -34,8 +34,21 @@ public sealed class ChartQueryService(IStrategyInstanceStore instances, ICandleS
 
         var history = await candles.GetLatestAsync(key, visible[0].OpenTimeUtc, strategy.RequiredCandles - 1,
             closedOnly: true, ct);
-        var closedSeries = history.Concat(visible.Where(c => c.IsClosed)).ToList();
+        var points = BuildPoints(strategy, history, visible);
 
+        var sigs = await signals.QueryAsync(instance.Id, instance.Version, visible[0].OpenTimeUtc, null,
+            MaxLimit, ct);
+        return new ChartData(instance, parameters, points, sigs);
+    }
+
+    /// <summary>
+    /// EMA cho từng nến hiển thị. Giá đóng cửa của chuỗi nến đã đóng được lấy một lần; mỗi nến chỉ
+    /// truyền một đoạn (span) kết thúc tại nến đó vào chiến lược, không sao chép cửa sổ.
+    /// </summary>
+    private static List<ChartPoint> BuildPoints(EmaCrossStrategy strategy, IReadOnlyList<Candle> history,
+        IReadOnlyList<Candle> visible)
+    {
+        var closes = ClosedCloses(history, visible);
         var points = new List<ChartPoint>(visible.Count);
         var closedIndex = history.Count - 1;
         foreach (var c in visible)
@@ -49,13 +62,22 @@ public sealed class ChartQueryService(IStrategyInstanceStore instances, ICandleS
 
             closedIndex++;
             var start = Math.Max(0, closedIndex - strategy.RequiredCandles + 1);
-            var window = closedSeries.GetRange(start, closedIndex - start + 1);
-            var ema = strategy.ComputeAt(window);
+            var ema = strategy.ComputeAt(closes.AsSpan(start, closedIndex - start + 1));
             points.Add(new ChartPoint(c, ema?.Fast, ema?.Slow));
         }
 
-        var sigs = await signals.QueryAsync(instance.Id, instance.Version, visible[0].OpenTimeUtc, null,
-            MaxLimit, ct);
-        return new ChartData(instance, parameters, points, sigs);
+        return points;
+    }
+
+    /// <summary>Giá đóng cửa của lịch sử + các nến hiển thị đã đóng, theo thứ tự thời gian.</summary>
+    private static decimal[] ClosedCloses(IReadOnlyList<Candle> history, IReadOnlyList<Candle> visible)
+    {
+        var closes = new List<decimal>(history.Count + visible.Count);
+        foreach (var c in history)
+            closes.Add(c.Close);
+        foreach (var c in visible)
+            if (c.IsClosed)
+                closes.Add(c.Close);
+        return closes.ToArray();
     }
 }

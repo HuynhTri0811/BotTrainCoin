@@ -1,4 +1,5 @@
 using CryptoBot.Application.Abstractions;
+using CryptoBot.Application.Indicators;
 using CryptoBot.Application.MarketData;
 using CryptoBot.Application.Signals;
 using CryptoBot.Domain.MarketData;
@@ -7,6 +8,7 @@ namespace CryptoBot.Api.Workers;
 
 /// <summary>
 /// Vòng lặp duy nhất: đồng bộ nến qua REST rồi đánh giá chiến lược trên nến đã đóng.
+/// Đồng bộ cả các cặp symbol/khung của chỉ báo tự viết (kể cả khi không có chiến lược nào dùng).
 /// Một consumer tuần tự nên không có hai tác vụ cùng ghi một strategy instance.
 /// Mỗi vòng lặp dùng DI scope (DbContext) riêng.
 /// </summary>
@@ -14,6 +16,7 @@ public sealed class MarketDataWorker(
     IServiceScopeFactory scopes,
     MarketDataStatusRegistry status,
     MarketDataOptions options,
+    IndicatorRegistry indicators,
     ILogger<MarketDataWorker> logger) : BackgroundService
 {
     private static readonly TimeSpan MaxBackoff = TimeSpan.FromMinutes(5);
@@ -58,9 +61,12 @@ public sealed class MarketDataWorker(
         var delay = options.PollInterval;
         var enabled = instances.Where(i => i.Enabled).ToList();
 
-        foreach (var group in enabled.GroupBy(i => new CandleKey(i.Exchange, i.Symbol, CandleInterval.Parse(i.Interval))))
+        var byKey = enabled.ToLookup(i => new CandleKey(i.Exchange, i.Symbol, CandleInterval.Parse(i.Interval)));
+        var keys = byKey.Select(g => g.Key).Concat(indicators.All.Select(i => i.Key)).Distinct();
+
+        foreach (var key in keys)
         {
-            var key = group.Key;
+            var group = byKey[key];
             try
             {
                 var result = await sync.SyncAsync(key, ct);

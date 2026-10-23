@@ -1,11 +1,12 @@
-import { Card, Col, Empty, Row, Space, Spin, Table, Tag, Typography } from 'antd';
+import { useState } from 'react';
+import { Alert, Card, Col, Empty, Row, Select, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { api, futuresApi, type Signal, type Strategy } from '../api/client';
+import { api, futuresApi, indicatorApi, type Signal, type Strategy } from '../api/client';
 import { AutoOrdersCard } from '../features/auto/AutoOrdersCard';
 import { LivePricePanel } from '../features/live/LivePricePanel';
 import { PositionsCard } from '../features/futures/PositionsCard';
 import { TradePanel } from '../features/futures/TradePanel';
-import { CandleChart, EMA_COLORS } from '../features/market/CandleChart';
+import { CandleChart, EMA_COLORS, INDICATOR_MARKER_COLOR } from '../features/market/CandleChart';
 import { formatVn } from '../time';
 
 const REFRESH_MS = 15_000;
@@ -21,6 +22,21 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
   const signals = useQuery({
     queryKey: ['signals', strategy.id],
     queryFn: () => api.signals(strategy.id, 50),
+    refetchInterval: REFRESH_MS,
+  });
+
+  // Chỉ báo tự viết cùng symbol và khung nến với chart đang xem.
+  const indicators = useQuery({ queryKey: ['indicators'], queryFn: indicatorApi.list, staleTime: 60_000 });
+  const matching = (indicators.data?.indicators ?? []).filter(
+    (i) => i.symbol === strategy.symbol && i.interval === strategy.interval,
+  );
+  const [picked, setPicked] = useState<string | null | undefined>(undefined);
+  // undefined = chưa chọn: mặc định chỉ báo đầu tiên; null = người dùng tắt.
+  const indicatorName = picked === undefined ? (matching[0]?.name ?? null) : picked;
+  const indicatorChart = useQuery({
+    queryKey: ['indicator-chart', indicatorName],
+    queryFn: () => indicatorApi.chart(indicatorName!, 300),
+    enabled: indicatorName != null,
     refetchInterval: REFRESH_MS,
   });
 
@@ -53,9 +69,19 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
               </Space>
             }
             extra={
-              <Space size="small">
+              <Space size="small" wrap>
                 <Tag color={EMA_COLORS.fast}>{fastLabel}</Tag>
                 <Tag color={EMA_COLORS.slow}>{slowLabel}</Tag>
+                <Select<string | null>
+                  size="small"
+                  value={indicatorName}
+                  onChange={(v) => setPicked(v ?? null)}
+                  allowClear
+                  placeholder={matching.length ? 'Chỉ báo của tôi' : `Chưa có chỉ báo ${strategy.interval}`}
+                  disabled={matching.length === 0}
+                  style={{ minWidth: 170 }}
+                  options={matching.map((i) => ({ value: i.name, label: `${i.name} (${i.type})` }))}
+                />
               </Space>
             }
           >
@@ -74,8 +100,30 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
                 fastLabel={fastLabel}
                 slowLabel={slowLabel}
                 position={openPosition}
+                indicator={indicatorName != null ? indicatorChart.data : undefined}
               />
             )}
+            {indicatorName != null && indicatorChart.data && (
+              <Typography.Paragraph style={{ margin: '8px 0 0', fontSize: 12 }}>
+                <Tooltip title={indicatorChart.data.indicator.description}>
+                  <Tag color={INDICATOR_MARKER_COLOR}>{indicatorChart.data.indicator.name}</Tag>
+                </Tooltip>
+                Nến đóng gần nhất: {indicatorChart.data.latestReason ?? '—'} · {indicatorChart.data.markers.length} tín
+                hiệu trong khung đang xem (chấm tím L = Long, S = Short).
+              </Typography.Paragraph>
+            )}
+            {indicatorChart.isError && (
+              <Alert type="error" showIcon style={{ marginTop: 8 }} title={`Không tải được chỉ báo: ${indicatorChart.error.message}`} />
+            )}
+            {(indicators.data?.errors ?? []).map((e) => (
+              <Alert
+                key={e.name}
+                type="warning"
+                showIcon
+                style={{ marginTop: 8 }}
+                title={`Chỉ báo "${e.name}" bị bỏ qua: ${e.error}`}
+              />
+            ))}
             <Typography.Paragraph type="secondary" style={{ margin: '8px 0 0', fontSize: 12 }}>
               Đánh giá đến nến mở lúc {formatVn(strategy.lastEvaluatedCandleOpenTimeUtc)}. Nến xám là nến đang chạy,
               chưa được chiến lược sử dụng. Mũi tên là tín hiệu trên nến đã đóng, không phải lệnh đã khớp.
