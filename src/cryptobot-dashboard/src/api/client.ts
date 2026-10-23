@@ -108,7 +108,7 @@ export interface FuturesPosition {
   openFee: number;
   closeFee: number;
   status: 'Open' | 'Closed' | 'Liquidated';
-  closeReason: 'Manual' | 'StopLoss' | 'TakeProfit' | 'Liquidation' | null;
+  closeReason: 'Manual' | 'StopLoss' | 'TakeProfit' | 'Liquidation' | 'Signal' | null;
   exitPrice: number | null;
   realizedPnl: number | null;
   netPnl: number | null;
@@ -219,6 +219,10 @@ export interface AutoRule {
   positionId: number | null;
   note: string | null;
   triggerDetail: string | null;
+  /** Quy tắc theo chỉ báo: tự đóng vị thế khi chỉ báo đảo chiều. */
+  closeOnReverse: boolean;
+  closeWatchEndedAtUtc: string | null;
+  closeDetail: string | null;
 }
 
 export interface AutoSummary {
@@ -244,6 +248,8 @@ export interface CreateAutoRule {
   triggerPrice: string | null;
   /** Chỉ với triggerType = 'Indicator'. */
   indicatorName: string | null;
+  /** Chỉ với triggerType = 'Indicator': tự đóng khi chỉ báo báo ngược hướng. */
+  closeOnReverse: boolean;
   margin: string;
   leverage: number;
   stopLossPercent: string;

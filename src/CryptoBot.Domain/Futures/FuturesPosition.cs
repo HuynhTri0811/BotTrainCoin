@@ -27,6 +27,9 @@ public enum CloseReason
 
     /// <summary>Mark price chạm giá thanh lý.</summary>
     Liquidation = 4,
+
+    /// <summary>Quy tắc tự động đóng vì chỉ báo phát tín hiệu ngược hướng vị thế.</summary>
+    Signal = 5,
 }
 
 /// <summary>
@@ -124,7 +127,7 @@ public sealed class FuturesPosition
     /// <summary>Lãi/lỗ ròng = PnL giá − phí mở − phí đóng (không lưu vào database).</summary>
     public decimal NetPnl => (RealizedPnl ?? 0) - OpenFee - CloseFee;
 
-    /// <summary>Đóng vị thế tại <paramref name="exitPrice"/> (tay, SL hoặc TP) và ghi PnL giá.</summary>
+    /// <summary>Đóng vị thế tại <paramref name="exitPrice"/> (tay, SL, TP hoặc tín hiệu đảo chiều) và ghi PnL giá.</summary>
     public void Close(CloseReason reason, decimal exitPrice, decimal closeFee, Guid? commandId, DateTime nowUtc)
     {
         EnsureOpen();

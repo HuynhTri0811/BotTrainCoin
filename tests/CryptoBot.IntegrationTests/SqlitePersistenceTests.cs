@@ -167,6 +167,35 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task Watching_close_query_returns_only_triggered_rules_still_watching()
+    {
+        await using (var db = NewContext())
+        {
+            var watching = AutoOrderRule.ForIndicator("BTCUSDT", PositionSide.Long, "rsi", 50m, 2, 1m, 2m, T0,
+                closeOnReverse: true);
+            watching.MarkTriggered(100m, 1, T0);
+            var ended = AutoOrderRule.ForIndicator("BTCUSDT", PositionSide.Long, "rsi", 50m, 2, 1m, 2m, T0,
+                closeOnReverse: true);
+            ended.MarkTriggered(100m, 2, T0);
+            ended.EndCloseWatch("Vị thế đã kết thúc trước (StopLoss).", T0);
+            var pending = AutoOrderRule.ForIndicator("BTCUSDT", PositionSide.Long, "rsi", 50m, 2, 1m, 2m, T0,
+                closeOnReverse: true);
+            var noClose = AutoOrderRule.ForIndicator("BTCUSDT", PositionSide.Long, "rsi", 50m, 2, 1m, 2m, T0);
+            noClose.MarkTriggered(100m, 3, T0);
+            db.AutoOrderRules.AddRange(watching, ended, pending, noClose);
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = NewContext())
+        {
+            var rule = Assert.Single(await new AutoOrderStore(db).GetWatchingCloseAsync(default));
+            Assert.Equal(1, rule.PositionId);
+            Assert.NotNull(rule.CloseCommandId);
+            Assert.True(rule.IsWatchingClose);
+        }
+    }
+
     private static TradingSignal Signal(int instanceId) =>
         new(instanceId, 1, "BTCUSDT", "1h", T0, SignalAction.Buy, "test", 100.5m, 101m, 100m, T0, isBackfill: true);
 }
