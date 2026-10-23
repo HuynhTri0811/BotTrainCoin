@@ -23,6 +23,19 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<Guid?>("CloseCommandId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CloseDetail")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("CloseOnReverse")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("CloseWatchEndedAtUtc")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("CommandId")
                         .HasColumnType("TEXT");
 
