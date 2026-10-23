@@ -123,7 +123,7 @@ public sealed class AutoOrderRule
         decimal margin, int leverage, decimal stopLossPercent, decimal? takeProfitPercent, DateTime createdAtUtc)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(indicatorName);
-        var rule = new AutoOrderRule { TriggerType = RuleTriggerType.Indicator, IndicatorName = indicatorName };
+        AutoOrderRule rule = new AutoOrderRule { TriggerType = RuleTriggerType.Indicator, IndicatorName = indicatorName };
         rule.Init(symbol, side, margin, leverage, stopLossPercent, takeProfitPercent, createdAtUtc);
         return rule;
     }

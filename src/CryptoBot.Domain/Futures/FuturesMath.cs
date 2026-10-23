@@ -30,7 +30,7 @@ public static class FuturesMath
     public static decimal ApplySlippage(decimal price, PositionSide side, bool opening, decimal slippageRate)
     {
         // Mở Long / đóng Short là mua: giá cao hơn. Mở Short / đóng Long là bán: giá thấp hơn.
-        var buying = (side == PositionSide.Long) == opening;
+        bool buying = (side == PositionSide.Long) == opening;
         return buying ? price * (1 + slippageRate) : price * (1 - slippageRate);
     }
 
@@ -42,7 +42,7 @@ public static class FuturesMath
     /// </summary>
     public static decimal LiquidationPrice(PositionSide side, decimal entry, int leverage, decimal mmr)
     {
-        var inv = 1m / leverage;
+        decimal inv = 1m / leverage;
         return side == PositionSide.Long
             ? entry * (1 - inv) / (1 - mmr)
             : entry * (1 + inv) / (1 + mmr);
