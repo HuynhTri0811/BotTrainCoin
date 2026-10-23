@@ -15,6 +15,14 @@ public sealed class CandleStore(BotDbContext db) : ICandleStore
             .Select(c => (DateTime?)c.OpenTimeUtc)
             .FirstOrDefaultAsync(ct);
 
+    public async Task<DateTime?> GetFirstMissingStatsOpenTimeAsync(CandleKey key, DateTime fromUtc,
+        CancellationToken ct) =>
+        await ForKey(key)
+            .Where(c => c.OpenTimeUtc >= fromUtc && c.TradeCount == null)
+            .OrderBy(c => c.OpenTimeUtc)
+            .Select(c => (DateTime?)c.OpenTimeUtc)
+            .FirstOrDefaultAsync(ct);
+
     public async Task<UpsertResult> UpsertAsync(CandleKey key, IReadOnlyList<Candle> candles, CancellationToken ct)
     {
         if (candles.Count == 0)

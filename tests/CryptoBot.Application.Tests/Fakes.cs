@@ -16,6 +16,9 @@ internal sealed class InMemoryCandleStore : ICandleStore
     public Task<DateTime?> GetLatestOpenTimeAsync(CandleKey key, CancellationToken ct) =>
         Task.FromResult(Candles.Count == 0 ? (DateTime?)null : Candles.Keys.Max());
 
+    public Task<DateTime?> GetFirstMissingStatsOpenTimeAsync(CandleKey key, DateTime fromUtc, CancellationToken ct) =>
+        Task.FromResult(Candles.Values.FirstOrDefault(c => c.OpenTimeUtc >= fromUtc && c.TradeCount is null)?.OpenTimeUtc);
+
     public Task<UpsertResult> UpsertAsync(CandleKey key, IReadOnlyList<Candle> candles, CancellationToken ct)
     {
         int inserted = 0, updated = 0, unchanged = 0;
