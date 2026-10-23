@@ -39,6 +39,12 @@ public sealed class Candle
     /// <summary>Khối lượng giao dịch (đơn vị coin).</summary>
     public decimal Volume { get; private set; }
 
+    /// <summary>Khối lượng giao dịch quy ra đồng định giá (USDT với cặp ...USDT); null với nến lưu trước khi có cột này.</summary>
+    public decimal? QuoteVolume { get; private set; }
+
+    /// <summary>Số giao dịch (lệnh khớp) trong nến; null với nến lưu trước khi có cột này.</summary>
+    public long? TradeCount { get; private set; }
+
     /// <summary>True khi nến đã kết thúc theo giờ server của sàn; chiến lược chỉ dùng nến đã đóng.</summary>
     public bool IsClosed { get; private set; }
 
@@ -60,7 +66,9 @@ public sealed class Candle
         decimal close,
         decimal volume,
         bool isClosed,
-        DateTime receivedAtUtc)
+        DateTime receivedAtUtc,
+        decimal? quoteVolume = null,
+        long? tradeCount = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(exchange);
         ArgumentException.ThrowIfNullOrWhiteSpace(symbol);
@@ -78,6 +86,8 @@ public sealed class Candle
         Low = low;
         Close = close;
         Volume = volume;
+        QuoteVolume = quoteVolume;
+        TradeCount = tradeCount;
         IsClosed = isClosed;
         ReceivedAtUtc = receivedAtUtc;
     }
@@ -96,8 +106,16 @@ public sealed class Candle
 
         if (IsClosed)
         {
-            return newer.Open == Open && newer.High == High && newer.Low == Low &&
-                   newer.Close == Close && newer.Volume == Volume;
+            bool same = newer.Open == Open && newer.High == High && newer.Low == Low &&
+                        newer.Close == Close && newer.Volume == Volume;
+            // Nến đã đóng lưu trước khi có số giao dịch: bổ sung khi sàn trả lại cùng nến.
+            if (same)
+            {
+                QuoteVolume ??= newer.QuoteVolume;
+                TradeCount ??= newer.TradeCount;
+            }
+
+            return same;
         }
 
         Open = newer.Open;
@@ -105,6 +123,8 @@ public sealed class Candle
         Low = newer.Low;
         Close = newer.Close;
         Volume = newer.Volume;
+        QuoteVolume = newer.QuoteVolume;
+        TradeCount = newer.TradeCount;
         IsClosed = newer.IsClosed;
         ReceivedAtUtc = newer.ReceivedAtUtc;
         return true;
@@ -115,8 +135,10 @@ public sealed class Candle
     {
         if (Open <= 0 || High <= 0 || Low <= 0 || Close <= 0)
             return "Giá phải dương.";
-        if (Volume < 0)
+        if (Volume < 0 || QuoteVolume < 0)
             return "Volume âm.";
+        if (TradeCount < 0)
+            return "Số giao dịch âm.";
         if (High < Math.Max(Open, Close) || Low > Math.Min(Open, Close) || Low > High)
             return "High/Low không bao Open/Close.";
         return null;
