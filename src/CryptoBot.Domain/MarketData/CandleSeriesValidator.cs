@@ -15,26 +15,26 @@ public static class CandleSeriesValidator
 {
     public static IReadOnlyList<CandleIssue> Validate(IReadOnlyList<Candle> candles, CandleInterval interval)
     {
-        var issues = new List<CandleIssue>();
+        List<CandleIssue> issues = new List<CandleIssue>();
 
-        for (var i = 0; i < candles.Count; i++)
+        for (int i = 0; i < candles.Count; i++)
         {
-            var c = candles[i];
+            Candle c = candles[i];
             if (c.Validate() is { } reason)
                 issues.Add(new CandleIssue(CandleIssueKind.InvalidValues, c.OpenTimeUtc, reason));
 
             if (i == 0)
                 continue;
 
-            var prev = candles[i - 1].OpenTimeUtc;
-            var diff = c.OpenTimeUtc - prev;
+            DateTime prev = candles[i - 1].OpenTimeUtc;
+            TimeSpan diff = c.OpenTimeUtc - prev;
             if (diff == TimeSpan.Zero)
                 issues.Add(new CandleIssue(CandleIssueKind.Duplicate, c.OpenTimeUtc, "Trùng OpenTime."));
             else if (diff < TimeSpan.Zero)
                 issues.Add(new CandleIssue(CandleIssueKind.OutOfOrder, c.OpenTimeUtc, $"Đứng sau {prev:O}."));
             else if (diff != interval.Duration)
             {
-                var missing = (int)(diff.Ticks / interval.Duration.Ticks) - 1;
+                int missing = (int)(diff.Ticks / interval.Duration.Ticks) - 1;
                 issues.Add(new CandleIssue(CandleIssueKind.Gap, c.OpenTimeUtc,
                     $"Thiếu khoảng {missing} nến sau {prev:O}."));
             }
