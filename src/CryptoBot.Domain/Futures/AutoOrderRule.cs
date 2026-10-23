@@ -1,5 +1,6 @@
 namespace CryptoBot.Domain.Futures;
 
+/// <summary>Hướng so sánh giữa mark price và giá đặt của quy tắc theo giá.</summary>
 public enum TriggerCondition
 {
     /// <summary>Kích hoạt khi mark price ≤ giá đặt (ví dụ mua khi giá giảm về một mức).</summary>
@@ -12,15 +13,26 @@ public enum TriggerCondition
 /// <summary>Quy tắc kích hoạt theo mức giá hay theo tín hiệu của một chỉ báo tự viết.</summary>
 public enum RuleTriggerType
 {
+    /// <summary>Kích hoạt khi mark price chạm mức giá đặt.</summary>
     Price = 1,
+
+    /// <summary>Kích hoạt khi chỉ báo tự viết phát tín hiệu cùng hướng với quy tắc.</summary>
     Indicator = 2,
 }
 
+/// <summary>Trạng thái của quy tắc. Chỉ trạng thái <see cref="Active"/> mới còn được kiểm tra.</summary>
 public enum AutoRuleStatus
 {
+    /// <summary>Đang chờ điều kiện xảy ra.</summary>
     Active = 1,
+
+    /// <summary>Đã kích hoạt và mở được vị thế.</summary>
     Triggered = 2,
+
+    /// <summary>Điều kiện đã xảy ra nhưng engine từ chối mở lệnh; lý do nằm trong <see cref="AutoOrderRule.Note"/>.</summary>
     Rejected = 3,
+
+    /// <summary>Người dùng đã hủy trước khi kích hoạt.</summary>
     Cancelled = 4,
 }
 
@@ -31,29 +43,58 @@ public enum AutoRuleStatus
 /// </summary>
 public sealed class AutoOrderRule
 {
+    /// <summary>Khóa chính do database cấp.</summary>
     public long Id { get; private set; }
+
+    /// <summary>Môi trường chạy; luôn là "Paper" (không có đường tới tiền thật).</summary>
     public string Environment { get; private set; } = "Paper";
+
+    /// <summary>Mã lệnh duy nhất, dùng lại làm commandId khi mở vị thế để chống mở trùng.</summary>
     public Guid CommandId { get; private set; }
+
+    /// <summary>Cặp giao dịch, ví dụ "BTCUSDT".</summary>
     public string Symbol { get; private set; } = null!;
+
+    /// <summary>Hướng vị thế sẽ mở khi kích hoạt: Long hoặc Short.</summary>
     public PositionSide Side { get; private set; }
+
+    /// <summary>Loại điều kiện: theo mức giá hay theo tín hiệu chỉ báo.</summary>
     public RuleTriggerType TriggerType { get; private set; } = RuleTriggerType.Price;
 
     /// <summary>Chỉ có với quy tắc theo giá.</summary>
     public TriggerCondition? Condition { get; private set; }
+
+    /// <summary>Mức giá kích hoạt (so với mark price); chỉ có với quy tắc theo giá.</summary>
     public decimal? TriggerPrice { get; private set; }
 
     /// <summary>Tên chỉ báo trong cấu hình; chỉ có với quy tắc theo chỉ báo.</summary>
     public string? IndicatorName { get; private set; }
+
+    /// <summary>Số tiền ký quỹ (USDT) cho vị thế sẽ mở.</summary>
     public decimal Margin { get; private set; }
+
+    /// <summary>Đòn bẩy, ví dụ 2 = 2x.</summary>
     public int Leverage { get; private set; }
 
     /// <summary>Stop loss theo % so với mark price lúc kích hoạt (1 = 1%).</summary>
     public decimal StopLossPercent { get; private set; }
+
+    /// <summary>Take profit theo % so với mark price lúc kích hoạt; null = không đặt.</summary>
     public decimal? TakeProfitPercent { get; private set; }
+
+    /// <summary>Trạng thái hiện tại của quy tắc.</summary>
     public AutoRuleStatus Status { get; private set; }
+
+    /// <summary>Thời điểm tạo quy tắc (UTC).</summary>
     public DateTime CreatedAtUtc { get; private set; }
+
+    /// <summary>Thời điểm điều kiện xảy ra và quy tắc được xử lý (UTC); null khi chưa kích hoạt.</summary>
     public DateTime? TriggeredAtUtc { get; private set; }
+
+    /// <summary>Mark price lúc kích hoạt; SL/TP được tính theo % từ giá này.</summary>
     public decimal? TriggeredMarkPrice { get; private set; }
+
+    /// <summary>Id vị thế đã mở khi kích hoạt thành công.</summary>
     public long? PositionId { get; private set; }
 
     /// <summary>Giá trị chỉ báo và lý do tại nến đã kích hoạt quy tắc.</summary>
@@ -62,8 +103,10 @@ public sealed class AutoOrderRule
     /// <summary>Lý do bị từ chối, hoặc ghi chú đang bị chặn (ví dụ chạm giới hạn lỗ ngày).</summary>
     public string? Note { get; private set; }
 
+    /// <summary>Dành cho EF Core khi đọc từ database.</summary>
     private AutoOrderRule() { }
 
+    /// <summary>Tạo quy tắc theo giá: mở lệnh khi mark price thỏa <paramref name="condition"/> so với <paramref name="triggerPrice"/>.</summary>
     public AutoOrderRule(string symbol, PositionSide side, TriggerCondition condition, decimal triggerPrice,
         decimal margin, int leverage, decimal stopLossPercent, decimal? takeProfitPercent, DateTime createdAtUtc)
     {
@@ -85,6 +128,7 @@ public sealed class AutoOrderRule
         return rule;
     }
 
+    /// <summary>Gán các giá trị chung cho mọi loại quy tắc và tạo <see cref="CommandId"/> mới.</summary>
     private void Init(string symbol, PositionSide side, decimal margin, int leverage, decimal stopLossPercent,
         decimal? takeProfitPercent, DateTime createdAtUtc)
     {
@@ -104,6 +148,7 @@ public sealed class AutoOrderRule
         ? markPrice <= TriggerPrice
         : markPrice >= TriggerPrice);
 
+    /// <summary>Ghi nhận đã kích hoạt và mở được vị thế <paramref name="positionId"/>. Chỉ gọi khi đang chờ.</summary>
     public void MarkTriggered(decimal markPrice, long positionId, DateTime nowUtc, string? detail = null)
     {
         EnsureActive();
@@ -115,6 +160,7 @@ public sealed class AutoOrderRule
         Note = null;
     }
 
+    /// <summary>Ghi nhận điều kiện đã xảy ra nhưng lệnh bị từ chối kèm <paramref name="reason"/>; quy tắc không tự thử lại.</summary>
     public void MarkRejected(decimal markPrice, string reason, DateTime nowUtc, string? detail = null)
     {
         EnsureActive();
@@ -125,6 +171,7 @@ public sealed class AutoOrderRule
         Note = reason;
     }
 
+    /// <summary>Hủy quy tắc đang chờ.</summary>
     public void Cancel()
     {
         EnsureActive();
@@ -141,6 +188,7 @@ public sealed class AutoOrderRule
         return true;
     }
 
+    /// <summary>Chặn mọi thay đổi trạng thái khi quy tắc không còn ở trạng thái chờ.</summary>
     private void EnsureActive()
     {
         if (Status != AutoRuleStatus.Active)
