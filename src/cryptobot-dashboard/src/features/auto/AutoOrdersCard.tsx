@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Button, Card, InputNumber, Modal, Popconfirm, Segmented, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Checkbox, InputNumber, Modal, Popconfirm, Segmented, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
@@ -30,8 +30,11 @@ function describe(r: CreateAutoRule) {
     r.triggerType === 'Indicator'
       ? `Khi chỉ báo ${r.indicatorName} báo ${r.side} trên một nến đóng sau lúc này`
       : `Khi mark price ${condText(r.condition)} ${r.triggerPrice}`;
+  const close = r.closeOnReverse
+    ? ` Tự đóng khi ${r.indicatorName} báo ${r.side === 'Long' ? 'Short' : 'Long'} trên nến đóng sau lúc mở lệnh.`
+    : '';
   return `${when}, tự mở ${r.side} ${r.symbol} ${r.leverage}x, ` +
-    `margin ${r.margin} USDT, SL ${r.stopLossPercent}%${tp}. Chỉ chạy một lần, chỉ tiền giả lập (Paper).`;
+    `margin ${r.margin} USDT, SL ${r.stopLossPercent}%${tp}.${close} Chỉ chạy một lần, chỉ tiền giả lập (Paper).`;
 }
 
 export function AutoOrdersCard({ symbol, account }: { symbol: string; account: FuturesAccount | undefined }) {
@@ -48,6 +51,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
     pickedIndicator && symbolIndicators.some((i) => i.name === pickedIndicator)
       ? pickedIndicator
       : (symbolIndicators[0]?.name ?? null);
+  const [closeOnReverse, setCloseOnReverse] = useState(false);
   const [side, setSide] = useState<PositionSide>('Long');
   const [condition, setCondition] = useState<TriggerCondition>('AtOrBelow');
   const [trigger, setTrigger] = useState<string | null>(null);
@@ -99,6 +103,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
       condition: byIndicator ? null : condition,
       triggerPrice: byIndicator ? null : trigger,
       indicatorName: byIndicator ? indicatorName : null,
+      closeOnReverse: byIndicator && closeOnReverse,
       margin: margin ?? String(d?.margin ?? 50),
       leverage: leverage ?? d?.leverage ?? 2,
       stopLossPercent: sl ?? String(d?.stopLossPercent ?? 1),
@@ -121,7 +126,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
       size="small"
       title={
         <Space size={4}>
-          <span>Tự mở lệnh theo giá / chỉ báo</span>
+          <span>Tự mở / đóng lệnh theo giá / chỉ báo</span>
           <Tag color="blue">PAPER</Tag>
         </Space>
       }
@@ -154,17 +159,22 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
         />
 
         {triggerType === 'Indicator' ? (
-          <Select<string>
-            value={indicatorName ?? undefined}
-            onChange={setPickedIndicator}
-            placeholder={`Chưa có chỉ báo cho ${symbol}`}
-            disabled={symbolIndicators.length === 0}
-            style={{ width: '100%' }}
-            options={symbolIndicators.map((i) => ({
-              value: i.name,
-              label: `${i.name} · ${i.type} · ${i.interval}`,
-            }))}
-          />
+          <>
+            <Select<string>
+              value={indicatorName ?? undefined}
+              onChange={setPickedIndicator}
+              placeholder={`Chưa có chỉ báo cho ${symbol}`}
+              disabled={symbolIndicators.length === 0}
+              style={{ width: '100%' }}
+              options={symbolIndicators.map((i) => ({
+                value: i.name,
+                label: `${i.name} · ${i.type} · ${i.interval}`,
+              }))}
+            />
+            <Checkbox checked={closeOnReverse} onChange={(e) => setCloseOnReverse(e.target.checked)}>
+              Tự đóng khi chỉ báo đảo chiều
+            </Checkbox>
+          </>
         ) : (
           <Space.Compact block>
             <Select<TriggerCondition>
@@ -242,7 +252,8 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
 
       <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '8px 0' }}>
         Chạy một lần khi mark price chạm mức, hoặc khi chỉ báo phát tín hiệu cùng hướng (Long/Short) trên nến
-        đóng sau lúc tạo quy tắc. SL/TP tính theo % so với mark lúc kích hoạt. Mặc định thận trọng: tối đa{' '}
+        đóng sau lúc tạo quy tắc. Quy tắc theo chỉ báo có thể tự đóng vị thế khi chỉ báo báo ngược hướng.
+        SL/TP tính theo % so với mark lúc kích hoạt. Mặc định thận trọng: tối đa{' '}
         {d?.maxActiveRules ?? 10} quy tắc, một vị thế mỗi symbol, dừng khi lỗ trong ngày quá {d?.dailyLossLimitPercent ?? 5}%.
       </Typography.Paragraph>
 
@@ -263,6 +274,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
                 {r.triggerType === 'Indicator' ? (
                   <>
                     {r.symbol} <Tag color="purple">{r.indicatorName}</Tag>
+                    {r.closeOnReverse && <Tag color="geekblue">Tự đóng khi đảo chiều</Tag>}
                   </>
                 ) : (
                   <>
@@ -295,6 +307,13 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
                 {r.triggeredAtUtc && (
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                     {formatVn(r.triggeredAtUtc)} @ {fmtPrice(r.triggeredMarkPrice)}
+                  </Typography.Text>
+                )}
+                {r.status === 'Triggered' && r.closeOnReverse && (
+                  <Typography.Text type="secondary" style={{ fontSize: 12, maxWidth: 260 }}>
+                    {r.closeWatchEndedAtUtc
+                      ? `Đóng: ${r.closeDetail} (${formatVn(r.closeWatchEndedAtUtc)})`
+                      : 'Đang chờ chỉ báo đảo chiều để tự đóng…'}
                   </Typography.Text>
                 )}
               </Space>

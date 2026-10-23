@@ -15,6 +15,7 @@ const reasonLabel: Record<string, { text: string; color: string }> = {
   StopLoss: { text: 'Stop loss', color: 'orange' },
   TakeProfit: { text: 'Take profit', color: 'green' },
   Liquidation: { text: 'Thanh lý', color: 'red' },
+  Signal: { text: 'Chỉ báo đảo chiều', color: 'purple' },
 };
 
 export function PositionsCard({ account }: { account: FuturesAccount | undefined }) {
