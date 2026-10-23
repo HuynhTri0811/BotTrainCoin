@@ -99,8 +99,14 @@ Quy tắc kích hoạt khi chỉ báo báo cùng hướng trên **nến đóng s
 SL/TP theo % mark price lúc kích hoạt, một lần duy nhất. Giá trị chỉ báo lúc kích hoạt lưu ở `TriggerDetail`.
 Chỉ xét nến đóng mới nhất ở mỗi vòng 2 giây, nên nếu bot tắt đúng lúc có tín hiệu thì tín hiệu đó bị bỏ lỡ.
 
+**Tự đóng khi chỉ báo đảo chiều**: tick *Tự đóng khi chỉ báo đảo chiều* khi tạo quy tắc theo chỉ báo. Sau khi mở lệnh,
+nếu chính chỉ báo đó báo ngược hướng (Long đang mở mà chỉ báo báo Short, và ngược lại) trên **nến đóng sau lúc mở lệnh**,
+bot tự đóng vị thế theo mark price (lý do đóng `Signal`, hiện "Chỉ báo đảo chiều" trong lịch sử vị thế).
+SL/TP vẫn chạy song song; nếu SL/TP/thanh lý/đóng tay đến trước thì quy tắc ngừng theo dõi. Tự đóng không bị chặn
+bởi giới hạn lỗ ngày. Nếu chưa có mark price mới thì giữ theo dõi và thử lại ở vòng sau.
+
 Endpoint: `GET /api/indicators`, `GET /api/indicators/{name}/chart?limit=`; tạo quy tắc: `POST /api/paper/futures/auto-rules`
-với `"triggerType": "Indicator", "indicatorName": "..."`.
+với `"triggerType": "Indicator", "indicatorName": "..."` (thêm `"closeOnReverse": true` để tự đóng khi đảo chiều).
 
 ## Bảng giá trực tiếp (mỗi 15 giây)
 
