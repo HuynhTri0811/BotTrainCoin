@@ -373,3 +373,82 @@ export const liveApi = {
   prices: (limit = 60) => getJson<LivePrices>(`/api/live/prices?limit=${limit}`),
   dailyRange: (symbol: string) => getJson<DailyRange>(`/api/live/daily-range?symbol=${encodeURIComponent(symbol)}`),
 };
+
+// ---- Dự đoán nến kế tiếp lên/xuống (CryptoBot.Domain/Prediction/PriceDirectionPredictor.cs) ----
+
+export type PriceDirection = 'Up' | 'Down';
+
+export interface PredictionHistory {
+  time: number; // Unix seconds, open time của nến được đoán
+  predicted: PriceDirection;
+  score: number;
+  /** null khi nến đóng đúng bằng giá nến trước. */
+  actual: PriceDirection | null;
+  previousClose: number;
+  close: number;
+  /** Giá đóng − giá đóng nến trước. */
+  change: number;
+  changePercent: number;
+}
+
+export interface Prediction {
+  symbol: string;
+  interval: string;
+  /** Open time (Unix seconds) của nến được dự đoán. */
+  nextCandleTime: number;
+  lastClose: number;
+  direction: PriceDirection;
+  score: number;
+  reason: string;
+  backtestPredictions: number;
+  backtestCorrect: number;
+  hitRatePercent: number;
+  recent: PredictionHistory[];
+  settings: {
+    trendPeriod: number;
+    momentumPeriod: number;
+    trendWeight: number;
+    momentumWeight: number;
+    pressureWeight: number;
+  };
+}
+
+export interface HorizonAccuracy {
+  /** Số nến sau tín hiệu. */
+  candles: number;
+  signals: number;
+  correct: number;
+  hitRatePercent: number;
+  /** Trung bình % giá đi theo hướng tín hiệu (âm = đi ngược). */
+  averageMovePercent: number;
+}
+
+export interface IndicatorSignalOutcome {
+  time: number;
+  direction: PriceDirection;
+  close: number;
+  /** % giá đi theo hướng tín hiệu sau 1 / 3 nến; null khi chưa đủ nến. */
+  move1: number | null;
+  move3: number | null;
+  reason: string;
+}
+
+export interface IndicatorAccuracy {
+  name: string;
+  type: string;
+  candles: number;
+  fromTime: number | null;
+  horizons: HorizonAccuracy[];
+  recent: IndicatorSignalOutcome[];
+}
+
+export const predictionApi = {
+  indicators: (symbol: string, interval: string) =>
+    getJson<IndicatorAccuracy[]>(
+      `/api/prediction/indicators?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}`,
+    ),
+  get: (symbol: string, interval: string, history = 300) =>
+    getJson<Prediction>(
+      `/api/prediction?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}&history=${history}`,
+    ),
+};

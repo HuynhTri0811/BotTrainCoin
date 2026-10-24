@@ -8,6 +8,8 @@ import { PositionsCard } from '../features/futures/PositionsCard';
 import { TradePanel } from '../features/futures/TradePanel';
 import { CandleChart, EMA_COLORS, INDICATOR_MARKER_COLOR } from '../features/market/CandleChart';
 import { SessionStatsCard } from '../features/market/SessionStatsCard';
+import { IndicatorAccuracyCard } from '../features/prediction/IndicatorAccuracyCard';
+import { PredictionCard } from '../features/prediction/PredictionCard';
 import { formatVn } from '../time';
 
 const REFRESH_MS = 15_000;
@@ -139,6 +141,9 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
           </Space>
         </Col>
       </Row>
+
+      <PredictionCard symbol={strategy.symbol} interval={strategy.interval} />
+      <IndicatorAccuracyCard symbol={strategy.symbol} interval={strategy.interval} />
 
       {chart.data && chart.data.candles.length > 0 && (
         <SessionStatsCard candles={chart.data.candles} symbol={strategy.symbol} interval={strategy.interval} />
