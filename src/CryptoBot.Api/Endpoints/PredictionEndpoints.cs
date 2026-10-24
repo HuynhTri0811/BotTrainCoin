@@ -1,5 +1,7 @@
 using CryptoBot.Application.Abstractions;
+using CryptoBot.Application.Indicators;
 using CryptoBot.Application.LivePrices;
+using CryptoBot.Domain.Indicators;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Prediction;
 
@@ -57,6 +59,44 @@ public static class PredictionEndpoints
                     settings.MomentumWeight, settings.PressureWeight)));
         });
 
+        // Độ chính xác tín hiệu Long/Short của các chỉ báo tự viết cùng symbol/khung nến.
+        app.MapGet("/api/prediction/indicators", async (string symbol, string interval, int? history,
+            IndicatorRegistry registry, IndicatorService indicators, CancellationToken ct) =>
+        {
+            if (!CandleInterval.TryParse(interval, out var iv))
+                return Results.BadRequest(new { error = $"Interval không hỗ trợ: {interval}" });
+
+            var result = new List<IndicatorAccuracyDto>();
+            foreach (var c in registry.All.Where(c =>
+                         c.Key.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase) && c.Key.Interval == iv))
+            {
+                var chart = await indicators.GetChartAsync(c.Name, history ?? IndicatorService.MaxLimit, ct);
+                if (chart is null)
+                    continue;
+
+                var series = chart.Points.Select(p => p.Candle).ToList();
+                var signals = chart.Points
+                    .Select((p, i) => (p.Result, Index: i))
+                    .Where(x => x.Result.Signal != IndicatorSignal.None)
+                    .Select(x => new DirectionSignal(x.Index,
+                        x.Result.Signal == IndicatorSignal.Long ? PriceDirection.Up : PriceDirection.Down))
+                    .ToList();
+                var horizons = SignalAccuracy.Evaluate(series, signals, SignalAccuracy.DefaultHorizons);
+
+                var recent = signals.TakeLast(RecentCount).Reverse().Select(s => new IndicatorSignalDto(
+                    ToUnixSeconds(series[s.Index].OpenTimeUtc), s.Direction.ToString(), series[s.Index].Close,
+                    SignalAccuracy.MovePercent(series, s, 1), SignalAccuracy.MovePercent(series, s, 3),
+                    chart.Points[s.Index].Result.Reason)).ToList();
+
+                result.Add(new IndicatorAccuracyDto(c.Name, c.Type, series.Count,
+                    series.Count > 0 ? ToUnixSeconds(series[0].OpenTimeUtc) : null,
+                    horizons.Select(h => new HorizonAccuracyDto(h.Candles, h.Signals, h.Correct, h.HitRatePercent,
+                        h.AverageMovePercent)).ToList(),
+                    recent));
+            }
+
+            return Results.Ok(result);
+        });
     }
 
     private static long ToUnixSeconds(DateTime utc) => new DateTimeOffset(utc).ToUnixTimeSeconds();
@@ -77,3 +117,14 @@ public sealed record PredictionHistoryDto(long Time, string Predicted, decimal S
 public sealed record PredictionSettingsDto(int TrendPeriod, int MomentumPeriod, decimal TrendWeight,
     decimal MomentumWeight, decimal PressureWeight);
 
+/// <summary>Tín hiệu Long (Up)/Short (Down) chấm trên Candles nến đã đóng gần nhất, bắt đầu từ FromTime.</summary>
+public sealed record IndicatorAccuracyDto(string Name, string Type, int Candles, long? FromTime,
+    IReadOnlyList<HorizonAccuracyDto> Horizons, IReadOnlyList<IndicatorSignalDto> Recent);
+
+/// <summary>AverageMovePercent: trung bình % giá đi theo hướng tín hiệu (âm = đi ngược).</summary>
+public sealed record HorizonAccuracyDto(int Candles, int Signals, int Correct, decimal HitRatePercent,
+    decimal AverageMovePercent);
+
+/// <summary>Move1/Move3: % giá đi theo hướng tín hiệu sau 1/3 nến; null khi chưa đủ nến.</summary>
+public sealed record IndicatorSignalDto(long Time, string Direction, decimal Close, decimal? Move1, decimal? Move3,
+    string Reason);
