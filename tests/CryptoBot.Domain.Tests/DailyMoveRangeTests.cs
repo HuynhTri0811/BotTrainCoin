@@ -55,6 +55,42 @@ public class DailyMoveRangeTests
     }
 
     [Fact]
+    public void Longer_horizon_scales_sigma_by_square_root_of_days()
+    {
+        List<decimal> closes = Alternating(60);
+        DailyMoveRange oneDay = DailyMoveRange.Compute(closes, 100)!;
+        DailyMoveRange thirtyDays = DailyMoveRange.Compute(closes, 100, 30)!;
+
+        // ln(cao/giá) = σ: 30 ngày rộng hơn 1 ngày đúng √30 lần.
+        double ratio = Math.Log((double)(thirtyDays.High68 / 100)) / Math.Log((double)(oneDay.High68 / 100));
+        Assert.Equal(Math.Sqrt(30), ratio, 6);
+        Assert.Equal(30, thirtyDays.HorizonDays);
+    }
+
+    [Fact]
+    public void History_stats_use_horizon_length_windows()
+    {
+        // Tăng đều 1%/ngày: mọi đoạn 30 ngày đều tăng ~34,8%.
+        List<decimal> closes = [100m];
+        for (int i = 0; i < 40; i++)
+            closes.Add(closes[^1] * 1.01m);
+
+        DailyMoveRange r = DailyMoveRange.Compute(closes, 100, 30)!;
+
+        Assert.Equal(11, r.Samples);
+        Assert.Equal(100m, r.UpDaysPercent);
+        Assert.InRange(r.LargestRisePercent, 34.7m, 34.9m);
+        Assert.InRange(r.LargestDropPercent, 34.7m, 34.9m);
+    }
+
+    [Fact]
+    public void Too_little_history_for_horizon_returns_null()
+    {
+        Assert.Null(DailyMoveRange.Compute(Alternating(30), 100, 25));
+        Assert.Throws<ArgumentOutOfRangeException>(() => DailyMoveRange.Compute(Alternating(30), 100, 0));
+    }
+
+    [Fact]
     public void Rejects_non_positive_prices()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => DailyMoveRange.Compute(Alternating(20), 0));

@@ -352,12 +352,14 @@ export interface LivePrices {
   symbols: { symbol: string; samples: LiveSample[] }[];
 }
 
-/** Biên độ dự kiến 24 giờ từ biến động nến ngày (không dự đoán hướng). */
+/** Biên độ dự kiến sau horizonDays ngày từ biến động nến ngày (không dự đoán hướng). */
 export interface DailyRange {
   symbol: string;
+  horizonDays: number;
+  /** Số thay đổi theo ngày dùng để tính σ. */
   days: number;
   price: number;
-  /** Độ lệch chuẩn % thay đổi một ngày (σ). */
+  /** Độ lệch chuẩn % thay đổi sau horizonDays ngày (σ). */
   typicalMovePercent: number;
   low68: number;
   high68: number;
@@ -366,12 +368,15 @@ export interface DailyRange {
   averageMovePercent: number;
   largestRisePercent: number;
   largestDropPercent: number;
+  /** Các số liệu lịch sử (TB, mạnh nhất, % lần tăng) tính trên các đoạn dài horizonDays ngày. */
   upDaysPercent: number;
+  samples: number;
 }
 
 export const liveApi = {
   prices: (limit = 60) => getJson<LivePrices>(`/api/live/prices?limit=${limit}`),
-  dailyRange: (symbol: string) => getJson<DailyRange>(`/api/live/daily-range?symbol=${encodeURIComponent(symbol)}`),
+  dailyRange: (symbol: string, days = 1) =>
+    getJson<DailyRange>(`/api/live/daily-range?symbol=${encodeURIComponent(symbol)}&days=${days}`),
 };
 
 // ---- Dự đoán nến kế tiếp lên/xuống (CryptoBot.Domain/Prediction/PriceDirectionPredictor.cs) ----
