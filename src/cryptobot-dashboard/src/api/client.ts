@@ -337,6 +337,24 @@ export interface LivePrices {
   symbols: { symbol: string; samples: LiveSample[] }[];
 }
 
+/** Biên độ dự kiến 24 giờ từ biến động nến ngày (không dự đoán hướng). */
+export interface DailyRange {
+  symbol: string;
+  days: number;
+  price: number;
+  /** Độ lệch chuẩn % thay đổi một ngày (σ). */
+  typicalMovePercent: number;
+  low68: number;
+  high68: number;
+  low95: number;
+  high95: number;
+  averageMovePercent: number;
+  largestRisePercent: number;
+  largestDropPercent: number;
+  upDaysPercent: number;
+}
+
 export const liveApi = {
   prices: (limit = 60) => getJson<LivePrices>(`/api/live/prices?limit=${limit}`),
+  dailyRange: (symbol: string) => getJson<DailyRange>(`/api/live/daily-range?symbol=${encodeURIComponent(symbol)}`),
 };
