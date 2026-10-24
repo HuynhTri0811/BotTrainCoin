@@ -1,4 +1,5 @@
 using CryptoBot.Application.Abstractions;
+using CryptoBot.Application.LivePrices;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Prediction;
 
@@ -12,8 +13,9 @@ public static class PredictionEndpoints
     public static void MapPredictionEndpoints(this IEndpointRouteBuilder app)
     {
         // Gọi PriceDirectionPredictor với PredictorSettings mặc định: sửa hàm/tham số rồi restart API là thấy kết quả mới.
+        // interval=1d: dự đoán theo ngày trên nến ngày lấy thẳng từ sàn (không lưu DB).
         app.MapGet("/api/prediction", async (string symbol, string interval, int? history, ICandleStore candles,
-            CancellationToken ct) =>
+            DailyRangeService daily, CancellationToken ct) =>
         {
             if (!CandleInterval.TryParse(interval, out var iv))
                 return Results.BadRequest(new { error = $"Interval không hỗ trợ: {interval}" });
@@ -21,8 +23,11 @@ public static class PredictionEndpoints
                 return Results.BadRequest(new { error = "Symbol không hợp lệ" });
 
             var settings = new PredictorSettings();
-            var closed = await candles.GetLatestAsync(new CandleKey("Binance", symbol.ToUpperInvariant(), iv), null,
-                Math.Clamp(history ?? 300, 1, 1000) + settings.RequiredCandles, closedOnly: true, ct);
+            var limit = Math.Clamp(history ?? 300, 1, 1000) + settings.RequiredCandles;
+            var closed = iv == CandleInterval.D1
+                ? (await daily.GetClosedDailyCandlesAsync(symbol.ToUpperInvariant(), ct)).TakeLast(limit).ToList()
+                : await candles.GetLatestAsync(new CandleKey("Binance", symbol.ToUpperInvariant(), iv), null, limit,
+                    closedOnly: true, ct);
             if (closed.Count < settings.RequiredCandles)
                 return Results.NotFound(new { error = $"Cần ít nhất {settings.RequiredCandles} nến đã đóng." });
 
