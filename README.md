@@ -108,6 +108,14 @@ bởi giới hạn lỗ ngày. Nếu chưa có mark price mới thì giữ theo 
 Endpoint: `GET /api/indicators`, `GET /api/indicators/{name}/chart?limit=`; tạo quy tắc: `POST /api/paper/futures/auto-rules`
 với `"triggerType": "Indicator", "indicatorName": "..."` (thêm `"closeOnReverse": true` để tự đóng khi đảo chiều).
 
+## Cảnh báo mua/bán áp đảo
+
+Card "Giao dịch theo phiên" có cột *Mua / Bán chủ động*: Binance trả sẵn khối lượng **mua chủ động** (taker buy, cột k[9] của kline),
+phần còn lại của Volume là **bán chủ động**. Thuật toán ở `CryptoBot.Domain/MarketData/VolumePressure.cs`:
+phía lớn hơn ≥ phía nhỏ hơn × (1 + ngưỡng%) thì cảnh báo `SellHeavy` (bán áp đảo) hoặc `BuyHeavy` (mua áp đảo).
+Ngưỡng mặc định 80% (`MarketData:VolumeAlertExcessPercent`), tức một phía chiếm ≥ ~64% tổng khối lượng.
+Dashboard hiện hộp cảnh báo cho phiên vừa đóng và phiên đang chạy. Nến cũ được tải lại để bổ sung số liệu này.
+
 ## Bảng giá trực tiếp (mỗi 15 giây)
 
 Panel trên cùng dashboard: mỗi `LivePrices:PollInterval` (mặc định 15s) backend lấy **Spot** (`/api/v3/ticker/price`) và **Mark Futures** (`/fapi/v1/premiumIndex`) song song cho từng symbol trong `LivePrices:Symbols`.

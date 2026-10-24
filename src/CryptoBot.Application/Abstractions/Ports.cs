@@ -22,7 +22,8 @@ public sealed record KlineDto(
     decimal Close,
     decimal Volume,
     decimal? QuoteVolume = null,
-    long? TradeCount = null);
+    long? TradeCount = null,
+    decimal? TakerBuyVolume = null);
 
 public interface IMarketDataClient
 {
@@ -44,7 +45,7 @@ public interface ICandleStore
 {
     Task<DateTime?> GetLatestOpenTimeAsync(CandleKey key, CancellationToken ct);
 
-    /// <summary>OpenTime sớm nhất (từ <paramref name="fromUtc"/>) của nến chưa có số giao dịch; null nếu đủ.</summary>
+    /// <summary>OpenTime sớm nhất (từ <paramref name="fromUtc"/>) của nến chưa có số giao dịch hoặc khối lượng mua chủ động; null nếu đủ.</summary>
     Task<DateTime?> GetFirstMissingStatsOpenTimeAsync(CandleKey key, DateTime fromUtc, CancellationToken ct);
 
     Task<UpsertResult> UpsertAsync(CandleKey key, IReadOnlyList<Candle> candles, CancellationToken ct);

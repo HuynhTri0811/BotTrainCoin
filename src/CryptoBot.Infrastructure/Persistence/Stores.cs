@@ -18,7 +18,7 @@ public sealed class CandleStore(BotDbContext db) : ICandleStore
     public async Task<DateTime?> GetFirstMissingStatsOpenTimeAsync(CandleKey key, DateTime fromUtc,
         CancellationToken ct) =>
         await ForKey(key)
-            .Where(c => c.OpenTimeUtc >= fromUtc && c.TradeCount == null)
+            .Where(c => c.OpenTimeUtc >= fromUtc && (c.TradeCount == null || c.TakerBuyVolume == null))
             .OrderBy(c => c.OpenTimeUtc)
             .Select(c => (DateTime?)c.OpenTimeUtc)
             .FirstOrDefaultAsync(ct);

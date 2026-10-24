@@ -119,6 +119,26 @@ public class CandleTests
     }
 
     [Fact]
+    public void Closed_candle_without_taker_buy_volume_is_filled_from_same_candle()
+    {
+        Candle stored = WithStats(closed: true);
+        Candle newer = new("Binance", "BTCUSDT", CandleInterval.H1, TestCandles.T0, 10, 10, 10, 10, 1, true,
+            TestCandles.T0, quoteVolume: 10m, tradeCount: 5, takerBuyVolume: 0.4m);
+
+        Assert.True(stored.ApplyUpdate(newer));
+        Assert.Equal(0.4m, stored.TakerBuyVolume);
+    }
+
+    [Fact]
+    public void Taker_buy_volume_above_volume_is_invalid()
+    {
+        Candle c = new("Binance", "BTCUSDT", CandleInterval.H1, TestCandles.T0, 10, 10, 10, 10, 1, true,
+            TestCandles.T0, takerBuyVolume: 2);
+
+        Assert.Equal("Khối lượng mua chủ động phải nằm trong [0, Volume].", c.Validate());
+    }
+
+    [Fact]
     public void Negative_trade_count_is_invalid()
     {
         Assert.Equal("Số giao dịch âm.", WithStats(closed: true, trades: -1).Validate());

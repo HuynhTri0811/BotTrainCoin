@@ -19,6 +19,9 @@ public sealed class MarketDataOptions
 
     /// <summary>Không sync thành công trong khoảng này thì dữ liệu bị coi là stale.</summary>
     public TimeSpan StaleAfter { get; set; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>Cảnh báo khi một phía (mua/bán chủ động) lớn hơn phía kia ít nhất bấy nhiêu %.</summary>
+    public decimal VolumeAlertExcessPercent { get; set; } = VolumePressure.DefaultAlertExcessPercent;
 }
 
 public sealed record SyncResult(
@@ -66,7 +69,8 @@ public sealed class CandleSyncService(
                 .Select(k => new Candle(key.Exchange, key.Symbol, key.Interval, k.OpenTimeUtc,
                     k.Open, k.High, k.Low, k.Close, k.Volume,
                     isClosed: serverTime >= k.OpenTimeUtc + key.Interval.Duration,
-                    receivedAtUtc: serverTime, quoteVolume: k.QuoteVolume, tradeCount: k.TradeCount))
+                    receivedAtUtc: serverTime, quoteVolume: k.QuoteVolume, tradeCount: k.TradeCount,
+                    takerBuyVolume: k.TakerBuyVolume))
                 .ToList();
 
             var batchIssues = CandleSeriesValidator.Validate(candles, key.Interval);

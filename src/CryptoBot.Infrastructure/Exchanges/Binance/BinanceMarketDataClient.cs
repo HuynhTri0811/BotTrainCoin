@@ -57,7 +57,8 @@ public sealed class BinanceMarketDataClient(HttpClient http, ILogger<BinanceMark
                 ParseDecimal(k[4]),
                 ParseDecimal(k[5]),
                 ParseDecimal(k[7]),
-                k[8].GetInt64()));
+                k[8].GetInt64(),
+                ParseDecimal(k[9])));
         }
 
         return result;
