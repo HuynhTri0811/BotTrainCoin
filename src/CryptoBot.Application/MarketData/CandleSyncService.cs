@@ -66,7 +66,8 @@ public sealed class CandleSyncService(
                 .Select(k => new Candle(key.Exchange, key.Symbol, key.Interval, k.OpenTimeUtc,
                     k.Open, k.High, k.Low, k.Close, k.Volume,
                     isClosed: serverTime >= k.OpenTimeUtc + key.Interval.Duration,
-                    receivedAtUtc: serverTime, quoteVolume: k.QuoteVolume, tradeCount: k.TradeCount))
+                    receivedAtUtc: serverTime, quoteVolume: k.QuoteVolume, tradeCount: k.TradeCount,
+                    takerBuyVolume: k.TakerBuyVolume))
                 .ToList();
 
             var batchIssues = CandleSeriesValidator.Validate(candles, key.Interval);

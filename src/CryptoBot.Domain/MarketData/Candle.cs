@@ -45,6 +45,12 @@ public sealed class Candle
     /// <summary>Số giao dịch (lệnh khớp) trong nến; null với nến lưu trước khi có cột này.</summary>
     public long? TradeCount { get; private set; }
 
+    /// <summary>
+    /// Khối lượng mua chủ động (lệnh mua khớp vào lệnh bán đang chờ, đơn vị coin). Phần còn lại của
+    /// <see cref="Volume"/> là bán chủ động. Null với nến lưu trước khi có cột này.
+    /// </summary>
+    public decimal? TakerBuyVolume { get; private set; }
+
     /// <summary>True khi nến đã kết thúc theo giờ server của sàn; chiến lược chỉ dùng nến đã đóng.</summary>
     public bool IsClosed { get; private set; }
 
@@ -68,7 +74,8 @@ public sealed class Candle
         bool isClosed,
         DateTime receivedAtUtc,
         decimal? quoteVolume = null,
-        long? tradeCount = null)
+        long? tradeCount = null,
+        decimal? takerBuyVolume = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(exchange);
         ArgumentException.ThrowIfNullOrWhiteSpace(symbol);
@@ -88,6 +95,7 @@ public sealed class Candle
         Volume = volume;
         QuoteVolume = quoteVolume;
         TradeCount = tradeCount;
+        TakerBuyVolume = takerBuyVolume;
         IsClosed = isClosed;
         ReceivedAtUtc = receivedAtUtc;
     }
@@ -113,6 +121,7 @@ public sealed class Candle
             {
                 QuoteVolume ??= newer.QuoteVolume;
                 TradeCount ??= newer.TradeCount;
+                TakerBuyVolume ??= newer.TakerBuyVolume;
             }
 
             return same;
@@ -125,6 +134,7 @@ public sealed class Candle
         Volume = newer.Volume;
         QuoteVolume = newer.QuoteVolume;
         TradeCount = newer.TradeCount;
+        TakerBuyVolume = newer.TakerBuyVolume;
         IsClosed = newer.IsClosed;
         ReceivedAtUtc = newer.ReceivedAtUtc;
         return true;
@@ -139,6 +149,8 @@ public sealed class Candle
             return "Volume âm.";
         if (TradeCount < 0)
             return "Số giao dịch âm.";
+        if (TakerBuyVolume < 0 || TakerBuyVolume > Volume)
+            return "Khối lượng mua chủ động phải nằm trong [0, Volume].";
         if (High < Math.Max(Open, Close) || Low > Math.Min(Open, Close) || Low > High)
             return "High/Low không bao Open/Close.";
         return null;

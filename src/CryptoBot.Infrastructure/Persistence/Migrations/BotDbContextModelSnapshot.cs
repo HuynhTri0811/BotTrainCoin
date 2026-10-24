@@ -308,6 +308,9 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("TakerBuyVolume")
+                        .HasColumnType("TEXT");
+
                     b.Property<long?>("TradeCount")
                         .HasColumnType("INTEGER");
 
