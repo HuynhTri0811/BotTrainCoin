@@ -413,7 +413,40 @@ export interface Prediction {
   };
 }
 
+export interface HorizonAccuracy {
+  /** Số nến sau tín hiệu. */
+  candles: number;
+  signals: number;
+  correct: number;
+  hitRatePercent: number;
+  /** Trung bình % giá đi theo hướng tín hiệu (âm = đi ngược). */
+  averageMovePercent: number;
+}
+
+export interface IndicatorSignalOutcome {
+  time: number;
+  direction: PriceDirection;
+  close: number;
+  /** % giá đi theo hướng tín hiệu sau 1 / 3 nến; null khi chưa đủ nến. */
+  move1: number | null;
+  move3: number | null;
+  reason: string;
+}
+
+export interface IndicatorAccuracy {
+  name: string;
+  type: string;
+  candles: number;
+  fromTime: number | null;
+  horizons: HorizonAccuracy[];
+  recent: IndicatorSignalOutcome[];
+}
+
 export const predictionApi = {
+  indicators: (symbol: string, interval: string) =>
+    getJson<IndicatorAccuracy[]>(
+      `/api/prediction/indicators?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}`,
+    ),
   get: (symbol: string, interval: string, history = 300) =>
     getJson<Prediction>(
       `/api/prediction?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}&history=${history}`,
