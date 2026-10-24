@@ -54,6 +54,21 @@ export interface ChartPoint {
   isClosed: boolean;
   fastEma: number | null;
   slowEma: number | null;
+  /** Mua/bán chủ động; null với nến lưu trước khi có dữ liệu này. */
+  pressure: VolumePressure | null;
+}
+
+export type VolumePressureSide = 'Balanced' | 'BuyHeavy' | 'SellHeavy';
+
+export interface VolumePressure {
+  buyVolume: number;
+  sellVolume: number;
+  /** Tỷ trọng mua trong tổng khối lượng, 0–100. */
+  buyPercent: number;
+  /** Phía lớn hơn vượt phía nhỏ hơn bao nhiêu %; null khi phía nhỏ hơn bằng 0. */
+  excessPercent: number | null;
+  side: VolumePressureSide;
+  alertExcessPercent: number;
 }
 
 export interface Signal {
