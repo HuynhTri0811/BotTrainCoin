@@ -5,12 +5,14 @@ public sealed record CandleInterval
 {
     public static readonly CandleInterval M15 = new("15m", TimeSpan.FromMinutes(15));
     public static readonly CandleInterval H1 = new("1h", TimeSpan.FromHours(1));
+    public static readonly CandleInterval D1 = new("1d", TimeSpan.FromDays(1));
 
     private static readonly IReadOnlyDictionary<string, CandleInterval> All =
         new Dictionary<string, CandleInterval>(StringComparer.Ordinal)
         {
             [M15.Code] = M15,
             [H1.Code] = H1,
+            [D1.Code] = D1,
         };
 
     public string Code { get; }
