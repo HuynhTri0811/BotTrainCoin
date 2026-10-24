@@ -16,18 +16,22 @@ public static class LivePriceEndpoints
             return new LivePricesDto((int)options.PollInterval.TotalSeconds, clock.UtcNow, symbols);
         });
 
-        app.MapGet("/api/live/daily-range", async (string symbol, LivePriceOptions options, DailyRangeService ranges,
-            CancellationToken ct) =>
+        // days: số ngày phía trước (mặc định 1 = 24 giờ).
+        app.MapGet("/api/live/daily-range", async (string symbol, int? days, LivePriceOptions options,
+            DailyRangeService ranges, CancellationToken ct) =>
         {
             if (!options.Symbols.Contains(symbol, StringComparer.OrdinalIgnoreCase))
                 return Results.BadRequest(new { error = $"Symbol không có trong LivePrices: {symbol}" });
+            var horizon = days ?? 1;
+            if (horizon < 1 || horizon > DailyRangeService.MaxHorizonDays)
+                return Results.BadRequest(new { error = $"days phải từ 1 đến {DailyRangeService.MaxHorizonDays}." });
 
-            var r = await ranges.GetAsync(symbol.ToUpperInvariant(), ct);
+            var r = await ranges.GetAsync(symbol.ToUpperInvariant(), horizon, ct);
             return r is null
                 ? Results.NotFound(new { error = "Chưa đủ dữ liệu nến ngày." })
-                : Results.Ok(new DailyRangeDto(symbol.ToUpperInvariant(), r.Days, r.Price, r.TypicalMovePercent,
-                    r.Low68, r.High68, r.Low95, r.High95, r.AverageMovePercent, r.LargestRisePercent,
-                    r.LargestDropPercent, r.UpDaysPercent));
+                : Results.Ok(new DailyRangeDto(symbol.ToUpperInvariant(), r.HorizonDays, r.Days, r.Price,
+                    r.TypicalMovePercent, r.Low68, r.High68, r.Low95, r.High95, r.AverageMovePercent,
+                    r.LargestRisePercent, r.LargestDropPercent, r.UpDaysPercent, r.Samples));
         });
     }
 }
@@ -39,7 +43,8 @@ public sealed record LiveSymbolDto(string Symbol, IReadOnlyList<LiveSampleDto> S
 
 public sealed record LivePricesDto(int IntervalSeconds, DateTime ServerTimeUtc, IReadOnlyList<LiveSymbolDto> Symbols);
 
-/// <summary>Biên độ dự kiến 24 giờ (xem DailyMoveRange). Số chỉ để hiển thị.</summary>
-public sealed record DailyRangeDto(string Symbol, int Days, decimal Price, decimal TypicalMovePercent, decimal Low68,
-    decimal High68, decimal Low95, decimal High95, decimal AverageMovePercent, decimal LargestRisePercent,
-    decimal LargestDropPercent, decimal UpDaysPercent);
+/// <summary>Biên độ dự kiến sau HorizonDays ngày (xem DailyMoveRange). Số chỉ để hiển thị.</summary>
+public sealed record DailyRangeDto(string Symbol, int HorizonDays, int Days, decimal Price,
+    decimal TypicalMovePercent, decimal Low68, decimal High68, decimal Low95, decimal High95,
+    decimal AverageMovePercent, decimal LargestRisePercent, decimal LargestDropPercent, decimal UpDaysPercent,
+    int Samples);

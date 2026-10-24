@@ -11,8 +11,11 @@ namespace CryptoBot.Application.LivePrices;
 /// </summary>
 public sealed class DailyRangeService(IMarketDataClient client, LivePriceHistory history, IClock clock)
 {
-    /// <summary>Số ngày lịch sử dùng để tính biên độ.</summary>
+    /// <summary>Số ngày lịch sử dùng để tính biên độ 24 giờ; mốc dài hơn dùng cả <see cref="FetchDays"/> ngày.</summary>
     public const int LookbackDays = 90;
+
+    /// <summary>Mốc dài nhất được ước lượng.</summary>
+    public const int MaxHorizonDays = 90;
 
     /// <summary>Số nến ngày tải về (một năm), đủ cho cả chạy thử dự đoán theo ngày.</summary>
     public const int FetchDays = 365;
@@ -20,15 +23,18 @@ public sealed class DailyRangeService(IMarketDataClient client, LivePriceHistory
     private static readonly TimeSpan CacheFor = TimeSpan.FromMinutes(15);
     private readonly ConcurrentDictionary<string, (DateTime FetchedAtUtc, IReadOnlyList<Candle> Candles)> _cache = new();
 
-    public async Task<DailyMoveRange?> GetAsync(string symbol, CancellationToken ct)
+    /// <summary>Biên độ sau <paramref name="horizonDays"/> ngày (1 = 24 giờ).</summary>
+    public async Task<DailyMoveRange?> GetAsync(string symbol, int horizonDays, CancellationToken ct)
     {
         var candles = await GetClosedDailyCandlesAsync(symbol, ct);
         if (candles.Count == 0)
             return null;
 
-        var closes = candles.TakeLast(LookbackDays + 1).Select(c => c.Close).ToList();
+        // 24 giờ: 90 ngày gần nhất phản ánh biến động hiện tại. Mốc dài cần nhiều đoạn lịch sử hơn: dùng cả năm.
+        var lookback = horizonDays == 1 ? LookbackDays : FetchDays;
+        var closes = candles.TakeLast(lookback + 1).Select(c => c.Close).ToList();
         var spot = history.Get(symbol, 1).LastOrDefault()?.SpotPrice;
-        return DailyMoveRange.Compute(closes, spot ?? closes[^1]);
+        return DailyMoveRange.Compute(closes, spot ?? closes[^1], horizonDays);
     }
 
     /// <summary>Tối đa <see cref="FetchDays"/> nến ngày đã đóng gần nhất, tăng dần theo thời gian.</summary>
