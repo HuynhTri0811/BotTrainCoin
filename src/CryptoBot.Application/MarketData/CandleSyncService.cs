@@ -19,6 +19,9 @@ public sealed class MarketDataOptions
 
     /// <summary>Không sync thành công trong khoảng này thì dữ liệu bị coi là stale.</summary>
     public TimeSpan StaleAfter { get; set; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>Cảnh báo khi một phía (mua/bán chủ động) lớn hơn phía kia ít nhất bấy nhiêu %.</summary>
+    public decimal VolumeAlertExcessPercent { get; set; } = VolumePressure.DefaultAlertExcessPercent;
 }
 
 public sealed record SyncResult(
