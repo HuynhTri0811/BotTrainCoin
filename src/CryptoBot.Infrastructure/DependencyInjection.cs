@@ -73,6 +73,7 @@ public static class DependencyInjection
         services.AddSingleton(config.GetSection("LivePrices").Get<LivePriceOptions>() ?? new LivePriceOptions());
         services.AddSingleton<LivePriceHistory>();
         services.AddScoped<LivePriceSampler>();
+        services.AddSingleton<DailyRangeService>();
 
         return services;
     }
