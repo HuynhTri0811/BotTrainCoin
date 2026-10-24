@@ -15,6 +15,14 @@ public sealed class CandleStore(BotDbContext db) : ICandleStore
             .Select(c => (DateTime?)c.OpenTimeUtc)
             .FirstOrDefaultAsync(ct);
 
+    public async Task<DateTime?> GetFirstMissingStatsOpenTimeAsync(CandleKey key, DateTime fromUtc,
+        CancellationToken ct) =>
+        await ForKey(key)
+            .Where(c => c.OpenTimeUtc >= fromUtc && (c.TradeCount == null || c.TakerBuyVolume == null))
+            .OrderBy(c => c.OpenTimeUtc)
+            .Select(c => (DateTime?)c.OpenTimeUtc)
+            .FirstOrDefaultAsync(ct);
+
     public async Task<UpsertResult> UpsertAsync(CandleKey key, IReadOnlyList<Candle> candles, CancellationToken ct)
     {
         if (candles.Count == 0)
@@ -196,6 +204,12 @@ public sealed class AutoOrderStore(BotDbContext db) : IAutoOrderStore
     public async Task<IReadOnlyList<AutoOrderRule>> GetActiveAsync(CancellationToken ct) =>
         await db.AutoOrderRules
             .Where(r => r.Environment == Env && r.Status == AutoRuleStatus.Active)
+            .OrderBy(r => r.Id).ToListAsync(ct);
+
+    public async Task<IReadOnlyList<AutoOrderRule>> GetWatchingCloseAsync(CancellationToken ct) =>
+        await db.AutoOrderRules
+            .Where(r => r.Environment == Env && r.CloseOnReverse && r.Status == AutoRuleStatus.Triggered &&
+                        r.CloseWatchEndedAtUtc == null)
             .OrderBy(r => r.Id).ToListAsync(ct);
 
     public async Task<IReadOnlyList<AutoOrderRule>> GetRecentAsync(int limit, CancellationToken ct) =>

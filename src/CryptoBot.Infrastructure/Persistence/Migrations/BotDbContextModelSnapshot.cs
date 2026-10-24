@@ -23,6 +23,19 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<Guid?>("CloseCommandId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CloseDetail")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("CloseOnReverse")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("CloseWatchEndedAtUtc")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("CommandId")
                         .HasColumnType("TEXT");
 
@@ -284,6 +297,9 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                     b.Property<long>("OpenTimeUtc")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("QuoteVolume")
+                        .HasColumnType("TEXT");
+
                     b.Property<long>("ReceivedAtUtc")
                         .HasColumnType("INTEGER");
 
@@ -291,6 +307,12 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("TakerBuyVolume")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("TradeCount")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Volume")
                         .IsRequired()

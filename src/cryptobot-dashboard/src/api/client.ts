@@ -47,9 +47,28 @@ export interface ChartPoint {
   low: number;
   close: number;
   volume: number;
+  /** Khối lượng quy ra USDT; null với nến lưu trước khi có dữ liệu này. */
+  quoteVolume: number | null;
+  /** Số giao dịch khớp trong nến; null với nến lưu trước khi có dữ liệu này. */
+  tradeCount: number | null;
   isClosed: boolean;
   fastEma: number | null;
   slowEma: number | null;
+  /** Mua/bán chủ động; null với nến lưu trước khi có dữ liệu này. */
+  pressure: VolumePressure | null;
+}
+
+export type VolumePressureSide = 'Balanced' | 'BuyHeavy' | 'SellHeavy';
+
+export interface VolumePressure {
+  buyVolume: number;
+  sellVolume: number;
+  /** Tỷ trọng mua trong tổng khối lượng, 0–100. */
+  buyPercent: number;
+  /** Phía lớn hơn vượt phía nhỏ hơn bao nhiêu %; null khi phía nhỏ hơn bằng 0. */
+  excessPercent: number | null;
+  side: VolumePressureSide;
+  alertExcessPercent: number;
 }
 
 export interface Signal {
@@ -108,7 +127,7 @@ export interface FuturesPosition {
   openFee: number;
   closeFee: number;
   status: 'Open' | 'Closed' | 'Liquidated';
-  closeReason: 'Manual' | 'StopLoss' | 'TakeProfit' | 'Liquidation' | null;
+  closeReason: 'Manual' | 'StopLoss' | 'TakeProfit' | 'Liquidation' | 'Signal' | null;
   exitPrice: number | null;
   realizedPnl: number | null;
   netPnl: number | null;
@@ -219,6 +238,10 @@ export interface AutoRule {
   positionId: number | null;
   note: string | null;
   triggerDetail: string | null;
+  /** Quy tắc theo chỉ báo: tự đóng vị thế khi chỉ báo đảo chiều. */
+  closeOnReverse: boolean;
+  closeWatchEndedAtUtc: string | null;
+  closeDetail: string | null;
 }
 
 export interface AutoSummary {
@@ -244,6 +267,8 @@ export interface CreateAutoRule {
   triggerPrice: string | null;
   /** Chỉ với triggerType = 'Indicator'. */
   indicatorName: string | null;
+  /** Chỉ với triggerType = 'Indicator': tự đóng khi chỉ báo báo ngược hướng. */
+  closeOnReverse: boolean;
   margin: string;
   leverage: number;
   stopLossPercent: string;
@@ -327,6 +352,24 @@ export interface LivePrices {
   symbols: { symbol: string; samples: LiveSample[] }[];
 }
 
+/** Biên độ dự kiến 24 giờ từ biến động nến ngày (không dự đoán hướng). */
+export interface DailyRange {
+  symbol: string;
+  days: number;
+  price: number;
+  /** Độ lệch chuẩn % thay đổi một ngày (σ). */
+  typicalMovePercent: number;
+  low68: number;
+  high68: number;
+  low95: number;
+  high95: number;
+  averageMovePercent: number;
+  largestRisePercent: number;
+  largestDropPercent: number;
+  upDaysPercent: number;
+}
+
 export const liveApi = {
   prices: (limit = 60) => getJson<LivePrices>(`/api/live/prices?limit=${limit}`),
+  dailyRange: (symbol: string) => getJson<DailyRange>(`/api/live/daily-range?symbol=${encodeURIComponent(symbol)}`),
 };

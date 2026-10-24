@@ -15,6 +15,9 @@ internal sealed class InMemoryAutoOrderStore : IAutoOrderStore
     public Task<IReadOnlyList<AutoOrderRule>> GetActiveAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<AutoOrderRule>>(Rules.Where(r => r.Status == AutoRuleStatus.Active).ToList());
 
+    public Task<IReadOnlyList<AutoOrderRule>> GetWatchingCloseAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<AutoOrderRule>>(Rules.Where(r => r.IsWatchingClose).ToList());
+
     public Task<IReadOnlyList<AutoOrderRule>> GetRecentAsync(int limit, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<AutoOrderRule>>(Rules.AsEnumerable().Reverse().Take(limit).ToList());
 
@@ -304,8 +307,8 @@ public class AutoOrderServiceTests
     }
 
     private static CreateRuleRequest OnIndicator(PositionSide side = PositionSide.Long, string name = "rsi-test",
-        string symbol = "BTCUSDT") =>
-        new(symbol, side, null, null, 50m, 2, 1m, 2m, RuleTriggerType.Indicator, name);
+        string symbol = "BTCUSDT", bool closeOnReverse = false) =>
+        new(symbol, side, null, null, 50m, 2, 1m, 2m, RuleTriggerType.Indicator, name, closeOnReverse);
 
     private void AdvanceTo(DateTime now)
     {
@@ -401,5 +404,98 @@ public class AutoOrderServiceTests
         Assert.Empty(ok.Errors);
         Assert.Equal(RuleTriggerType.Indicator, ok.Rule!.TriggerType);
         Assert.Null(ok.Rule.TriggerPrice);
+    }
+
+    // ── Tự đóng khi chỉ báo đảo chiều ─────────────────────────────────────────
+
+    /// <summary>Tạo quy tắc Long theo chỉ báo, mở lệnh trên nến 12:00–13:00 (RSI cắt lên).</summary>
+    private async Task<AutoOrderRule> OpenLongOnIndicator(bool closeOnReverse)
+    {
+        var rule = await CreateRule(OnIndicator(closeOnReverse: closeOnReverse));
+        AddCandles(T0, RsiCrossUp);
+        AdvanceTo(T0.AddHours(1).AddSeconds(30));
+        Assert.Equal(1, await _svc.EvaluateAsync(default));
+        return rule;
+    }
+
+    [Fact]
+    public async Task Close_on_reverse_closes_long_when_indicator_signals_short()
+    {
+        var rule = await OpenLongOnIndicator(closeOnReverse: true);
+        AddCandles(T0.AddHours(1), RsiCrossDown);   // nến 13:00–14:00 báo Short
+        AdvanceTo(T0.AddHours(2).AddSeconds(30));
+
+        Assert.Equal(1, await _svc.EvaluateAsync(default));
+
+        var p = Assert.Single(_paperStore.Positions);
+        Assert.Equal(PositionStatus.Closed, p.Status);
+        Assert.Equal(CloseReason.Signal, p.CloseReason);
+        Assert.Equal(rule.CloseCommandId, p.CloseCommandId);
+        Assert.False(rule.IsWatchingClose);
+        Assert.Contains("RSI cắt xuống", rule.CloseDetail);
+
+        // Đã ngừng theo dõi: lần kiểm tra sau không làm gì thêm.
+        Assert.Equal(0, await _svc.EvaluateAsync(default));
+    }
+
+    [Fact]
+    public async Task Close_on_reverse_ignores_signal_in_same_direction()
+    {
+        var rule = await OpenLongOnIndicator(closeOnReverse: true);
+        AddCandles(T0.AddHours(1), RsiCrossUp);
+        AdvanceTo(T0.AddHours(2).AddSeconds(30));
+
+        Assert.Equal(0, await _svc.EvaluateAsync(default));
+        Assert.Equal(PositionStatus.Open, Assert.Single(_paperStore.Positions).Status);
+        Assert.True(rule.IsWatchingClose);
+    }
+
+    [Fact]
+    public async Task Without_close_on_reverse_position_stays_open_on_opposite_signal()
+    {
+        var rule = await OpenLongOnIndicator(closeOnReverse: false);
+        AddCandles(T0.AddHours(1), RsiCrossDown);
+        AdvanceTo(T0.AddHours(2).AddSeconds(30));
+
+        Assert.Equal(0, await _svc.EvaluateAsync(default));
+        Assert.Equal(PositionStatus.Open, Assert.Single(_paperStore.Positions).Status);
+        Assert.Null(rule.CloseCommandId);
+    }
+
+    [Fact]
+    public async Task Close_on_reverse_stops_watching_when_stop_loss_closed_first()
+    {
+        var rule = await OpenLongOnIndicator(closeOnReverse: true);
+        SetMark(98_900m);                           // dưới SL 99 000
+        Assert.Equal(1, await _paper.EvaluateTriggersAsync(default));
+
+        Assert.Equal(0, await _svc.EvaluateAsync(default));
+        Assert.False(rule.IsWatchingClose);
+        Assert.Contains("StopLoss", rule.CloseDetail);
+    }
+
+    [Fact]
+    public async Task Close_on_reverse_waits_for_fresh_mark_price()
+    {
+        var rule = await OpenLongOnIndicator(closeOnReverse: true);
+        AddCandles(T0.AddHours(1), RsiCrossDown);
+        _clock.UtcNow = T0.AddHours(2).AddSeconds(30); // mark price cũ đã hết hạn
+
+        Assert.Equal(0, await _svc.EvaluateAsync(default));
+        Assert.Equal(PositionStatus.Open, Assert.Single(_paperStore.Positions).Status);
+        Assert.True(rule.IsWatchingClose);
+
+        SetMark(100_000m);
+        Assert.Equal(1, await _svc.EvaluateAsync(default));
+        Assert.Equal(CloseReason.Signal, Assert.Single(_paperStore.Positions).CloseReason);
+    }
+
+    [Fact]
+    public async Task Create_rejects_close_on_reverse_for_price_rule()
+    {
+        var result = await _svc.CreateAsync(BuyDip() with { CloseOnReverse = true }, default);
+
+        Assert.Null(result.Rule);
+        Assert.Contains(result.Errors, e => e.Contains("chỉ dùng với quy tắc theo chỉ báo"));
     }
 }

@@ -3,6 +3,7 @@ import { Alert, Card, Flex, Progress, Space, Statistic, Tag, Tooltip, Typography
 import { useQuery } from '@tanstack/react-query';
 import { liveApi, type LiveSample } from '../../api/client';
 import { fmtPrice2 as fmtPrice } from '../futures/format';
+import { DailyRangeBar } from './DailyRangeBar';
 import { Sparkline } from './Sparkline';
 
 interface Row extends LiveSample {
@@ -100,6 +101,8 @@ export function LivePricePanel({ symbol }: { symbol: string }) {
         />
         <Sparkline values={samples.flatMap((s) => (s.spotPrice != null ? [s.spotPrice] : []))} />
       </Flex>
+
+      <DailyRangeBar symbol={symbol} />
 
       {latest?.error && <Alert type="warning" showIcon title={latest.error} style={{ marginBottom: 8 }} />}
     </Card>

@@ -7,6 +7,7 @@ import { LivePricePanel } from '../features/live/LivePricePanel';
 import { PositionsCard } from '../features/futures/PositionsCard';
 import { TradePanel } from '../features/futures/TradePanel';
 import { CandleChart, EMA_COLORS, INDICATOR_MARKER_COLOR } from '../features/market/CandleChart';
+import { SessionStatsCard } from '../features/market/SessionStatsCard';
 import { formatVn } from '../time';
 
 const REFRESH_MS = 15_000;
@@ -126,7 +127,7 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
             ))}
             <Typography.Paragraph type="secondary" style={{ margin: '8px 0 0', fontSize: 12 }}>
               Đánh giá đến nến mở lúc {formatVn(strategy.lastEvaluatedCandleOpenTimeUtc)}. Nến xám là nến đang chạy,
-              chưa được chiến lược sử dụng. Mũi tên là tín hiệu trên nến đã đóng, không phải lệnh đã khớp.
+              chưa được chiến lược sử dụng. Cột dưới đáy là khối lượng mỗi nến. Mũi tên là tín hiệu trên nến đã đóng, không phải lệnh đã khớp.
               Nến là giá Spot; vị thế futures khớp theo mark price Futures nên có thể lệch nhẹ.
             </Typography.Paragraph>
           </Card>
@@ -138,6 +139,10 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
           </Space>
         </Col>
       </Row>
+
+      {chart.data && chart.data.candles.length > 0 && (
+        <SessionStatsCard candles={chart.data.candles} symbol={strategy.symbol} interval={strategy.interval} />
+      )}
 
       <PositionsCard account={account.data} />
 

@@ -58,7 +58,11 @@ public sealed class PaperFuturesService(
         }
     }
 
-    public async Task<CloseResult> CloseAsync(long positionId, Guid commandId, CancellationToken ct)
+    public Task<CloseResult> CloseAsync(long positionId, Guid commandId, CancellationToken ct) =>
+        CloseAsync(positionId, commandId, CloseReason.Manual, ct);
+
+    /// <summary>Đóng vị thế theo giá thị trường. Gửi lại cùng <paramref name="commandId"/> không đóng hai lần.</summary>
+    public async Task<CloseResult> CloseAsync(long positionId, Guid commandId, CloseReason reason, CancellationToken ct)
     {
         await gate.Semaphore.WaitAsync(ct);
         try
@@ -76,7 +80,7 @@ public sealed class PaperFuturesService(
             if (marks.GetFresh(position.Symbol) is not { } mark)
                 return new CloseResult(false, "Chưa có mark price mới; không thể ước lượng giá đóng.", position);
 
-            CloseAt(position, CloseReason.Manual, mark.Price, commandId);
+            CloseAt(position, reason, mark.Price, commandId);
             await store.SaveAsync(ct);
             return new CloseResult(true, null, position);
         }

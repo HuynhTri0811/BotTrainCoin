@@ -99,11 +99,29 @@ Quy tắc kích hoạt khi chỉ báo báo cùng hướng trên **nến đóng s
 SL/TP theo % mark price lúc kích hoạt, một lần duy nhất. Giá trị chỉ báo lúc kích hoạt lưu ở `TriggerDetail`.
 Chỉ xét nến đóng mới nhất ở mỗi vòng 2 giây, nên nếu bot tắt đúng lúc có tín hiệu thì tín hiệu đó bị bỏ lỡ.
 
+**Tự đóng khi chỉ báo đảo chiều**: tick *Tự đóng khi chỉ báo đảo chiều* khi tạo quy tắc theo chỉ báo. Sau khi mở lệnh,
+nếu chính chỉ báo đó báo ngược hướng (Long đang mở mà chỉ báo báo Short, và ngược lại) trên **nến đóng sau lúc mở lệnh**,
+bot tự đóng vị thế theo mark price (lý do đóng `Signal`, hiện "Chỉ báo đảo chiều" trong lịch sử vị thế).
+SL/TP vẫn chạy song song; nếu SL/TP/thanh lý/đóng tay đến trước thì quy tắc ngừng theo dõi. Tự đóng không bị chặn
+bởi giới hạn lỗ ngày. Nếu chưa có mark price mới thì giữ theo dõi và thử lại ở vòng sau.
+
 Endpoint: `GET /api/indicators`, `GET /api/indicators/{name}/chart?limit=`; tạo quy tắc: `POST /api/paper/futures/auto-rules`
-với `"triggerType": "Indicator", "indicatorName": "..."`.
+với `"triggerType": "Indicator", "indicatorName": "..."` (thêm `"closeOnReverse": true` để tự đóng khi đảo chiều).
+
+## Cảnh báo mua/bán áp đảo
+
+Card "Giao dịch theo phiên" có cột *Mua / Bán chủ động*: Binance trả sẵn khối lượng **mua chủ động** (taker buy, cột k[9] của kline),
+phần còn lại của Volume là **bán chủ động**. Thuật toán ở `CryptoBot.Domain/MarketData/VolumePressure.cs`:
+phía lớn hơn ≥ phía nhỏ hơn × (1 + ngưỡng%) thì cảnh báo `SellHeavy` (bán áp đảo) hoặc `BuyHeavy` (mua áp đảo).
+Ngưỡng mặc định 80% (`MarketData:VolumeAlertExcessPercent`), tức một phía chiếm ≥ ~64% tổng khối lượng.
+Dashboard hiện hộp cảnh báo cho phiên vừa đóng và phiên đang chạy. Nến cũ được tải lại để bổ sung số liệu này.
 
 ## Bảng giá trực tiếp (mỗi 15 giây)
 
 Panel trên cùng dashboard: mỗi `LivePrices:PollInterval` (mặc định 15s) backend lấy **Spot** (`/api/v3/ticker/price`) và **Mark Futures** (`/fapi/v1/premiumIndex`) song song cho từng symbol trong `LivePrices:Symbols`.
 Hiển thị giá, % đổi so với lần trước, chênh lệch Mark − Spot, độ trễ API từng nguồn, trạng thái OK/Lỗi, đếm ngược lần lấy tiếp theo và cảnh báo "Chậm" nếu quá 2 chu kỳ.
 Một nguồn lỗi thì chỉ nguồn đó để trống kèm lý do, không điền giá cũ. Lịch sử (240 mẫu ≈ 1 giờ) giữ trong bộ nhớ, mất khi restart. Endpoint: `GET /api/live/prices?limit=`.
+
+**Biên độ 24 giờ** (dưới giá Spot): lấy 90 nến ngày đã đóng (`/api/v3/klines`, cache 15 phút), tính độ lệch chuẩn σ của log return
+một ngày (`CryptoBot.Domain/MarketData/DailyMoveRange.cs`). Khoảng `giá × e^(±σ)` ≈ 68% số ngày, `giá × e^(±2σ)` ≈ 95%.
+Kèm % ngày tăng, ngày tăng/giảm mạnh nhất. Chỉ là biên độ, không đoán hướng. Endpoint: `GET /api/live/daily-range?symbol=`.

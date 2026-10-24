@@ -40,6 +40,7 @@ public enum AutoRuleStatus
 /// Quy tắc "khi giá chạm mức này (hoặc chỉ báo phát tín hiệu) thì tự mở lệnh Paper". Chạy một lần: sau khi kích hoạt
 /// (thành công hoặc bị từ chối) quy tắc không tự bật lại. <see cref="CommandId"/> cũng là
 /// commandId của lệnh mở, nên dù bị xử lý lặp cũng không mở hai vị thế.
+/// Quy tắc theo chỉ báo có thể bật <see cref="CloseOnReverse"/> để tự đóng vị thế đã mở khi chỉ báo đảo chiều.
 /// </summary>
 public sealed class AutoOrderRule
 {
@@ -103,6 +104,25 @@ public sealed class AutoOrderRule
     /// <summary>Lý do bị từ chối, hoặc ghi chú đang bị chặn (ví dụ chạm giới hạn lỗ ngày).</summary>
     public string? Note { get; private set; }
 
+    /// <summary>
+    /// Chỉ với quy tắc theo chỉ báo: sau khi mở lệnh, tự đóng vị thế khi chính chỉ báo đó phát tín hiệu
+    /// ngược hướng (Long đang mở mà chỉ báo báo Short, và ngược lại).
+    /// </summary>
+    public bool CloseOnReverse { get; private set; }
+
+    /// <summary>Mã lệnh đóng, dùng làm commandId khi tự đóng để dù xử lý lặp cũng không đóng hai lần.</summary>
+    public Guid? CloseCommandId { get; private set; }
+
+    /// <summary>Thời điểm ngừng theo dõi đảo chiều (đã tự đóng, hoặc vị thế đã kết thúc theo cách khác).</summary>
+    public DateTime? CloseWatchEndedAtUtc { get; private set; }
+
+    /// <summary>Kết quả theo dõi đảo chiều: tín hiệu đã đóng vị thế, hoặc lý do vị thế đã kết thúc trước.</summary>
+    public string? CloseDetail { get; private set; }
+
+    /// <summary>Lệnh đã mở và vẫn đang chờ tín hiệu đảo chiều để tự đóng.</summary>
+    public bool IsWatchingClose =>
+        CloseOnReverse && Status == AutoRuleStatus.Triggered && CloseWatchEndedAtUtc is null;
+
     /// <summary>Dành cho EF Core khi đọc từ database.</summary>
     private AutoOrderRule() { }
 
@@ -118,12 +138,20 @@ public sealed class AutoOrderRule
     /// <summary>
     /// Quy tắc mở lệnh khi chỉ báo <paramref name="indicatorName"/> phát tín hiệu cùng hướng
     /// (Long ↔ Long, Short ↔ Short) trên một nến đóng sau thời điểm tạo quy tắc.
+    /// <paramref name="closeOnReverse"/> = true: sau đó tự đóng vị thế khi chỉ báo phát tín hiệu ngược hướng.
     /// </summary>
     public static AutoOrderRule ForIndicator(string symbol, PositionSide side, string indicatorName,
-        decimal margin, int leverage, decimal stopLossPercent, decimal? takeProfitPercent, DateTime createdAtUtc)
+        decimal margin, int leverage, decimal stopLossPercent, decimal? takeProfitPercent, DateTime createdAtUtc,
+        bool closeOnReverse = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(indicatorName);
-        AutoOrderRule rule = new AutoOrderRule { TriggerType = RuleTriggerType.Indicator, IndicatorName = indicatorName };
+        AutoOrderRule rule = new AutoOrderRule
+        {
+            TriggerType = RuleTriggerType.Indicator,
+            IndicatorName = indicatorName,
+            CloseOnReverse = closeOnReverse,
+            CloseCommandId = closeOnReverse ? Guid.NewGuid() : null,
+        };
         rule.Init(symbol, side, margin, leverage, stopLossPercent, takeProfitPercent, createdAtUtc);
         return rule;
     }
@@ -169,6 +197,15 @@ public sealed class AutoOrderRule
         TriggeredAtUtc = nowUtc;
         TriggeredMarkPrice = markPrice;
         Note = reason;
+    }
+
+    /// <summary>Ngừng theo dõi đảo chiều kèm <paramref name="detail"/>. Chỉ gọi khi <see cref="IsWatchingClose"/>.</summary>
+    public void EndCloseWatch(string detail, DateTime nowUtc)
+    {
+        if (!IsWatchingClose)
+            throw new InvalidOperationException($"Quy tắc {Id} không theo dõi đảo chiều.");
+        CloseWatchEndedAtUtc = nowUtc;
+        CloseDetail = detail;
     }
 
     /// <summary>Hủy quy tắc đang chờ.</summary>
