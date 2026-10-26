@@ -13,7 +13,7 @@ public static class HistoryEndpoints
     {
         // Chênh lệch mở → đóng cửa từng tháng trên nến ngày lịch sử (DailyHistoryWorker, mặc định Bitfinex từ 2016).
         app.MapGet("/api/history/monthly", async (string? symbol, DailyHistoryOptions options,
-            IDailyHistoryClient client, ICandleStore candles, CancellationToken ct) =>
+            IDailyHistoryClient client, ICandleStore candles, MarketEventCatalog events, CancellationToken ct) =>
         {
             if (options.Symbols.Count == 0)
                 return Results.NotFound(new { error = "Chưa cấu hình DailyHistory:Symbols." });
@@ -36,7 +36,9 @@ public static class HistoryEndpoints
                 report.Years.Select(y => new YearChangeDto(y.Year, y.Open, y.Close, y.ChangePercent, y.Complete))
                     .ToList(),
                 report.MonthStats.Select(s => new MonthStatsDto(s.Month, s.Years, s.AverageChangePercent,
-                    s.BestChangePercent, s.WorstChangePercent, s.UpCount, s.UpPercent)).ToList()));
+                    s.BestChangePercent, s.WorstChangePercent, s.UpCount, s.UpPercent)).ToList(),
+                events.For(picked).Select(e => new MonthEventDto(e.Year, e.Month, e.Title, e.Detail, e.MarketWide))
+                    .ToList()));
         });
     }
 }
@@ -46,10 +48,13 @@ public sealed record MonthChangeDto(int Year, int Month, decimal Open, decimal C
 
 public sealed record YearChangeDto(int Year, decimal Open, decimal Close, decimal ChangePercent, bool Complete);
 
+/// <summary>Sự kiện cùng tháng (marketevents.json), không khẳng định là nguyên nhân.</summary>
+public sealed record MonthEventDto(int Year, int Month, string Title, string? Detail, bool MarketWide);
+
 public sealed record MonthStatsDto(int Month, int Years, decimal AverageChangePercent, decimal BestChangePercent,
     decimal WorstChangePercent, int UpCount, decimal UpPercent);
 
 /// <summary>Báo cáo theo tháng (xem MonthlyChangeReport). Số chỉ để hiển thị.</summary>
 public sealed record MonthlyHistoryDto(string Symbol, string Exchange, IReadOnlyList<string> Symbols,
     DateTime FirstDayUtc, DateTime LastDayUtc, IReadOnlyList<MonthChangeDto> Months, IReadOnlyList<YearChangeDto> Years,
-    IReadOnlyList<MonthStatsDto> MonthStats);
+    IReadOnlyList<MonthStatsDto> MonthStats, IReadOnlyList<MonthEventDto> Events);

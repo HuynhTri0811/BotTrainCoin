@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, Card, Empty, Segmented, Space, Spin, Tooltip, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { historyApi, type MonthStats } from '../api/client';
+import { DropEventsCard } from '../features/history/DropEventsCard';
 import { fmtPct, MONTHS, MonthlyHeatmap, pctColor } from '../features/history/MonthlyHeatmap';
 
 const day = new Intl.DateTimeFormat('vi-VN', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -105,13 +106,15 @@ export function HistoryPage() {
             <MonthlyHeatmap data={d} />
             <Typography.Paragraph type="secondary" style={{ margin: 0, fontSize: 12 }}>
               Mỗi ô = (giá đóng cửa ngày cuối tháng − giá mở cửa ngày đầu tháng) / giá mở cửa. Màu càng đậm chênh lệch
-              càng lớn (đậm nhất từ ±30%). * là tháng/năm chưa trọn, không tính vào các dòng thống kê. Rê chuột vào ô
+              càng lớn (đậm nhất từ ±30%). Chấm tím là tháng có sự kiện ghi nhận. * là tháng/năm chưa trọn, không tính vào các dòng thống kê. Rê chuột vào ô
               để xem giá. Nến ngày {d.exchange} theo giờ UTC, cập nhật đến {day.format(new Date(d.lastDayUtc))}; sàn bỏ
               qua ngày không có giao dịch nên vài tháng đầu có thể thiếu ngày.
             </Typography.Paragraph>
           </Space>
         )}
       </Card>
+
+      {d && d.months.length > 0 && <DropEventsCard key={d.symbol} data={d} />}
 
       {d && d.monthStats.length > 0 && (
         <Card size="small" title={`Trung bình mỗi tháng qua các năm · ${symbol.replace(/USD$/, '')}`}>
