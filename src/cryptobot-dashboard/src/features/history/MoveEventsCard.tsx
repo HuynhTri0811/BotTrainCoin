@@ -1,41 +1,59 @@
 import { useState } from 'react';
-import { Card, Segmented, Table, Tag, Typography } from 'antd';
+import { Card, Segmented, Space, Table, Tag, Typography } from 'antd';
 import type { MonthChange, MonthlyHistory } from '../../api/client';
 import { fmtPrice2 as fmtPrice } from '../futures/format';
 import { eventsByMonth, fmtPct, pctColor } from './MonthlyHeatmap';
 
-const THRESHOLDS = [-10, -15, -20, -30];
+type Direction = 'drop' | 'rise';
 
-/** Các tháng giảm từ ngưỡng trở xuống, kèm sự kiện thị trường cùng tháng để xem lại. */
-export function DropEventsCard({ data }: { data: MonthlyHistory }) {
-  const [threshold, setThreshold] = useState(-20);
+/** Ngưỡng % theo độ lớn; giảm là âm, tăng là dương. */
+const THRESHOLDS = [10, 15, 20, 30];
+
+/** Các tháng giảm (hoặc tăng) từ ngưỡng trở lên, kèm sự kiện thị trường cùng tháng để xem lại. */
+export function MoveEventsCard({ data }: { data: MonthlyHistory }) {
+  const [direction, setDirection] = useState<Direction>('drop');
+  const [threshold, setThreshold] = useState(20);
+  const rise = direction === 'rise';
   const events = eventsByMonth(data.events);
-  const drops = data.months
-    .filter((m) => m.changePercent <= threshold)
-    .sort((a, b) => a.changePercent - b.changePercent);
-  const withEvents = drops.filter((m) => events.has(`${m.year}-${m.month}`)).length;
+  // Tháng biến động mạnh nhất đứng đầu.
+  const moves = data.months
+    .filter((m) => (rise ? m.changePercent >= threshold : m.changePercent <= -threshold))
+    .sort((a, b) => (rise ? b.changePercent - a.changePercent : a.changePercent - b.changePercent));
+  const withEvents = moves.filter((m) => events.has(`${m.year}-${m.month}`)).length;
   const coin = data.symbol.replace(/USD$/, '');
 
   return (
     <Card
       size="small"
-      title={`Tháng giảm mạnh và sự kiện · ${coin}`}
+      title={`Tháng biến động mạnh và sự kiện · ${coin}`}
       extra={
-        <Segmented<number>
-          size="small"
-          value={threshold}
-          onChange={setThreshold}
-          options={THRESHOLDS.map((t) => ({ value: t, label: `≤ ${t}%` }))}
-        />
+        <Space size="small" wrap>
+          <Segmented<Direction>
+            size="small"
+            value={direction}
+            onChange={setDirection}
+            options={[
+              { value: 'drop', label: 'Giảm mạnh' },
+              { value: 'rise', label: 'Tăng mạnh' },
+            ]}
+          />
+          <Segmented<number>
+            size="small"
+            value={threshold}
+            onChange={setThreshold}
+            options={THRESHOLDS.map((t) => ({ value: t, label: rise ? `≥ +${t}%` : `≤ −${t}%` }))}
+          />
+        </Space>
       }
     >
       <Typography.Paragraph style={{ margin: '0 0 8px' }}>
-        {drops.length} tháng {coin} giảm từ {Math.abs(threshold)}% trở lên; {withEvents} tháng có sự kiện ghi nhận.
+        {moves.length} tháng {coin} {rise ? 'tăng' : 'giảm'} từ {threshold}% trở lên; {withEvents} tháng có sự kiện ghi
+        nhận.
       </Typography.Paragraph>
       <Table<MonthChange>
         rowKey={(m) => `${m.year}-${m.month}`}
         size="small"
-        dataSource={drops}
+        dataSource={moves}
         pagination={{ pageSize: 10, hideOnSinglePage: true, size: 'small' }}
         scroll={{ x: 'max-content' }}
         columns={[
@@ -94,7 +112,7 @@ export function DropEventsCard({ data }: { data: MonthlyHistory }) {
       />
       <Typography.Paragraph type="secondary" style={{ margin: '8px 0 0', fontSize: 12 }}>
         Sự kiện được ghi tay trong <code>src/CryptoBot.Api/marketevents.json</code> và chỉ là những gì xảy ra cùng
-        tháng, không khẳng định là nguyên nhân giá giảm. Muốn thêm hoặc sửa, mở file đó rồi restart API.
+        tháng, không khẳng định là nguyên nhân giá tăng hay giảm. Muốn thêm hoặc sửa, mở file đó rồi restart API.
       </Typography.Paragraph>
     </Card>
   );

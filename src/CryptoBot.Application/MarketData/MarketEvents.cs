@@ -18,7 +18,7 @@ public sealed class MarketEvent
 public sealed record MonthEvent(int Year, int Month, string Title, string? Detail, bool MarketWide);
 
 /// <summary>
-/// Danh sách sự kiện ghi tay để đối chiếu với các tháng giá giảm mạnh. Chỉ là sự kiện cùng tháng,
+/// Danh sách sự kiện ghi tay để đối chiếu với các tháng giá tăng hoặc giảm mạnh. Chỉ là sự kiện cùng tháng,
 /// không khẳng định đó là nguyên nhân.
 /// </summary>
 public sealed class MarketEventCatalog

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Alert, Card, Empty, Segmented, Space, Spin, Tooltip, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { historyApi, type MonthStats } from '../api/client';
-import { DropEventsCard } from '../features/history/DropEventsCard';
+import { MoveEventsCard } from '../features/history/MoveEventsCard';
 import { fmtPct, MONTHS, MonthlyHeatmap, pctColor } from '../features/history/MonthlyHeatmap';
 
 const day = new Intl.DateTimeFormat('vi-VN', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -114,7 +114,7 @@ export function HistoryPage() {
         )}
       </Card>
 
-      {d && d.months.length > 0 && <DropEventsCard key={d.symbol} data={d} />}
+      {d && d.months.length > 0 && <MoveEventsCard key={d.symbol} data={d} />}
 
       {d && d.monthStats.length > 0 && (
         <Card size="small" title={`Trung bình mỗi tháng qua các năm · ${symbol.replace(/USD$/, '')}`}>

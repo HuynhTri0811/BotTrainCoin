@@ -12,7 +12,7 @@ CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICult
 CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
-// Sự kiện thị trường để đối chiếu với tháng giảm mạnh; sửa file rồi restart API.
+// Sự kiện thị trường để đối chiếu với tháng tăng/giảm mạnh; sửa file rồi restart API.
 builder.Configuration.AddJsonFile("marketevents.json", optional: true);
 
 builder.Host.UseSerilog((ctx, cfg) => cfg
