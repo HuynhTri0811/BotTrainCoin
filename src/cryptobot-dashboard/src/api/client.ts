@@ -457,3 +457,53 @@ export const predictionApi = {
       `/api/prediction?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}&history=${history}`,
     ),
 };
+
+// ---- Chênh lệch mở → đóng cửa theo tháng (CryptoBot.Domain/MarketData/MonthlyChangeReport.cs) ----
+
+export interface MonthChange {
+  year: number;
+  /** 1–12. */
+  month: number;
+  /** Giá mở cửa ngày đầu tiên có nến của tháng. */
+  open: number;
+  /** Giá đóng cửa ngày cuối cùng có nến (tháng đang chạy: giá gần nhất). */
+  close: number;
+  changePercent: number;
+  days: number;
+  complete: boolean;
+}
+
+export interface YearChange {
+  year: number;
+  open: number;
+  close: number;
+  changePercent: number;
+  complete: boolean;
+}
+
+/** Cùng một tháng qua các năm, chỉ tính tháng trọn vẹn. */
+export interface MonthStats {
+  month: number;
+  years: number;
+  averageChangePercent: number;
+  bestChangePercent: number;
+  worstChangePercent: number;
+  upCount: number;
+  upPercent: number;
+}
+
+export interface MonthlyHistory {
+  symbol: string;
+  exchange: string;
+  /** Các symbol có dữ liệu lịch sử (DailyHistory:Symbols). */
+  symbols: string[];
+  firstDayUtc: string;
+  lastDayUtc: string;
+  months: MonthChange[];
+  years: YearChange[];
+  monthStats: MonthStats[];
+}
+
+export const historyApi = {
+  monthly: (symbol: string) => getJson<MonthlyHistory>(`/api/history/monthly?symbol=${encodeURIComponent(symbol)}`),
+};
