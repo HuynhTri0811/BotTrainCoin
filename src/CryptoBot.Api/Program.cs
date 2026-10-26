@@ -55,6 +55,7 @@ app.MapAutoOrderEndpoints();
 app.MapIndicatorEndpoints();
 app.MapLivePriceEndpoints();
 app.MapPredictionEndpoints();
+app.MapHistoryEndpoints();
 // API không tồn tại phải là 404 JSON, không bao giờ rơi vào trang SPA.
 app.MapFallback("/api/{**path}", () => Results.NotFound(new { error = "Endpoint không tồn tại" }));
 app.MapFallbackToFile("index.html");
