@@ -5,6 +5,7 @@ using CryptoBot.Application.LivePrices;
 using CryptoBot.Application.MarketData;
 using CryptoBot.Application.Signals;
 using CryptoBot.Infrastructure.Exchanges.Binance;
+using CryptoBot.Infrastructure.Exchanges.Bitfinex;
 using CryptoBot.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -74,6 +75,19 @@ public static class DependencyInjection
         services.AddSingleton<LivePriceHistory>();
         services.AddScoped<LivePriceSampler>();
         services.AddSingleton<DailyRangeService>();
+
+        // Nến ngày lịch sử dài hạn (từ 2016) từ Bitfinex, lưu vào Candles với Exchange = "Bitfinex".
+        services.Configure<BitfinexOptions>(config.GetSection("Bitfinex"));
+        services.AddHttpClient<IDailyHistoryClient, BitfinexDailyHistoryClient>((sp, http) =>
+        {
+            var o = sp.GetRequiredService<IOptions<BitfinexOptions>>().Value;
+            http.BaseAddress = new Uri(o.BaseUrl);
+            http.Timeout = o.RequestTimeout;
+            // Bitfinex trả 403 cho request không có User-Agent.
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("CryptoBot/1.0");
+        });
+        services.AddSingleton(config.GetSection("DailyHistory").Get<DailyHistoryOptions>() ?? new DailyHistoryOptions());
+        services.AddScoped<DailyHistorySyncService>();
 
         return services;
     }

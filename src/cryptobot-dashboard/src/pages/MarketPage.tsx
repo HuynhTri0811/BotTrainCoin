@@ -1,28 +1,19 @@
 import { useState } from 'react';
-import { Alert, Card, Col, Empty, Row, Select, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Card, Col, Empty, Row, Select, Space, Spin, Tag, Tooltip, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { api, futuresApi, indicatorApi, type Signal, type Strategy } from '../api/client';
-import { AutoOrdersCard } from '../features/auto/AutoOrdersCard';
+import { api, futuresApi, indicatorApi, type Strategy } from '../api/client';
+import { formatVn } from '../time';
 import { LivePricePanel } from '../features/live/LivePricePanel';
-import { PositionsCard } from '../features/futures/PositionsCard';
-import { TradePanel } from '../features/futures/TradePanel';
 import { CandleChart, EMA_COLORS, INDICATOR_MARKER_COLOR } from '../features/market/CandleChart';
 import { SessionStatsCard } from '../features/market/SessionStatsCard';
-import { formatVn } from '../time';
 
 const REFRESH_MS = 15_000;
 
-const priceFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 8 });
-
+/** Biểu đồ nến + EMA + chỉ báo tự viết, giá trực tiếp và thống kê phiên của chiến lược đang chọn. */
 export function MarketPage({ strategy }: { strategy: Strategy }) {
   const chart = useQuery({
     queryKey: ['chart', strategy.id],
     queryFn: () => api.chart(strategy.id, 300),
-    refetchInterval: REFRESH_MS,
-  });
-  const signals = useQuery({
-    queryKey: ['signals', strategy.id],
-    queryFn: () => api.signals(strategy.id, 50),
     refetchInterval: REFRESH_MS,
   });
 
@@ -56,7 +47,7 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       <LivePricePanel symbol={strategy.symbol} />
       <Row gutter={[16, 16]}>
-        <Col xs={24} lg={16}>
+        <Col span={24}>
           <Card
             size="small"
             title={
@@ -132,53 +123,11 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
             </Typography.Paragraph>
           </Card>
         </Col>
-        <Col xs={24} lg={8}>
-          <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-            <TradePanel symbol={strategy.symbol} account={account.data} />
-            <AutoOrdersCard symbol={strategy.symbol} account={account.data} />
-          </Space>
-        </Col>
       </Row>
 
       {chart.data && chart.data.candles.length > 0 && (
         <SessionStatsCard candles={chart.data.candles} symbol={strategy.symbol} interval={strategy.interval} />
       )}
-
-      <PositionsCard account={account.data} />
-
-      <Card size="small" title="Tín hiệu gần đây">
-        <Table<Signal>
-          rowKey="id"
-          size="small"
-          loading={signals.isPending}
-          dataSource={signals.data ?? []}
-          pagination={{ pageSize: 10, hideOnSinglePage: true }}
-          scroll={{ x: true }}
-          columns={[
-            {
-              title: 'Hành động',
-              dataIndex: 'action',
-              render: (a: Signal['action']) => <Tag color={a === 'Buy' ? 'green' : 'red'}>{a.toUpperCase()}</Tag>,
-            },
-            { title: 'Nến (mở)', dataIndex: 'candleOpenTimeUtc', render: formatVn },
-            { title: 'Close', dataIndex: 'candleClose', align: 'right', render: (v: number) => priceFormat.format(v) },
-            {
-              title: `${fastLabel} / ${slowLabel}`,
-              key: 'ema',
-              align: 'right',
-              render: (_, s) => `${priceFormat.format(s.fastEma)} / ${priceFormat.format(s.slowEma)}`,
-            },
-            { title: 'Lý do', dataIndex: 'reason' },
-            {
-              title: 'Loại',
-              dataIndex: 'isBackfill',
-              render: (b: boolean) =>
-                b ? <Tag>Backfill</Tag> : <Tag color="processing">Mới</Tag>,
-            },
-            { title: 'Tạo lúc', dataIndex: 'createdAtUtc', render: formatVn },
-          ]}
-        />
-      </Card>
     </Space>
   );
 }

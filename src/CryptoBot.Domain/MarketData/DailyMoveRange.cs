@@ -1,22 +1,26 @@
 namespace CryptoBot.Domain.MarketData;
 
 /// <summary>
-/// Ước lượng sau 24 giờ giá có thể lên/xuống bao nhiêu, dựa trên biến động của các ngày đã qua.
-/// Không dự đoán hướng: chỉ nói "thường dao động trong khoảng nào". Giả định biến động sắp tới giống quá khứ,
-/// nên ngày có tin lớn có thể vượt khoảng 95%.
+/// Ước lượng sau <see cref="HorizonDays"/> ngày giá có thể lên/xuống bao nhiêu, dựa trên biến động của các ngày đã qua.
+/// Không dự đoán hướng: chỉ nói "thường dao động trong khoảng nào". Giả định biến động sắp tới giống quá khứ
+/// và các ngày độc lập với nhau (σ của N ngày = σ một ngày × √N), nên giai đoạn có tin lớn hoặc xu hướng mạnh
+/// có thể vượt khoảng 95%.
 /// </summary>
-/// <param name="Days">Số thay đổi theo ngày dùng để tính.</param>
+/// <param name="HorizonDays">Số ngày phía trước được ước lượng.</param>
+/// <param name="Days">Số thay đổi theo ngày dùng để tính σ.</param>
 /// <param name="Price">Giá làm mốc.</param>
-/// <param name="TypicalMovePercent">Độ lệch chuẩn của % thay đổi một ngày (σ).</param>
-/// <param name="Low68">Giá thấp của khoảng ±1σ (khoảng 68% số ngày nằm trong).</param>
+/// <param name="TypicalMovePercent">Độ lệch chuẩn của % thay đổi sau <see cref="HorizonDays"/> ngày (σ).</param>
+/// <param name="Low68">Giá thấp của khoảng ±1σ (khoảng 68% trường hợp nằm trong).</param>
 /// <param name="High68">Giá cao của khoảng ±1σ.</param>
-/// <param name="Low95">Giá thấp của khoảng ±2σ (khoảng 95% số ngày nằm trong).</param>
+/// <param name="Low95">Giá thấp của khoảng ±2σ (khoảng 95% trường hợp nằm trong).</param>
 /// <param name="High95">Giá cao của khoảng ±2σ.</param>
-/// <param name="AverageMovePercent">Trung bình độ lớn thay đổi một ngày (không tính dấu).</param>
-/// <param name="LargestRisePercent">Ngày tăng mạnh nhất (%).</param>
-/// <param name="LargestDropPercent">Ngày giảm mạnh nhất (%, số âm).</param>
-/// <param name="UpDaysPercent">Tỷ lệ ngày đóng cửa cao hơn ngày trước (%).</param>
+/// <param name="AverageMovePercent">Trung bình độ lớn thay đổi sau <see cref="HorizonDays"/> ngày trong lịch sử (không tính dấu).</param>
+/// <param name="LargestRisePercent">Lần tăng mạnh nhất sau <see cref="HorizonDays"/> ngày trong lịch sử (%).</param>
+/// <param name="LargestDropPercent">Lần giảm mạnh nhất sau <see cref="HorizonDays"/> ngày trong lịch sử (%, số âm).</param>
+/// <param name="UpDaysPercent">Tỷ lệ lần giá sau <see cref="HorizonDays"/> ngày cao hơn lúc đầu (%).</param>
+/// <param name="Samples">Số đoạn <see cref="HorizonDays"/> ngày (trượt từng ngày) dùng cho các số liệu lịch sử.</param>
 public sealed record DailyMoveRange(
+    int HorizonDays,
     int Days,
     decimal Price,
     decimal TypicalMovePercent,
@@ -27,38 +31,45 @@ public sealed record DailyMoveRange(
     decimal AverageMovePercent,
     decimal LargestRisePercent,
     decimal LargestDropPercent,
-    decimal UpDaysPercent)
+    decimal UpDaysPercent,
+    int Samples)
 {
-    /// <summary>Cần ít nhất ngần này thay đổi theo ngày thì số liệu mới có ý nghĩa.</summary>
+    /// <summary>Cần ít nhất ngần này thay đổi theo ngày (và ngần này đoạn lịch sử) thì số liệu mới có ý nghĩa.</summary>
     public const int MinDays = 10;
 
     /// <summary>
-    /// Tính từ giá đóng cửa theo ngày (tăng dần theo thời gian, chỉ ngày đã đóng).
-    /// Trả null khi chưa đủ <see cref="MinDays"/> thay đổi.
+    /// Tính từ giá đóng cửa theo ngày (tăng dần theo thời gian, chỉ ngày đã đóng) cho khoảng
+    /// <paramref name="horizonDays"/> ngày tới. Trả null khi chưa đủ <see cref="MinDays"/> thay đổi
+    /// hoặc chưa đủ <see cref="MinDays"/> đoạn lịch sử dài <paramref name="horizonDays"/> ngày.
     /// </summary>
-    public static DailyMoveRange? Compute(IReadOnlyList<decimal> dailyCloses, decimal price)
+    public static DailyMoveRange? Compute(IReadOnlyList<decimal> dailyCloses, decimal price, int horizonDays = 1)
     {
         if (price <= 0)
             throw new ArgumentOutOfRangeException(nameof(price), "Giá phải dương.");
+        if (horizonDays <= 0)
+            throw new ArgumentOutOfRangeException(nameof(horizonDays), "Số ngày phải lớn hơn 0.");
         if (dailyCloses.Any(c => c <= 0))
             throw new ArgumentException("Giá đóng cửa phải dương.", nameof(dailyCloses));
-        if (dailyCloses.Count - 1 < MinDays)
+        if (dailyCloses.Count - 1 < MinDays || dailyCloses.Count - horizonDays < MinDays)
             return null;
 
         // Log return cộng dồn được qua nhiều ngày và đối xứng lên/xuống, nên dùng để tính σ.
         List<double> logReturns = new(dailyCloses.Count - 1);
-        List<decimal> changes = new(dailyCloses.Count - 1);
         for (int i = 1; i < dailyCloses.Count; i++)
-        {
             logReturns.Add(Math.Log((double)(dailyCloses[i] / dailyCloses[i - 1])));
-            changes.Add((dailyCloses[i] / dailyCloses[i - 1] - 1) * 100);
-        }
 
         double mean = logReturns.Average();
-        double sigma = Math.Sqrt(logReturns.Sum(r => (r - mean) * (r - mean)) / (logReturns.Count - 1));
+        double dailySigma = Math.Sqrt(logReturns.Sum(r => (r - mean) * (r - mean)) / (logReturns.Count - 1));
+        double sigma = dailySigma * Math.Sqrt(horizonDays);
+
+        // Thay đổi thực tế sau horizonDays ngày, trượt từng ngày một.
+        List<decimal> changes = new(dailyCloses.Count - horizonDays);
+        for (int i = horizonDays; i < dailyCloses.Count; i++)
+            changes.Add((dailyCloses[i] / dailyCloses[i - horizonDays] - 1) * 100);
 
         return new DailyMoveRange(
-            Days: changes.Count,
+            HorizonDays: horizonDays,
+            Days: logReturns.Count,
             Price: price,
             TypicalMovePercent: (decimal)((Math.Exp(sigma) - 1) * 100),
             Low68: price * (decimal)Math.Exp(-sigma),
@@ -68,6 +79,7 @@ public sealed record DailyMoveRange(
             AverageMovePercent: changes.Average(Math.Abs),
             LargestRisePercent: changes.Max(),
             LargestDropPercent: changes.Min(),
-            UpDaysPercent: (decimal)changes.Count(c => c > 0) / changes.Count * 100);
+            UpDaysPercent: (decimal)changes.Count(c => c > 0) / changes.Count * 100,
+            Samples: changes.Count);
     }
 }

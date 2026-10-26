@@ -23,6 +23,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<MarketDataWorker>();
 builder.Services.AddHostedService<PaperFuturesWorker>();
 builder.Services.AddHostedService<LivePriceWorker>();
+builder.Services.AddHostedService<DailyHistoryWorker>();
 // Cho phép client gửi số tiền dạng chuỗi ("50.5") để không mất chính xác qua JSON number.
 builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString);
@@ -53,6 +54,8 @@ app.MapPaperFuturesEndpoints();
 app.MapAutoOrderEndpoints();
 app.MapIndicatorEndpoints();
 app.MapLivePriceEndpoints();
+app.MapPredictionEndpoints();
+app.MapHistoryEndpoints();
 // API không tồn tại phải là 404 JSON, không bao giờ rơi vào trang SPA.
 app.MapFallback("/api/{**path}", () => Results.NotFound(new { error = "Endpoint không tồn tại" }));
 app.MapFallbackToFile("index.html");

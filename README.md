@@ -13,7 +13,7 @@ dotnet run --project src/CryptoBot.Api --launch-profile http
 npm --prefix src/cryptobot-dashboard install && npm --prefix src/cryptobot-dashboard run dev
 ```
 
-Dashboard dev: http://localhost:5173 (proxy `/api` sang http://localhost:5080).
+Dashboard dev: http://localhost:8090 (proxy `/api` sang http://localhost:5080).
 Production: `npm run build` xuất vào `src/CryptoBot.Api/wwwroot`, API phục vụ luôn file tĩnh.
 
 DB: `src/CryptoBot.Api/data/cryptobot.db` (tạo tự động, migration chạy khi khởi động).
@@ -124,4 +124,6 @@ Một nguồn lỗi thì chỉ nguồn đó để trống kèm lý do, không đ
 
 **Biên độ 24 giờ** (dưới giá Spot): lấy 90 nến ngày đã đóng (`/api/v3/klines`, cache 15 phút), tính độ lệch chuẩn σ của log return
 một ngày (`CryptoBot.Domain/MarketData/DailyMoveRange.cs`). Khoảng `giá × e^(±σ)` ≈ 68% số ngày, `giá × e^(±2σ)` ≈ 95%.
-Kèm % ngày tăng, ngày tăng/giảm mạnh nhất. Chỉ là biên độ, không đoán hướng. Endpoint: `GET /api/live/daily-range?symbol=`.
+Kèm % ngày tăng, ngày tăng/giảm mạnh nhất. Chỉ là biên độ, không đoán hướng. Endpoint: `GET /api/live/daily-range?symbol=&days=`.
+Nút **24 giờ / 7 ngày / 30 ngày**: mốc N ngày dùng σ của 365 ngày × √N (giả định các ngày độc lập), số liệu lịch sử tính trên
+các đoạn N ngày trượt từng ngày trong một năm.
