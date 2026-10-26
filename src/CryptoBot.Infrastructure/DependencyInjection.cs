@@ -88,6 +88,8 @@ public static class DependencyInjection
         });
         services.AddSingleton(config.GetSection("DailyHistory").Get<DailyHistoryOptions>() ?? new DailyHistoryOptions());
         services.AddScoped<DailyHistorySyncService>();
+        // Sự kiện thị trường ghi tay (marketevents.json) để đối chiếu với các tháng giảm mạnh.
+        services.AddSingleton(new MarketEventCatalog(config.GetSection("MarketEvents").Get<List<MarketEvent>>() ?? []));
 
         return services;
     }
