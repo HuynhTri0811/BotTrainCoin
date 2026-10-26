@@ -492,6 +492,16 @@ export interface MonthStats {
   upPercent: number;
 }
 
+/** Sự kiện thị trường cùng tháng (marketevents.json), không khẳng định là nguyên nhân. */
+export interface MonthEvent {
+  year: number;
+  month: number;
+  title: string;
+  detail: string | null;
+  /** true: sự kiện chung của thị trường; false: riêng của symbol này. */
+  marketWide: boolean;
+}
+
 export interface MonthlyHistory {
   symbol: string;
   exchange: string;
@@ -502,6 +512,7 @@ export interface MonthlyHistory {
   months: MonthChange[];
   years: YearChange[];
   monthStats: MonthStats[];
+  events: MonthEvent[];
 }
 
 export const historyApi = {
