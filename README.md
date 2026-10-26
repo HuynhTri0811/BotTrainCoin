@@ -13,7 +13,7 @@ dotnet run --project src/CryptoBot.Api --launch-profile http
 npm --prefix src/cryptobot-dashboard install && npm --prefix src/cryptobot-dashboard run dev
 ```
 
-Dashboard dev: http://localhost:5173 (proxy `/api` sang http://localhost:5080).
+Dashboard dev: http://localhost:8090 (proxy `/api` sang http://localhost:5080).
 Production: `npm run build` xuất vào `src/CryptoBot.Api/wwwroot`, API phục vụ luôn file tĩnh.
 
 DB: `src/CryptoBot.Api/data/cryptobot.db` (tạo tự động, migration chạy khi khởi động).
