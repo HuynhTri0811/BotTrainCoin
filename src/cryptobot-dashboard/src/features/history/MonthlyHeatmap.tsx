@@ -11,7 +11,7 @@ const FULL_COLOR_PERCENT = 30;
 export const fmtPct = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(1)}%`;
 
 export function pctColor(v: number) {
-  return v > 0 ? '#16a34a' : v < 0 ? '#dc2626' : undefined;
+  return v > 0 ? 'var(--up)' : v < 0 ? 'var(--down)' : undefined;
 }
 
 /** Sự kiện gom theo khóa `năm-tháng`. */
@@ -26,11 +26,12 @@ export function eventsByMonth(events: MonthEvent[]) {
 
 function cellBackground(v: number) {
   const alpha = 0.08 + 0.62 * Math.min(Math.abs(v) / FULL_COLOR_PERCENT, 1);
-  return v >= 0 ? `rgba(22, 163, 74, ${alpha.toFixed(3)})` : `rgba(220, 38, 38, ${alpha.toFixed(3)})`;
+  const pct = (alpha * 100).toFixed(1);
+  return `color-mix(in srgb, var(${v >= 0 ? '--up' : '--down'}) ${pct}%, transparent)`;
 }
 
-const border = '1px solid #e5e7eb';
-const th: CSSProperties = { padding: '6px 8px', fontWeight: 600, fontSize: 12, background: '#f8fafc', border, whiteSpace: 'nowrap' };
+const border = '1px solid var(--border)';
+const th: CSSProperties = { padding: '6px 8px', fontWeight: 600, fontSize: 12, background: 'var(--surface-subtle)', border, whiteSpace: 'nowrap' };
 const td: CSSProperties = {
   padding: '6px 8px',
   fontSize: 12,
@@ -53,7 +54,7 @@ function PriceTip({ open, close, extra }: { open: number; close: number; extra?:
 }
 
 function MonthCell({ m, events }: { m: MonthChange | undefined; events: MonthEvent[] | undefined }) {
-  if (!m) return <td style={{ ...td, color: '#cbd5e1' }}>—</td>;
+  if (!m) return <td style={{ ...td, color: 'var(--faint-2)' }}>—</td>;
   return (
     <Tooltip
       title={
@@ -79,7 +80,7 @@ function MonthCell({ m, events }: { m: MonthChange | undefined; events: MonthEve
           ...td,
           background: cellBackground(m.changePercent),
           fontStyle: m.complete ? undefined : 'italic',
-          outline: m.complete ? undefined : '1px dashed #64748b',
+          outline: m.complete ? undefined : '1px dashed var(--text-muted)',
           outlineOffset: -3,
           position: 'relative',
         }}
@@ -87,7 +88,7 @@ function MonthCell({ m, events }: { m: MonthChange | undefined; events: MonthEve
         {events && (
           <span
             aria-label="Có sự kiện"
-            style={{ position: 'absolute', top: 2, left: 3, width: 6, height: 6, borderRadius: 3, background: '#7c3aed' }}
+            style={{ position: 'absolute', top: 2, left: 3, width: 6, height: 6, borderRadius: 3, background: 'var(--accent)' }}
           />
         )}
         {fmtPct(m.changePercent)}
@@ -101,7 +102,7 @@ function YearCell({ y }: { y: YearChange | undefined }) {
   if (!y) return <td style={td}>—</td>;
   return (
     <Tooltip title={<PriceTip open={y.open} close={y.close} extra={y.complete ? null : <><br />Năm chưa trọn</>} />}>
-      <td style={{ ...td, fontWeight: 600, color: pctColor(y.changePercent), borderLeft: '2px solid #94a3b8' }}>
+      <td style={{ ...td, fontWeight: 600, color: pctColor(y.changePercent), borderLeft: '2px solid var(--faint)' }}>
         {fmtPct(y.changePercent)}
         {y.complete ? '' : '*'}
       </td>
@@ -124,12 +125,12 @@ function StatsRow({
       {MONTHS.map((month) => {
         const s = stats.get(month);
         return (
-          <td key={month} style={{ ...td, background: '#f8fafc' }}>
+          <td key={month} style={{ ...td, background: 'var(--surface-subtle)' }}>
             {s ? render(s) : '—'}
           </td>
         );
       })}
-      <td style={{ ...td, background: '#f8fafc', borderLeft: '2px solid #94a3b8' }} />
+      <td style={{ ...td, background: 'var(--surface-subtle)', borderLeft: '2px solid var(--faint)' }} />
     </tr>
   );
 }
@@ -152,7 +153,7 @@ export function MonthlyHeatmap({ data }: { data: MonthlyHistory }) {
                 T{m}
               </th>
             ))}
-            <th style={{ ...th, borderLeft: '2px solid #94a3b8' }}>Cả năm</th>
+            <th style={{ ...th, borderLeft: '2px solid var(--faint)' }}>Cả năm</th>
           </tr>
         </thead>
         <tbody>

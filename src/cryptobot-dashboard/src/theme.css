@@ -1,0 +1,48 @@
+/*
+ * Màu dùng chung cho style viết trong component (style={{ color: 'var(--up)' }}).
+ * Antd tự đổi màu theo darkAlgorithm; các biến này phủ phần còn lại.
+ * index.html đặt data-theme trước khi React chạy để không nháy trắng.
+ */
+:root {
+  --up: #16a34a;
+  --down: #dc2626;
+  --text-muted: #64748b;
+  --text-soft: #475569;
+  --faint: #94a3b8;
+  --faint-2: #cbd5e1;
+  --border: #e5e7eb;
+  --track: #e2e8f0;
+  --surface-subtle: #f8fafc;
+  --surface-note: #f1f5f9;
+  --ink: #0f172a;
+  --accent: #7c3aed;
+  --page-bg: #f8fafc;
+  /* Nền nút mở lệnh: đủ đậm để chữ trắng đọc rõ (tương phản ≥ 4.5:1). */
+  --long-solid: #15803d;
+  --short-solid: #b91c1c;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --up: #22c55e;
+  --down: #f87171;
+  --text-muted: #94a3b8;
+  --text-soft: #cbd5e1;
+  --faint: #64748b;
+  --faint-2: #475569;
+  --border: #303030;
+  --track: #2a2f3a;
+  --surface-subtle: #1b1e24;
+  --surface-note: #1f242d;
+  --ink: #f1f5f9;
+  --accent: #a78bfa;
+  --page-bg: #0b0d10;
+  --long-solid: #15803d;
+  --short-solid: #b91c1c;
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--page-bg);
+}

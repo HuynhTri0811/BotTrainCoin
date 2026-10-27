@@ -20,8 +20,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, futuresApi, type FuturesAccount, type FuturesQuote, type OpenRequest, type PositionSide } from '../../api/client';
 import { fmtPrice, fmtUsdt, pnlColor } from './format';
 
-const LONG = '#16a34a';
-const SHORT = '#dc2626';
+const LONG = 'var(--up)';
+const SHORT = 'var(--down)';
+/** Nền nút: đậm hơn màu chữ để chữ trắng đọc rõ ở cả chế độ sáng và tối. */
+const LONG_SOLID = 'var(--long-solid)';
+const SHORT_SOLID = 'var(--short-solid)';
 
 interface Props {
   symbol: string;
@@ -41,7 +44,8 @@ export function TradePanel({ symbol, account }: Props) {
   const maxLeverage = account?.rules.maxLeverage ?? 10;
   const supported = account?.rules.symbols.includes(symbol) ?? false;
   const hasOpen = account?.openPositions.some((p) => p.symbol === symbol) ?? false;
-  const color = side === 'Long' ? LONG : SHORT;
+  const solid = side === 'Long' ? LONG_SOLID : SHORT_SOLID;
+  const disabled = !supported || hasOpen;
 
   const quote = useMutation({
     mutationFn: futuresApi.quote,
@@ -206,9 +210,10 @@ export function TradePanel({ symbol, account }: Props) {
         block
         type="primary"
         size="large"
-        style={{ marginTop: 16, background: color, borderColor: color }}
+        // Bị vô hiệu thì để kiểu xám mặc định của antd, không tô màu như đang bấm được.
+        style={{ marginTop: 16, ...(disabled ? {} : { background: solid, borderColor: solid, color: '#fff' }) }}
         loading={quote.isPending}
-        disabled={!supported || hasOpen}
+        disabled={disabled}
         onClick={submit}
       >
         {side === 'Long' ? 'Mở Long' : 'Mở Short'} {leverage}x
@@ -242,6 +247,7 @@ function ConfirmModal({
   const q = pending?.quote;
   const r = pending?.request;
   const color = q?.side === 'Long' ? LONG : SHORT;
+  const solid = q?.side === 'Long' ? LONG_SOLID : SHORT_SOLID;
   const liqDistance =
     q?.fillPrice && q.liquidationPrice ? Math.abs(q.liquidationPrice - q.fillPrice) / q.fillPrice : null;
 
@@ -257,7 +263,10 @@ function ConfirmModal({
         </Space>
       }
       okText={`Xác nhận mở ${q?.side ?? ''}`}
-      okButtonProps={{ disabled: !q?.accepted, style: q?.accepted ? { background: color } : undefined }}
+      okButtonProps={{
+        disabled: !q?.accepted,
+        style: q?.accepted ? { background: solid, borderColor: solid, color: '#fff' } : undefined,
+      }}
       cancelText="Hủy"
       confirmLoading={loading}
       onCancel={onCancel}

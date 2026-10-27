@@ -18,6 +18,7 @@ import {
   type UTCTimestamp,
 } from 'lightweight-charts';
 import type { ChartPoint, FuturesPosition, IndicatorChart, Signal } from '../../api/client';
+import { useChartColors } from '../../theme';
 import { formatVnTick, formatVnUnix } from '../../time';
 
 const FAST_COLOR = '#d97706';
@@ -52,6 +53,7 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
   const fitted = useRef(false);
   const priceLines = useRef<IPriceLine[]>([]);
   const indicatorSeries = useRef(new Map<string, ISeriesApi<'Line'>>());
+  const colors = useChartColors();
 
   // Chỉ tạo lại series khi danh sách đường thay đổi, không phải mỗi lần dữ liệu được làm mới.
   const linesKey = JSON.stringify(indicator?.indicator.lines ?? []);
@@ -63,12 +65,8 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
 
     const chart = createChart(el, {
       autoSize: true,
-      layout: { background: { type: ColorType.Solid, color: '#ffffff' }, textColor: '#334155' },
-      grid: { vertLines: { color: '#f1f5f9' }, horzLines: { color: '#f1f5f9' } },
       crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: '#e2e8f0' },
       timeScale: {
-        borderColor: '#e2e8f0',
         timeVisible: true,
         tickMarkFormatter: (time: Time, type: TickMarkType) =>
           formatVnTick(time as number, type === TickMarkType.DayOfMonth || type === TickMarkType.Month),
@@ -76,13 +74,8 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
       localization: { locale: 'vi-VN', timeFormatter: (time: Time) => formatVnUnix(time as number) },
     });
 
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#16a34a',
-      downColor: '#dc2626',
-      wickUpColor: '#16a34a',
-      wickDownColor: '#dc2626',
-      borderVisible: false,
-    });
+    // Màu theo chế độ sáng/tối được áp ở effect bên dưới.
+    const candleSeries = chart.addSeries(CandlestickSeries, { borderVisible: false });
     // Cột khối lượng ở đáy khung giá, thang riêng (không có trục) để không đè lên nến.
     const volume = chart.addSeries(HistogramSeries, {
       priceScaleId: 'volume',
@@ -105,6 +98,24 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
     };
   }, [fastLabel, slowLabel]);
 
+  // Đổi chế độ sáng/tối: áp màu mới lên chart đang có, không tạo lại.
+  useEffect(() => {
+    const h = handles.current;
+    if (!h) return;
+    h.chart.applyOptions({
+      layout: { background: { type: ColorType.Solid, color: colors.background }, textColor: colors.text },
+      grid: { vertLines: { color: colors.grid }, horzLines: { color: colors.grid } },
+      rightPriceScale: { borderColor: colors.border },
+      timeScale: { borderColor: colors.border },
+    });
+    h.candles.applyOptions({
+      upColor: colors.up,
+      downColor: colors.down,
+      wickUpColor: colors.up,
+      wickDownColor: colors.down,
+    });
+  }, [colors, fastLabel, slowLabel]);
+
   useEffect(() => {
     const h = handles.current;
     if (!h) return;
@@ -117,14 +128,14 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
         low: c.low,
         close: c.close,
         // Nến đang chạy hiển thị nhạt hơn: chiến lược chưa dùng nến này.
-        ...(c.isClosed ? {} : { color: '#94a3b8', wickColor: '#94a3b8' }),
+        ...(c.isClosed ? {} : { color: colors.running, wickColor: colors.running }),
       })),
     );
     h.volume.setData(
       candles.map((c) => ({
         time: c.time as UTCTimestamp,
         value: c.volume,
-        color: !c.isClosed ? '#cbd5e1' : c.close >= c.open ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.35)',
+        color: !c.isClosed ? colors.runningVolume : c.close >= c.open ? colors.upVolume : colors.downVolume,
       })),
     );
     h.fast.setData(
@@ -138,7 +149,7 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
       // autoSize đo kích thước bất đồng bộ; fit sau frame kế tiếp để dùng đúng chiều rộng.
       requestAnimationFrame(() => handles.current?.chart.timeScale().fitContent());
     }
-  }, [candles]);
+  }, [candles, colors]);
 
   useEffect(() => {
     const h = handles.current;
@@ -151,7 +162,7 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
         l.overlay ? 0 : 1,
       );
       for (const level of l.levels)
-        series.createPriceLine({ price: level, color: '#94a3b8', lineStyle: LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: '' });
+        series.createPriceLine({ price: level, color: colors.level, lineStyle: LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: '' });
       return [l.key, series] as const;
     });
     indicatorSeries.current = new Map(created);
@@ -163,7 +174,7 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
       if (chart) for (const [, series] of created) chart.removeSeries(series);
       indicatorSeries.current = new Map();
     };
-  }, [linesKey, fastLabel, slowLabel]);
+  }, [linesKey, fastLabel, slowLabel, colors]);
 
   useEffect(() => {
     for (const [key, series] of indicatorSeries.current) {
@@ -173,15 +184,15 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
           .map((p) => ({ time: p.time as UTCTimestamp, value: p.values[key]! })),
       );
     }
-  }, [indicator, linesKey, fastLabel, slowLabel]);
+  }, [indicator, linesKey, fastLabel, slowLabel, colors]);
 
   useEffect(() => {
     const h = handles.current;
     if (!h) return;
     const markers: SeriesMarker<Time>[] = signals.map((s) =>
       s.action === 'Buy'
-        ? { time: s.time as UTCTimestamp, position: 'belowBar', color: '#16a34a', shape: 'arrowUp', text: 'BUY' }
-        : { time: s.time as UTCTimestamp, position: 'aboveBar', color: '#dc2626', shape: 'arrowDown', text: 'SELL' },
+        ? { time: s.time as UTCTimestamp, position: 'belowBar', color: colors.up, shape: 'arrowUp', text: 'BUY' }
+        : { time: s.time as UTCTimestamp, position: 'aboveBar', color: colors.down, shape: 'arrowDown', text: 'SELL' },
     );
     // Tín hiệu của chỉ báo tự viết: chấm tím, khác mũi tên BUY/SELL của chiến lược EMA.
     for (const m of indicator?.markers ?? [])
@@ -192,7 +203,7 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
       );
     markers.sort((a, b) => (a.time as number) - (b.time as number));
     h.markers.setMarkers(markers);
-  }, [signals, indicator, fastLabel, slowLabel]);
+  }, [signals, indicator, fastLabel, slowLabel, colors]);
 
   useEffect(() => {
     const h = handles.current;
@@ -205,11 +216,11 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
       priceLines.current.push(
         h.candles.createPriceLine({ price, title, color, lineStyle: style, lineWidth: 1, axisLabelVisible: true }),
       );
-    add(position.entryPrice, `${position.side} ${position.leverage}x`, '#475569', LineStyle.Solid);
-    add(position.stopLoss, 'SL', '#dc2626', LineStyle.Dashed);
-    if (position.takeProfit != null) add(position.takeProfit, 'TP', '#16a34a', LineStyle.Dashed);
-    add(position.liquidationPrice, 'Thanh lý', '#9333ea', LineStyle.Dotted);
-  }, [position, fastLabel, slowLabel]);
+    add(position.entryPrice, `${position.side} ${position.leverage}x`, colors.entry, LineStyle.Solid);
+    add(position.stopLoss, 'SL', colors.down, LineStyle.Dashed);
+    if (position.takeProfit != null) add(position.takeProfit, 'TP', colors.up, LineStyle.Dashed);
+    add(position.liquidationPrice, 'Thanh lý', colors.liquidation, LineStyle.Dotted);
+  }, [position, fastLabel, slowLabel, colors]);
 
   return (
     <div

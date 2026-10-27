@@ -79,7 +79,7 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
                 title={`Tỷ lệ đúng (chạy thử ${p.backtestPredictions} ${unit})`}
                 value={p.hitRatePercent.toFixed(1)}
                 suffix="%"
-                styles={{ content: { color: p.hitRatePercent > 50 ? '#16a34a' : '#dc2626' } }}
+                styles={{ content: { color: p.hitRatePercent > 50 ? 'var(--up)' : 'var(--down)' } }}
               />
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 {p.backtestCorrect}/{p.backtestPredictions} lần đúng · đoán bừa ≈ 50%
@@ -122,7 +122,7 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
                 key: 'change',
                 align: 'right',
                 render: (_, r) => (
-                  <span style={{ color: r.change > 0 ? '#16a34a' : r.change < 0 ? '#dc2626' : undefined, fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ color: r.change > 0 ? 'var(--up)' : r.change < 0 ? 'var(--down)' : undefined, fontVariantNumeric: 'tabular-nums' }}>
                     {r.change > 0 ? '+' : ''}
                     {fmtPrice(r.change)} ({r.changePercent > 0 ? '+' : ''}
                     {r.changePercent.toFixed(2)}%)
