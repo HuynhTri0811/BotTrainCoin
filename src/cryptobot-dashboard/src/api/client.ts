@@ -371,6 +371,32 @@ export interface DailyRange {
   /** Các số liệu lịch sử (TB, mạnh nhất, % lần tăng) tính trên các đoạn dài horizonDays ngày. */
   upDaysPercent: number;
   samples: number;
+  /** Chỉ có với 24 giờ và symbol có lịch sử dài hạn (DailyHistory). */
+  similarDays: SimilarDays | null;
+}
+
+/** Dự báo "ngày tương tự" (CryptoBot.Domain/MarketData/SimilarDaysForecast.cs). */
+export interface SimilarDays {
+  historySymbol: string;
+  exchange: string;
+  asOfDayUtc: string;
+  /** Số ngày tương tự được dùng. */
+  neighbors: number;
+  /** % ngày tương tự có giá sau đó cao hơn. */
+  upPercent: number;
+  medianPercent: number;
+  low68Percent: number;
+  high68Percent: number;
+  /** Giá: mốc giá hiện tại × (1 + %). */
+  low68: number;
+  high68: number;
+  lean: 'Up' | 'Down' | 'Neutral';
+  /** Chạy thử walk-forward trên lịch sử. */
+  testedDays: number;
+  hitRatePercent: number;
+  /** Số ngày nghiêng rõ (≥ 60% hoặc ≤ 40%) và tỷ lệ đúng của chúng. */
+  strongDays: number;
+  strongHitRatePercent: number;
 }
 
 export const liveApi = {
