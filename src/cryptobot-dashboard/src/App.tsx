@@ -7,6 +7,7 @@ import { HistoryPage } from './pages/HistoryPage';
 import { MarketPage } from './pages/MarketPage';
 import { PredictionPage } from './pages/PredictionPage';
 import { SignalsPage } from './pages/SignalsPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { TradingPage } from './pages/TradingPage';
 
 const PAGES = [
@@ -15,6 +16,7 @@ const PAGES = [
   { key: 'prediction', label: 'Dự đoán' },
   { key: 'signals', label: 'Tín hiệu' },
   { key: 'history', label: 'Lịch sử theo tháng' },
+  { key: 'settings', label: 'Cài đặt' },
 ] as const;
 
 type Page = (typeof PAGES)[number]['key'];
@@ -38,12 +40,12 @@ export function App() {
 
   const strategies = status.data?.strategies.filter((s) => s.enabled) ?? [];
   const current = strategies.find((s) => s.id === selected) ?? strategies[0];
-  // Lịch sử theo tháng dùng nến ngày riêng, không theo cặp/khung nến của chiến lược.
-  const usesStrategy = page !== 'history';
+  // Lịch sử theo tháng dùng nến ngày riêng, Cài đặt không cần dữ liệu: không theo cặp/khung nến của chiến lược.
+  const usesStrategy = page !== 'history' && page !== 'settings';
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Layout.Sider breakpoint="lg" collapsedWidth={0} width={200} theme="light" style={{ borderRight: '1px solid #e5e7eb' }}>
+      <Layout.Sider breakpoint="lg" collapsedWidth={0} width={200} theme="light" style={{ borderRight: '1px solid var(--border)' }}>
         <Typography.Title level={4} style={{ margin: 0, padding: '16px 24px' }}>
           CryptoBot
         </Typography.Title>
@@ -57,7 +59,7 @@ export function App() {
           items={PAGES.map((p) => ({ key: p.key, label: p.label }))}
         />
       </Layout.Sider>
-      <Layout style={{ background: '#f8fafc' }}>
+      <Layout style={{ background: 'var(--page-bg)' }}>
         <Layout.Content style={{ maxWidth: 1280, width: '100%', margin: '0 auto', padding: 16 }}>
           <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
             <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
@@ -80,6 +82,7 @@ export function App() {
             {status.data && <StatusBar status={status.data} />}
 
             {page === 'history' && <HistoryPage />}
+            {page === 'settings' && <SettingsPage />}
             {usesStrategy && current && (
               <>
                 {page === 'market' && <MarketPage key={current.id} strategy={current} />}
