@@ -33,10 +33,9 @@ public static class LivePriceEndpoints
             // Ngày tương tự chỉ cho 24 giờ: chạy thử cho thấy 7/30 ngày không có lợi thế so với đoán mặc định.
             var s = horizon == 1 ? await similar.GetAsync(symbol.ToUpperInvariant(), horizon, ct) : null;
             var similarDto = s is null ? null : new SimilarDaysDto(s.HistorySymbol, s.Exchange, s.AsOfDayUtc,
-                s.Forecast.Neighbors, s.Forecast.UpPercent, s.Forecast.MedianPercent, s.Forecast.Low68Percent,
-                s.Forecast.High68Percent, r.Price * (1 + s.Forecast.Low68Percent / 100),
-                r.Price * (1 + s.Forecast.High68Percent / 100), s.Forecast.Lean.ToString(), s.Backtest.Days,
-                s.Backtest.HitRatePercent, s.Backtest.StrongDays, s.Backtest.StrongHitRatePercent);
+                s.AnchorPrice, s.TargetCloseUtc, s.Forecast.Neighbors, s.Forecast.UpPercent, s.Forecast.MedianPercent,
+                s.Forecast.Low68Percent, s.Forecast.High68Percent, s.Low68, s.High68, s.Forecast.Lean.ToString(),
+                s.Backtest.Days, s.Backtest.HitRatePercent, s.Backtest.StrongDays, s.Backtest.StrongHitRatePercent);
             return Results.Ok(new DailyRangeDto(symbol.ToUpperInvariant(), r.HorizonDays, r.Days, r.Price,
                 r.TypicalMovePercent, r.Low68, r.High68, r.Low95, r.High95, r.AverageMovePercent,
                 r.LargestRisePercent, r.LargestDropPercent, r.UpDaysPercent, r.Samples, similarDto));
@@ -58,10 +57,10 @@ public sealed record DailyRangeDto(string Symbol, int HorizonDays, int Days, dec
     int Samples, SimilarDaysDto? SimilarDays);
 
 /// <summary>
-/// Dự báo "ngày tương tự" (SimilarDaysForecast) kèm tỷ lệ đúng khi chạy thử. Low68/High68 là giá: mốc giá
-/// hiện tại × (1 + % của các ngày tương tự). Lean: Up / Down / Neutral.
+/// Dự báo "ngày tương tự" (SimilarDaysForecast) cho giá đóng cửa lúc TargetCloseUtc, kèm tỷ lệ đúng khi chạy thử.
+/// Low68/High68 là giá: AnchorPrice (giá đóng hôm qua) × (1 + % của các ngày tương tự). Lean: Up / Down / Neutral.
 /// </summary>
-public sealed record SimilarDaysDto(string HistorySymbol, string Exchange, DateTime AsOfDayUtc, int Neighbors,
-    decimal UpPercent, decimal MedianPercent, decimal Low68Percent, decimal High68Percent, decimal Low68,
-    decimal High68, string Lean, int TestedDays, decimal HitRatePercent, int StrongDays,
-    decimal StrongHitRatePercent);
+public sealed record SimilarDaysDto(string HistorySymbol, string Exchange, DateTime AsOfDayUtc, decimal AnchorPrice,
+    DateTime TargetCloseUtc, int Neighbors, decimal UpPercent, decimal MedianPercent, decimal Low68Percent,
+    decimal High68Percent, decimal Low68, decimal High68, string Lean, int TestedDays, decimal HitRatePercent,
+    int StrongDays, decimal StrongHitRatePercent);

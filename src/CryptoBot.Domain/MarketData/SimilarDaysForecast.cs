@@ -61,7 +61,8 @@ public sealed record SimilarDaysForecast(
     /// <summary>
     /// Chạy thử walk-forward: với mỗi ngày từ sau <paramref name="warmupDays"/> ngày đầu, chỉ dùng các ngày đã biết
     /// kết quả trước đó để đoán, rồi so với thực tế. Độ lệch chuẩn để chuẩn hoá đặc trưng tính trên cả chuỗi
-    /// (chỉ đổi thang đo, không dùng kết quả tương lai).
+    /// (chỉ đổi thang đo, không dùng kết quả tương lai). Bỏ qua ngày hòa (đúng 50%) và ngày giá đứng yên,
+    /// cùng quy tắc với <see cref="UpPercent"/> (chỉ đếm ngày tăng thật).
     /// </summary>
     public static SimilarDaysBacktest Backtest(IReadOnlyList<decimal> dailyCloses, int horizonDays = 1,
         int neighbors = DefaultNeighbors, int warmupDays = 730)
@@ -79,8 +80,12 @@ public sealed record SimilarDaysForecast(
             if (outcomes is null)
                 continue;
 
+            // Hòa (đúng 50% ngày tương tự tăng) là không đoán; giá đứng yên thì không có hướng để chấm.
             decimal up = UpShare(outcomes);
-            bool hit = up >= 50m == dailyCloses[i + horizonDays] > dailyCloses[i];
+            if (up == 50m || dailyCloses[i + horizonDays] == dailyCloses[i])
+                continue;
+
+            bool hit = up > 50m == dailyCloses[i + horizonDays] > dailyCloses[i];
             days++;
             if (hit) correct++;
             if (up >= StrongLeanPercent || up <= 100m - StrongLeanPercent)

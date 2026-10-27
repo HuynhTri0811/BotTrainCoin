@@ -3,6 +3,7 @@ import { Flex, Segmented, Tooltip, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { liveApi, type SimilarDays } from '../../api/client';
 import { fmtPrice2 as fmtPrice } from '../futures/format';
+import { formatVn } from '../../time';
 
 const signed = (v: number, digits = 2) => `${v > 0 ? '+' : ''}${v.toFixed(digits)}`;
 
@@ -121,7 +122,7 @@ function SimilarSummary({ s }: { s: SimilarDays }) {
     <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6, background: '#f1f5f9', fontSize: 12 }}>
       <Flex justify="space-between" wrap gap={8} align="baseline">
         <span>
-          <Typography.Text strong>Ngày tương tự hôm nay: </Typography.Text>
+          <Typography.Text strong>Ngày tương tự · giá đóng cửa hôm nay: </Typography.Text>
           <span style={{ fontWeight: 600, color: lean.color }}>
             {s.upPercent.toFixed(0)}% tăng · {lean.text}
           </span>
@@ -132,8 +133,9 @@ function SimilarSummary({ s }: { s: SimilarDays }) {
         </span>
       </Flex>
       <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '4px 0 0' }}>
-        {s.neighbors} ngày trong lịch sử {s.historySymbol} ({s.exchange}, nến ngày đến{' '}
-        {new Date(s.asOfDayUtc).toLocaleDateString('vi-VN', { timeZone: 'UTC' })}) giống hôm nay nhất về khoảng cách
+        Dự báo giá đóng cửa lúc {formatVn(s.targetCloseUtc)}, tính % từ giá đóng hôm qua {fmtPrice(s.anchorPrice)}{' '}
+        (không phải từ giá hiện tại, vì phần giá đã chạy trong ngày đã nằm trong đó). {s.neighbors} ngày trong lịch sử{' '}
+        {s.historySymbol} ({s.exchange}) giống hôm qua nhất về khoảng cách
         tới EMA200/EMA50, RSI, % thay đổi 7 ngày và 1 ngày. Chạy thử trên {s.testedDays} ngày: đúng{' '}
         {s.hitRatePercent.toFixed(1)}%; riêng {s.strongDays} ngày nghiêng rõ (≥ 60% hoặc ≤ 40%) đúng{' '}
         {s.strongHitRatePercent.toFixed(1)}%. Chỉ tin khi nghiêng rõ, và đây vẫn là thống kê quá khứ.

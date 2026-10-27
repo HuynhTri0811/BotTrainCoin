@@ -379,7 +379,12 @@ export interface DailyRange {
 export interface SimilarDays {
   historySymbol: string;
   exchange: string;
+  /** Ngày (nến đã đóng) cuối cùng dùng để dự báo: hôm qua. */
   asOfDayUtc: string;
+  /** Giá đóng cửa hôm qua trên Binance; khoảng giá tính từ đây, không phải từ giá hiện tại. */
+  anchorPrice: number;
+  /** Thời điểm đóng cửa được dự báo (cuối ngày hôm nay, UTC). */
+  targetCloseUtc: string;
   /** Số ngày tương tự được dùng. */
   neighbors: number;
   /** % ngày tương tự có giá sau đó cao hơn. */
@@ -387,7 +392,7 @@ export interface SimilarDays {
   medianPercent: number;
   low68Percent: number;
   high68Percent: number;
-  /** Giá: mốc giá hiện tại × (1 + %). */
+  /** Giá: anchorPrice × (1 + %). */
   low68: number;
   high68: number;
   lean: 'Up' | 'Down' | 'Neutral';
