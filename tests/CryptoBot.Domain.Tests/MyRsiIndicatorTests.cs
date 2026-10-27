@@ -63,4 +63,54 @@ public class MyRsiIndicatorTests
         Assert.Contains("dưới EMA3", r.Reason);
         Assert.Equal(2, ind.Lines.Count);
     }
+
+    private static MyRsiIndicator Pullback() => new() { Period = 2, TrendEmaPeriod = 3, LookbackCandles = 6 };
+
+    [Fact]
+    public void Trend_filter_longs_a_dip_in_an_uptrend()
+    {
+        // RSI2: 33.3 → 75 (cắt lên 40); EMA3 = 125 < giá 135.
+        var r = Pullback().Compute(TestCandles.FromCloses(100m, 110m, 120m, 130m, 110m, 135m));
+
+        Assert.Equal(IndicatorSignal.Long, r.Signal);
+        Assert.Contains("trên EMA3", r.Reason);
+    }
+
+    [Fact]
+    public void Trend_filter_shorts_a_bounce_in_a_downtrend()
+    {
+        // RSI2: 66.7 → 25 (cắt xuống 60); EMA3 = 175 > giá 165.
+        var r = Pullback().Compute(TestCandles.FromCloses(200m, 190m, 180m, 170m, 190m, 165m));
+
+        Assert.Equal(IndicatorSignal.Short, r.Signal);
+        Assert.Contains("dưới EMA3", r.Reason);
+    }
+
+    [Fact]
+    public void Trend_filter_blocks_short_above_ema()
+    {
+        // RSI2: 100 → 55.6 (cắt xuống 60) nhưng giá 150 vẫn trên EMA3 = 147.5.
+        var r = Pullback().Compute(TestCandles.FromCloses(100m, 110m, 120m, 130m, 170m, 150m));
+
+        Assert.Equal(IndicatorSignal.None, r.Signal);
+        Assert.Contains("trên EMA3", r.Reason);
+    }
+
+    [Fact]
+    public void Trend_filter_draws_pullback_levels()
+    {
+        var line = Pullback().Lines.Single(l => l.Key == "rsi");
+
+        Assert.Equal([40m, 60m], line.Levels);
+    }
+
+    [Theory]
+    [InlineData(0, 60)]
+    [InlineData(40, 100)]
+    public void Pullback_levels_must_be_inside_0_100(decimal longLevel, decimal shortLevel)
+    {
+        var ind = new MyRsiIndicator { TrendEmaPeriod = 50, PullbackLong = longLevel, PullbackShort = shortLevel };
+
+        Assert.Contains("Pullback", ind.Validate());
+    }
 }
