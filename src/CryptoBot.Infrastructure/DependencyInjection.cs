@@ -75,6 +75,8 @@ public static class DependencyInjection
         services.AddSingleton<LivePriceHistory>();
         services.AddScoped<LivePriceSampler>();
         services.AddSingleton<DailyRangeService>();
+        services.AddSingleton<SimilarDaysCache>();
+        services.AddScoped<SimilarDaysService>();
 
         // Nến ngày lịch sử dài hạn (từ 2016) từ Bitfinex, lưu vào Candles với Exchange = "Bitfinex".
         services.Configure<BitfinexOptions>(config.GetSection("Bitfinex"));
@@ -88,6 +90,8 @@ public static class DependencyInjection
         });
         services.AddSingleton(config.GetSection("DailyHistory").Get<DailyHistoryOptions>() ?? new DailyHistoryOptions());
         services.AddScoped<DailyHistorySyncService>();
+        // Sự kiện thị trường ghi tay (marketevents.json) để đối chiếu với các tháng tăng/giảm mạnh.
+        services.AddSingleton(new MarketEventCatalog(config.GetSection("MarketEvents").Get<List<MarketEvent>>() ?? []));
 
         return services;
     }

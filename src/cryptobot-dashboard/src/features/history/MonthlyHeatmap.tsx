@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Tooltip } from 'antd';
-import type { MonthChange, MonthlyHistory, MonthStats, YearChange } from '../../api/client';
+import type { MonthChange, MonthEvent, MonthlyHistory, MonthStats, YearChange } from '../../api/client';
 import { fmtPrice2 as fmtPrice } from '../futures/format';
 
 export const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -12,6 +12,16 @@ export const fmtPct = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(1)}%`;
 
 export function pctColor(v: number) {
   return v > 0 ? '#16a34a' : v < 0 ? '#dc2626' : undefined;
+}
+
+/** Sự kiện gom theo khóa `năm-tháng`. */
+export function eventsByMonth(events: MonthEvent[]) {
+  const map = new Map<string, MonthEvent[]>();
+  for (const e of events) {
+    const key = `${e.year}-${e.month}`;
+    map.set(key, [...(map.get(key) ?? []), e]);
+  }
+  return map;
 }
 
 function cellBackground(v: number) {
@@ -42,7 +52,7 @@ function PriceTip({ open, close, extra }: { open: number; close: number; extra?:
   );
 }
 
-function MonthCell({ m }: { m: MonthChange | undefined }) {
+function MonthCell({ m, events }: { m: MonthChange | undefined; events: MonthEvent[] | undefined }) {
   if (!m) return <td style={{ ...td, color: '#cbd5e1' }}>—</td>;
   return (
     <Tooltip
@@ -54,6 +64,11 @@ function MonthCell({ m }: { m: MonthChange | undefined }) {
             <>
               <br />
               {m.days} ngày có nến{m.complete ? '' : ' · tháng đang chạy, giá đóng là giá gần nhất'}
+              {events?.map((e) => (
+                <div key={e.title} style={{ marginTop: 4 }}>
+                  ● {e.title}
+                </div>
+              ))}
             </>
           }
         />
@@ -66,8 +81,15 @@ function MonthCell({ m }: { m: MonthChange | undefined }) {
           fontStyle: m.complete ? undefined : 'italic',
           outline: m.complete ? undefined : '1px dashed #64748b',
           outlineOffset: -3,
+          position: 'relative',
         }}
       >
+        {events && (
+          <span
+            aria-label="Có sự kiện"
+            style={{ position: 'absolute', top: 2, left: 3, width: 6, height: 6, borderRadius: 3, background: '#7c3aed' }}
+          />
+        )}
         {fmtPct(m.changePercent)}
         {m.complete ? '' : '*'}
       </td>
@@ -117,6 +139,7 @@ export function MonthlyHeatmap({ data }: { data: MonthlyHistory }) {
   const byKey = new Map(data.months.map((m) => [`${m.year}-${m.month}`, m]));
   const years = new Map(data.years.map((y) => [y.year, y]));
   const stats = new Map(data.monthStats.map((s) => [s.month, s]));
+  const events = eventsByMonth(data.events);
 
   return (
     <div style={{ overflowX: 'auto' }}>
@@ -137,7 +160,7 @@ export function MonthlyHeatmap({ data }: { data: MonthlyHistory }) {
             <tr key={year}>
               <th style={{ ...th, textAlign: 'left' }}>{year}</th>
               {MONTHS.map((month) => (
-                <MonthCell key={month} m={byKey.get(`${year}-${month}`)} />
+                <MonthCell key={month} m={byKey.get(`${year}-${month}`)} events={events.get(`${year}-${month}`)} />
               ))}
               <YearCell y={years.get(year)} />
             </tr>
