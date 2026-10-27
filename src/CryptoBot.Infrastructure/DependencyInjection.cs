@@ -75,6 +75,8 @@ public static class DependencyInjection
         services.AddSingleton<LivePriceHistory>();
         services.AddScoped<LivePriceSampler>();
         services.AddSingleton<DailyRangeService>();
+        services.AddSingleton<SimilarDaysCache>();
+        services.AddScoped<SimilarDaysService>();
 
         // Nến ngày lịch sử dài hạn (từ 2016) từ Bitfinex, lưu vào Candles với Exchange = "Bitfinex".
         services.Configure<BitfinexOptions>(config.GetSection("Bitfinex"));
