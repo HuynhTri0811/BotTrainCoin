@@ -15,7 +15,13 @@ namespace CryptoBot.Domain.Indicators;
 /// Ý tưởng: RSI đo "đà" tăng/giảm trong <see cref="Period"/> nến, giá trị 0..100.
 ///   - RSI cắt LÊN qua mức quá bán (<see cref="Oversold"/>, mặc định 30)  → phát Long (giá có thể hồi lên).
 ///   - RSI cắt XUỐNG qua mức quá mua (<see cref="Overbought"/>, mặc định 70) → phát Short (giá có thể quay đầu).
-/// Tuỳ chọn <see cref="TrendEmaPeriod"/>: chỉ nhận Long khi giá trên EMA, Short khi giá dưới EMA (lọc ngược xu hướng).
+///
+/// Tuỳ chọn <see cref="TrendEmaPeriod"/> đổi sang kiểu "hồi trong xu hướng" (pullback):
+///   - Giá trên EMA (xu hướng tăng) và RSI cắt LÊN <see cref="PullbackLong"/> (mặc định 40) → Long.
+///   - Giá dưới EMA (xu hướng giảm) và RSI cắt XUỐNG <see cref="PullbackShort"/> (mặc định 60) → Short.
+/// Không dùng mức 30/70 khi có EMA: RSI vừa dưới 30 thì giá gần như luôn dưới EMA, nên "cắt lên 30 và giá trên EMA"
+/// hầu như không bao giờ xảy ra (đã kiểm tra: 0 tín hiệu trên nến 15m/1h). Trong xu hướng tăng RSI thường chỉ
+/// lùi về quanh 40 rồi bật lên, trong xu hướng giảm chỉ hồi lên quanh 60 rồi quay xuống.
 ///
 /// Cách dùng: khai báo trong appsettings.json → "Indicators" với "Type": "MyRsi".
 /// Tên property (Period, Oversold...) chính là tên khoá trong "Parameters".
@@ -35,8 +41,14 @@ public sealed class MyRsiIndicator : ICustomIndicator
     /// <summary>Mức "quá mua" (mặc định 70). RSI rơi xuống dưới mức này → có thể phát Short.</summary>
     public decimal Overbought { get; set; } = 70m;
 
-    /// <summary>0 = tắt bộ lọc xu hướng. Ví dụ 50: chỉ Long khi giá đóng cửa trên EMA50.</summary>
+    /// <summary>0 = tắt. Ví dụ 50: chuyển sang kiểu hồi trong xu hướng, so giá đóng cửa với EMA50.</summary>
     public int TrendEmaPeriod { get; set; } = 0;
+
+    /// <summary>Chỉ dùng khi bật <see cref="TrendEmaPeriod"/>: giá trên EMA và RSI cắt lên mức này → Long.</summary>
+    public decimal PullbackLong { get; set; } = 40m;
+
+    /// <summary>Chỉ dùng khi bật <see cref="TrendEmaPeriod"/>: giá dưới EMA và RSI cắt xuống mức này → Short.</summary>
+    public decimal PullbackShort { get; set; } = 60m;
 
     /// <summary>
     /// Số nến dùng để tính mỗi lần. RSI/EMA phụ thuộc điểm bắt đầu, nên luôn dùng đúng số nến này
@@ -53,6 +65,8 @@ public sealed class MyRsiIndicator : ICustomIndicator
         if (Oversold <= 0 || Overbought >= 100 || Oversold >= Overbought)
             return "Cần 0 < Oversold < Overbought < 100.";
         if (TrendEmaPeriod < 0) return "TrendEmaPeriod phải >= 0.";
+        if (PullbackLong <= 0 || PullbackLong >= 100 || PullbackShort <= 0 || PullbackShort >= 100)
+            return "PullbackLong và PullbackShort phải nằm trong (0, 100).";
         if (LookbackCandles < Math.Max(Period, TrendEmaPeriod) + 2)
             return "LookbackCandles phải lớn hơn Period và TrendEmaPeriod ít nhất 2 nến.";
         return null;
@@ -67,7 +81,7 @@ public sealed class MyRsiIndicator : ICustomIndicator
         TrendEmaPeriod > 0
             ?
             [
-                new("rsi", $"RSI {Period}", "#7c3aed", Overlay: false, Levels: [Oversold, Overbought]),
+                new("rsi", $"RSI {Period}", "#7c3aed", Overlay: false, Levels: [PullbackLong, PullbackShort]),
                 new("ema", $"EMA {TrendEmaPeriod}", "#0891b2", Overlay: true),
             ]
             : [new("rsi", $"RSI {Period}", "#7c3aed", Overlay: false, Levels: [Oversold, Overbought])];
@@ -95,14 +109,9 @@ public sealed class MyRsiIndicator : ICustomIndicator
         decimal close = closes[^1];            // giá đóng cửa của nến vừa đóng (^1 = phần tử cuối)
         Dictionary<string, decimal?> values = BuildValues(rsi.Now, ema); // 4c: số liệu để vẽ
 
-        // RSI vừa vượt LÊN mức quá bán (ví dụ 28 → 31 qua mốc 30) → xét phát Long.
-        if (Crossover.UpThrough(rsi.Prev, rsi.Now, Oversold))
-            return LongSignal(rsi, close, ema, values);
-        // RSI vừa rơi XUỐNG dưới mức quá mua (ví dụ 72 → 68 qua mốc 70) → xét phát Short.
-        if (Crossover.DownThrough(rsi.Prev, rsi.Now, Overbought))
-            return ShortSignal(rsi, close, ema, values);
-        // Không cắt mức nào: chỉ trả số liệu để vẽ, không có tín hiệu.
-        return IndicatorResult.None($"RSI {rsi.Now:0.##}, không cắt mức.", values);
+        return ema is { } e
+            ? PullbackSignal(rsi, close, e, values)   // 4e: có EMA → hồi trong xu hướng
+            : ReversalSignal(rsi, values);            // 4d: không EMA → quá bán / quá mua
     }
 
     /// <summary>RSI tại nến trước (Prev) và nến vừa đóng (Now).</summary>
@@ -131,18 +140,32 @@ public sealed class MyRsiIndicator : ICustomIndicator
         return values;
     }
 
-    // 4d. RSI cắt lên mức quá bán → Long, trừ khi giá đang dưới EMA xu hướng.
-    //     Lý do lọc: giá dưới EMA nghĩa là xu hướng chung vẫn đang giảm, mua lúc này là đi ngược xu hướng.
-    //     Khi tắt bộ lọc (ema = null) thì luôn phát Long.
-    private IndicatorResult LongSignal(RsiPair rsi, decimal close, decimal? ema, Dictionary<string, decimal?> values) =>
-        ema is { } e && close < e
-            ? IndicatorResult.None($"RSI cắt lên {Oversold} nhưng giá dưới EMA{TrendEmaPeriod}.", values)
-            : new IndicatorResult(values, IndicatorSignal.Long, $"RSI cắt lên {Oversold}: {rsi.Prev:0.##} → {rsi.Now:0.##}.");
+    // 4d. Không có EMA: RSI vừa vượt LÊN mức quá bán (ví dụ 28 → 31 qua mốc 30) → Long,
+    //     vừa rơi XUỐNG dưới mức quá mua (ví dụ 72 → 68 qua mốc 70) → Short.
+    private IndicatorResult ReversalSignal(RsiPair rsi, Dictionary<string, decimal?> values)
+    {
+        if (Crossover.UpThrough(rsi.Prev, rsi.Now, Oversold))
+            return new IndicatorResult(values, IndicatorSignal.Long, $"RSI cắt lên {Oversold}: {rsi.Prev:0.##} → {rsi.Now:0.##}.");
+        if (Crossover.DownThrough(rsi.Prev, rsi.Now, Overbought))
+            return new IndicatorResult(values, IndicatorSignal.Short, $"RSI cắt xuống {Overbought}: {rsi.Prev:0.##} → {rsi.Now:0.##}.");
+        return IndicatorResult.None($"RSI {rsi.Now:0.##}, không cắt mức.", values);
+    }
 
-    // 4e. RSI cắt xuống mức quá mua → Short, trừ khi giá đang trên EMA xu hướng.
-    //     Ngược lại với 4d: giá trên EMA nghĩa là xu hướng vẫn đang tăng, bán khống lúc này là đi ngược xu hướng.
-    private IndicatorResult ShortSignal(RsiPair rsi, decimal close, decimal? ema, Dictionary<string, decimal?> values) =>
-        ema is { } e && close > e
-            ? IndicatorResult.None($"RSI cắt xuống {Overbought} nhưng giá trên EMA{TrendEmaPeriod}.", values)
-            : new IndicatorResult(values, IndicatorSignal.Short, $"RSI cắt xuống {Overbought}: {rsi.Prev:0.##} → {rsi.Now:0.##}.");
+    // 4e. Có EMA: chỉ đánh theo xu hướng.
+    //     Giá trên EMA (xu hướng tăng) mà RSI lùi về rồi cắt LÊN PullbackLong (ví dụ 38 → 42 qua 40) → Long.
+    //     Giá dưới EMA (xu hướng giảm) mà RSI hồi lên rồi cắt XUỐNG PullbackShort (ví dụ 62 → 58 qua 60) → Short.
+    //     Cắt mức nhưng ngược xu hướng thì không phát, kèm lý do để dashboard hiện.
+    private IndicatorResult PullbackSignal(RsiPair rsi, decimal close, decimal ema, Dictionary<string, decimal?> values)
+    {
+        string move = $"{rsi.Prev:0.##} → {rsi.Now:0.##}";
+        if (Crossover.UpThrough(rsi.Prev, rsi.Now, PullbackLong))
+            return close > ema
+                ? new IndicatorResult(values, IndicatorSignal.Long, $"Giá trên EMA{TrendEmaPeriod}, RSI cắt lên {PullbackLong}: {move}.")
+                : IndicatorResult.None($"RSI cắt lên {PullbackLong} nhưng giá dưới EMA{TrendEmaPeriod}.", values);
+        if (Crossover.DownThrough(rsi.Prev, rsi.Now, PullbackShort))
+            return close < ema
+                ? new IndicatorResult(values, IndicatorSignal.Short, $"Giá dưới EMA{TrendEmaPeriod}, RSI cắt xuống {PullbackShort}: {move}.")
+                : IndicatorResult.None($"RSI cắt xuống {PullbackShort} nhưng giá trên EMA{TrendEmaPeriod}.", values);
+        return IndicatorResult.None($"RSI {rsi.Now:0.##}, không cắt mức hồi.", values);
+    }
 }
