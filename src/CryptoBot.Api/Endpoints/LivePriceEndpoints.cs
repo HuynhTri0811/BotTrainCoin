@@ -18,7 +18,7 @@ public static class LivePriceEndpoints
 
         // days: số ngày phía trước (mặc định 1 = 24 giờ).
         app.MapGet("/api/live/daily-range", async (string symbol, int? days, LivePriceOptions options,
-            DailyRangeService ranges, CancellationToken ct) =>
+            DailyRangeService ranges, SimilarDaysService similar, CancellationToken ct) =>
         {
             if (!options.Symbols.Contains(symbol, StringComparer.OrdinalIgnoreCase))
                 return Results.BadRequest(new { error = $"Symbol không có trong LivePrices: {symbol}" });
@@ -27,11 +27,19 @@ public static class LivePriceEndpoints
                 return Results.BadRequest(new { error = $"days phải từ 1 đến {DailyRangeService.MaxHorizonDays}." });
 
             var r = await ranges.GetAsync(symbol.ToUpperInvariant(), horizon, ct);
-            return r is null
-                ? Results.NotFound(new { error = "Chưa đủ dữ liệu nến ngày." })
-                : Results.Ok(new DailyRangeDto(symbol.ToUpperInvariant(), r.HorizonDays, r.Days, r.Price,
-                    r.TypicalMovePercent, r.Low68, r.High68, r.Low95, r.High95, r.AverageMovePercent,
-                    r.LargestRisePercent, r.LargestDropPercent, r.UpDaysPercent, r.Samples));
+            if (r is null)
+                return Results.NotFound(new { error = "Chưa đủ dữ liệu nến ngày." });
+
+            // Ngày tương tự chỉ cho 24 giờ: chạy thử cho thấy 7/30 ngày không có lợi thế so với đoán mặc định.
+            var s = horizon == 1 ? await similar.GetAsync(symbol.ToUpperInvariant(), horizon, ct) : null;
+            var similarDto = s is null ? null : new SimilarDaysDto(s.HistorySymbol, s.Exchange, s.AsOfDayUtc,
+                s.Forecast.Neighbors, s.Forecast.UpPercent, s.Forecast.MedianPercent, s.Forecast.Low68Percent,
+                s.Forecast.High68Percent, r.Price * (1 + s.Forecast.Low68Percent / 100),
+                r.Price * (1 + s.Forecast.High68Percent / 100), s.Forecast.Lean.ToString(), s.Backtest.Days,
+                s.Backtest.HitRatePercent, s.Backtest.StrongDays, s.Backtest.StrongHitRatePercent);
+            return Results.Ok(new DailyRangeDto(symbol.ToUpperInvariant(), r.HorizonDays, r.Days, r.Price,
+                r.TypicalMovePercent, r.Low68, r.High68, r.Low95, r.High95, r.AverageMovePercent,
+                r.LargestRisePercent, r.LargestDropPercent, r.UpDaysPercent, r.Samples, similarDto));
         });
     }
 }
@@ -47,4 +55,13 @@ public sealed record LivePricesDto(int IntervalSeconds, DateTime ServerTimeUtc, 
 public sealed record DailyRangeDto(string Symbol, int HorizonDays, int Days, decimal Price,
     decimal TypicalMovePercent, decimal Low68, decimal High68, decimal Low95, decimal High95,
     decimal AverageMovePercent, decimal LargestRisePercent, decimal LargestDropPercent, decimal UpDaysPercent,
-    int Samples);
+    int Samples, SimilarDaysDto? SimilarDays);
+
+/// <summary>
+/// Dự báo "ngày tương tự" (SimilarDaysForecast) kèm tỷ lệ đúng khi chạy thử. Low68/High68 là giá: mốc giá
+/// hiện tại × (1 + % của các ngày tương tự). Lean: Up / Down / Neutral.
+/// </summary>
+public sealed record SimilarDaysDto(string HistorySymbol, string Exchange, DateTime AsOfDayUtc, int Neighbors,
+    decimal UpPercent, decimal MedianPercent, decimal Low68Percent, decimal High68Percent, decimal Low68,
+    decimal High68, string Lean, int TestedDays, decimal HitRatePercent, int StrongDays,
+    decimal StrongHitRatePercent);
