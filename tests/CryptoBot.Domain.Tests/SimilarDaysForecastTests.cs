@@ -54,6 +54,18 @@ public class SimilarDaysForecastTests
     }
 
     [Fact]
+    public void Backtest_skips_days_without_a_direction()
+    {
+        // Giá đứng yên: không có hướng để chấm, nên không ngày nào được tính.
+        List<decimal> flat = Enumerable.Repeat(100m, 1200).ToList();
+
+        SimilarDaysBacktest b = SimilarDaysForecast.Backtest(flat, warmupDays: 100);
+
+        Assert.Equal(0, b.Days);
+        Assert.Equal(0m, b.HitRatePercent);
+    }
+
+    [Fact]
     public void Rejects_bad_input()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => SimilarDaysForecast.Compute(Alternating(300), horizonDays: 0));
