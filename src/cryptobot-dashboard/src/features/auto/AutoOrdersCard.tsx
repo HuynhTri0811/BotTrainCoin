@@ -202,8 +202,8 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
           value={side}
           onChange={(v) => setSide(v as PositionSide)}
           options={[
-            { label: <span style={{ color: '#16a34a', fontWeight: 600 }}>Long</span>, value: 'Long' },
-            { label: <span style={{ color: '#dc2626', fontWeight: 600 }}>Short</span>, value: 'Short' },
+            { label: <span style={{ color: 'var(--up)', fontWeight: 600 }}>Long</span>, value: 'Long' },
+            { label: <span style={{ color: 'var(--down)', fontWeight: 600 }}>Short</span>, value: 'Short' },
           ]}
         />
 

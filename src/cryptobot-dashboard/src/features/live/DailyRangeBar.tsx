@@ -50,7 +50,7 @@ export function DailyRangeBar({ symbol }: { symbol: string }) {
         </Typography.Text>
       </Flex>
 
-      <div style={{ position: 'relative', height: 14, margin: '10px 0 6px', borderRadius: 7, background: '#e2e8f0' }}>
+      <div style={{ position: 'relative', height: 14, margin: '10px 0 6px', borderRadius: 7, background: 'var(--track)' }}>
         <Tooltip title={`~68% trường hợp: ${fmtPrice(r.low68)} – ${fmtPrice(r.high68)}`}>
           <div
             style={{
@@ -60,19 +60,19 @@ export function DailyRangeBar({ symbol }: { symbol: string }) {
               left: at(r.low68),
               right: `calc(100% - ${at(r.high68)})`,
               borderRadius: 7,
-              background: 'linear-gradient(90deg, #fca5a5, #e2e8f0 50%, #86efac)',
+              background: 'linear-gradient(90deg, color-mix(in srgb, var(--down) 45%, var(--track)), var(--track) 50%, color-mix(in srgb, var(--up) 45%, var(--track)))',
             }}
           />
         </Tooltip>
-        <div style={{ position: 'absolute', top: -3, bottom: -3, left: at(r.price), width: 2, background: '#0f172a' }} />
+        <div style={{ position: 'absolute', top: -3, bottom: -3, left: at(r.price), width: 2, background: 'var(--ink)' }} />
       </div>
       {r.similarDays && <SimilarBand s={r.similarDays} at={at} price={r.price} />}
 
       <Flex justify="space-between" wrap gap={12} style={{ fontVariantNumeric: 'tabular-nums' }}>
-        <Bound label="Giảm mạnh (~95%)" price={r.low95} diff={diff(r.low95)} color="#dc2626" />
-        <Bound label="Giảm thường (~68%)" price={r.low68} diff={diff(r.low68)} color="#dc2626" />
-        <Bound label="Tăng thường (~68%)" price={r.high68} diff={diff(r.high68)} color="#16a34a" align="end" />
-        <Bound label="Tăng mạnh (~95%)" price={r.high95} diff={diff(r.high95)} color="#16a34a" align="end" />
+        <Bound label="Giảm mạnh (~95%)" price={r.low95} diff={diff(r.low95)} color="var(--down)" />
+        <Bound label="Giảm thường (~68%)" price={r.low68} diff={diff(r.low68)} color="var(--down)" />
+        <Bound label="Tăng thường (~68%)" price={r.high68} diff={diff(r.high68)} color="var(--up)" align="end" />
+        <Bound label="Tăng mạnh (~95%)" price={r.high95} diff={diff(r.high95)} color="var(--up)" align="end" />
       </Flex>
 
       <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '6px 0 0' }}>
@@ -87,9 +87,9 @@ export function DailyRangeBar({ symbol }: { symbol: string }) {
 }
 
 const LEAN = {
-  Up: { text: 'Nghiêng tăng', color: '#16a34a', band: 'rgba(22, 163, 74, 0.55)' },
-  Down: { text: 'Nghiêng giảm', color: '#dc2626', band: 'rgba(220, 38, 38, 0.55)' },
-  Neutral: { text: 'Trung lập', color: '#64748b', band: 'rgba(100, 116, 139, 0.45)' },
+  Up: { text: 'Nghiêng tăng', color: 'var(--up)', band: 'color-mix(in srgb, var(--up) 55%, transparent)' },
+  Down: { text: 'Nghiêng giảm', color: 'var(--down)', band: 'color-mix(in srgb, var(--down) 55%, transparent)' },
+  Neutral: { text: 'Trung lập', color: 'var(--text-muted)', band: 'color-mix(in srgb, var(--text-muted) 45%, transparent)' },
 } as const;
 
 /** Khoảng ~68% của các ngày tương tự, cùng thang với thanh biên độ ở trên (bị cắt ở hai đầu khoảng 95%). */
@@ -110,7 +110,7 @@ function SimilarBand({ s, at, price }: { s: SimilarDays; at: (v: number) => stri
             background: lean.band,
           }}
         />
-        <div style={{ position: 'absolute', top: -2, bottom: -2, left: clamp(at(price)), width: 2, background: '#0f172a' }} />
+        <div style={{ position: 'absolute', top: -2, bottom: -2, left: clamp(at(price)), width: 2, background: 'var(--ink)' }} />
       </div>
     </Tooltip>
   );
@@ -119,7 +119,7 @@ function SimilarBand({ s, at, price }: { s: SimilarDays; at: (v: number) => stri
 function SimilarSummary({ s }: { s: SimilarDays }) {
   const lean = LEAN[s.lean];
   return (
-    <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6, background: '#f1f5f9', fontSize: 12 }}>
+    <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6, background: 'var(--surface-note)', fontSize: 12 }}>
       <Flex justify="space-between" wrap gap={8} align="baseline">
         <span>
           <Typography.Text strong>Ngày tương tự · giá đóng cửa hôm nay: </Typography.Text>

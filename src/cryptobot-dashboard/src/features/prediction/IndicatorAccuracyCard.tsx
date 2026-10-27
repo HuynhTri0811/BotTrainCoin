@@ -5,7 +5,7 @@ import { fmtPrice2 as fmtPrice } from '../futures/format';
 import { formatVnUnix } from '../../time';
 
 const signedPct = (v: number | null) => (v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(2)}%`);
-const moveColor = (v: number | null) => (v == null || v === 0 ? undefined : v > 0 ? '#16a34a' : '#dc2626');
+const moveColor = (v: number | null) => (v == null || v === 0 ? undefined : v > 0 ? 'var(--up)' : 'var(--down)');
 
 /**
  * Tín hiệu Long/Short của chỉ báo tự viết (vd. my-rsi) đúng bao nhiêu %: sau 1, 3, 6, 12 nến
@@ -60,7 +60,7 @@ function IndicatorBlock({ a, interval }: { a: IndicatorAccuracy; interval: strin
               h.signals === 0 ? (
                 '—'
               ) : (
-                <span style={{ color: h.hitRatePercent > 50 ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                <span style={{ color: h.hitRatePercent > 50 ? 'var(--up)' : 'var(--down)', fontWeight: 600 }}>
                   {h.hitRatePercent.toFixed(1)}%
                 </span>
               ),

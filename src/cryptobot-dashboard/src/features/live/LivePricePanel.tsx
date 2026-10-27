@@ -12,7 +12,7 @@ interface Row extends LiveSample {
 }
 
 const pct = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(3)}%`;
-const deltaColor = (v: number | null) => (v == null || v === 0 ? undefined : v > 0 ? '#16a34a' : '#dc2626');
+const deltaColor = (v: number | null) => (v == null || v === 0 ? undefined : v > 0 ? 'var(--up)' : 'var(--down)');
 
 export function LivePricePanel({ symbol }: { symbol: string }) {
   const live = useQuery({
