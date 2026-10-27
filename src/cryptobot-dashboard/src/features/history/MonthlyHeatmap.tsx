@@ -11,7 +11,7 @@ const FULL_COLOR_PERCENT = 30;
 export const fmtPct = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
 
 export function pctColor(value: number) {
-  return value > 0 ? '#16a34a' : value < 0 ? '#dc2626' : undefined;
+  return value > 0 ? 'var(--up)' : value < 0 ? 'var(--down)' : undefined;
 }
 
 /** Sự kiện gom theo khóa `năm-tháng`. */
@@ -26,11 +26,12 @@ export function eventsByMonth(events: MonthEvent[]) {
 
 function cellBackground(value: number) {
   const alpha = 0.08 + 0.62 * Math.min(Math.abs(value) / FULL_COLOR_PERCENT, 1);
-  return value >= 0 ? `rgba(22, 163, 74, ${alpha.toFixed(3)})` : `rgba(220, 38, 38, ${alpha.toFixed(3)})`;
+  const pct = (alpha * 100).toFixed(1);
+  return `color-mix(in srgb, var(${value >= 0 ? '--up' : '--down'}) ${pct}%, transparent)`;
 }
 
-const border = '1px solid #e5e7eb';
-const th: CSSProperties = { padding: '6px 8px', fontWeight: 600, fontSize: 12, background: '#f8fafc', border, whiteSpace: 'nowrap' };
+const border = '1px solid var(--border)';
+const th: CSSProperties = { padding: '6px 8px', fontWeight: 600, fontSize: 12, background: 'var(--surface-subtle)', border, whiteSpace: 'nowrap' };
 const td: CSSProperties = {
   padding: '6px 8px',
   fontSize: 12,
@@ -53,7 +54,7 @@ function PriceTip({ open, close, extra }: { open: number; close: number; extra?:
 }
 
 function MonthCell({ change, events }: { change: MonthChange | undefined; events: MonthEvent[] | undefined }) {
-  if (!change) return <td style={{ ...td, color: '#cbd5e1' }}>—</td>;
+  if (!change) return <td style={{ ...td, color: 'var(--faint-2)' }}>—</td>;
   return (
     <Tooltip
       title={
@@ -79,7 +80,7 @@ function MonthCell({ change, events }: { change: MonthChange | undefined; events
           ...td,
           background: cellBackground(change.changePercent),
           fontStyle: change.complete ? undefined : 'italic',
-          outline: change.complete ? undefined : '1px dashed #64748b',
+          outline: change.complete ? undefined : '1px dashed var(--text-muted)',
           outlineOffset: -3,
           position: 'relative',
         }}
@@ -87,7 +88,7 @@ function MonthCell({ change, events }: { change: MonthChange | undefined; events
         {events && (
           <span
             aria-label="Có sự kiện"
-            style={{ position: 'absolute', top: 2, left: 3, width: 6, height: 6, borderRadius: 3, background: '#7c3aed' }}
+            style={{ position: 'absolute', top: 2, left: 3, width: 6, height: 6, borderRadius: 3, background: 'var(--accent)' }}
           />
         )}
         {fmtPct(change.changePercent)}
@@ -101,7 +102,7 @@ function YearCell({ year }: { year: YearChange | undefined }) {
   if (!year) return <td style={td}>—</td>;
   return (
     <Tooltip title={<PriceTip open={year.open} close={year.close} extra={year.complete ? null : <><br />Năm chưa trọn</>} />}>
-      <td style={{ ...td, fontWeight: 600, color: pctColor(year.changePercent), borderLeft: '2px solid #94a3b8' }}>
+      <td style={{ ...td, fontWeight: 600, color: pctColor(year.changePercent), borderLeft: '2px solid var(--faint)' }}>
         {fmtPct(year.changePercent)}
         {year.complete ? '' : '*'}
       </td>
@@ -124,12 +125,12 @@ function StatsRow({
       {MONTHS.map((month) => {
         const monthStats = stats.get(month);
         return (
-          <td key={month} style={{ ...td, background: '#f8fafc' }}>
+          <td key={month} style={{ ...td, background: 'var(--surface-subtle)' }}>
             {monthStats ? render(monthStats) : '—'}
           </td>
         );
       })}
-      <td style={{ ...td, background: '#f8fafc', borderLeft: '2px solid #94a3b8' }} />
+      <td style={{ ...td, background: 'var(--surface-subtle)', borderLeft: '2px solid var(--faint)' }} />
     </tr>
   );
 }
@@ -152,7 +153,7 @@ export function MonthlyHeatmap({ data }: { data: MonthlyHistory }) {
                 T{month}
               </th>
             ))}
-            <th style={{ ...th, borderLeft: '2px solid #94a3b8' }}>Cả năm</th>
+            <th style={{ ...th, borderLeft: '2px solid var(--faint)' }}>Cả năm</th>
           </tr>
         </thead>
         <tbody>
