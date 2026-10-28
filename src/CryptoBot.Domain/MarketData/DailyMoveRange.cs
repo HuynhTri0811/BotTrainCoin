@@ -62,7 +62,7 @@ public sealed record DailyMoveRange(
         // Thay đổi thực tế sau horizonDays ngày, trượt từng ngày một.
         List<decimal> changes = new(dailyCloses.Count - horizonDays);
         for (int i = horizonDays; i < dailyCloses.Count; i++)
-            changes.Add((dailyCloses[i] / dailyCloses[i - horizonDays] - 1) * 100);
+            changes.Add(PercentChange.Between(dailyCloses[i - horizonDays], dailyCloses[i]));
 
         return new DailyMoveRange(
             HorizonDays: horizonDays,
@@ -76,7 +76,7 @@ public sealed record DailyMoveRange(
             AverageMovePercent: changes.Average(Math.Abs),
             LargestRisePercent: changes.Max(),
             LargestDropPercent: changes.Min(),
-            UpDaysPercent: (decimal)changes.Count(c => c > 0) / changes.Count * 100,
+            UpDaysPercent: PercentChange.UpShare(changes),
             Samples: changes.Count);
     }
 }
