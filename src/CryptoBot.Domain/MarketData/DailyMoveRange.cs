@@ -46,10 +46,7 @@ public sealed record DailyMoveRange(
     {
         if (price <= 0)
             throw new ArgumentOutOfRangeException(nameof(price), "Giá phải dương.");
-        if (horizonDays <= 0)
-            throw new ArgumentOutOfRangeException(nameof(horizonDays), "Số ngày phải lớn hơn 0.");
-        if (dailyCloses.Any(c => c <= 0))
-            throw new ArgumentException("Giá đóng cửa phải dương.", nameof(dailyCloses));
+        DailyCloses.Validate(dailyCloses, horizonDays);
         if (dailyCloses.Count - 1 < MinDays || dailyCloses.Count - horizonDays < MinDays)
             return null;
 

@@ -100,12 +100,9 @@ public sealed record SimilarDaysForecast(
 
     private static void Validate(IReadOnlyList<decimal> dailyCloses, int horizonDays, int neighbors)
     {
-        if (horizonDays <= 0)
-            throw new ArgumentOutOfRangeException(nameof(horizonDays), "Số ngày phải lớn hơn 0.");
+        DailyCloses.Validate(dailyCloses, horizonDays);
         if (neighbors <= 0)
             throw new ArgumentOutOfRangeException(nameof(neighbors), "Số ngày tương tự phải lớn hơn 0.");
-        if (dailyCloses.Any(c => c <= 0))
-            throw new ArgumentException("Giá đóng cửa phải dương.", nameof(dailyCloses));
     }
 
     /// <summary>% thay đổi sau horizon ngày của <paramref name="neighbors"/> ngày (≤ lastCandidate) giống ngày target nhất.</summary>
