@@ -1,6 +1,6 @@
 using System.Collections;
 
-namespace CryptoBot.Domain.MarketData;
+namespace CryptoBot.Domain.Common;
 
 /// <summary>
 /// Một đoạn liên tiếp của danh sách có sẵn, không sao chép phần tử. Dùng cho cửa sổ nến trượt:
