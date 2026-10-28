@@ -79,6 +79,19 @@ public static class PriceDirectionPredictor
     }
 
     /// <summary>
+    /// Dự đoán nến tại vị trí <paramref name="index"/> chỉ từ <see cref="PredictorSettings.RequiredCandles"/> nến
+    /// ngay trước nó (không sao chép danh sách). <paramref name="index"/> = số nến là đoán nến chưa có.
+    /// </summary>
+    public static PricePrediction PredictAt(IReadOnlyList<Candle> closedCandles, int index,
+        PredictorSettings? settings = null)
+    {
+        PredictorSettings s = settings ?? new PredictorSettings();
+        ArgumentOutOfRangeException.ThrowIfLessThan(index, s.RequiredCandles);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(index, closedCandles.Count);
+        return Predict(new ListSlice<Candle>(closedCandles, index - s.RequiredCandles, s.RequiredCandles), s);
+    }
+
+    /// <summary>
     /// Chạy thử trên lịch sử: với mỗi nến từ vị trí <see cref="PredictorSettings.RequiredCandles"/>,
     /// chỉ dùng các nến trước nó để đoán, rồi so với thực tế (đóng cao hơn nến trước = Up).
     /// Nến đóng bằng đúng giá nến trước bị bỏ qua.
@@ -95,8 +108,7 @@ public static class PriceDirectionPredictor
             if (actualClose == previousClose)
                 continue;
 
-            List<Candle> window = closedCandles.Skip(i - s.RequiredCandles).Take(s.RequiredCandles).ToList();
-            PriceDirection predicted = Predict(window, s).Direction;
+            PriceDirection predicted = PredictAt(closedCandles, i, s).Direction;
             PriceDirection actual = actualClose > previousClose ? PriceDirection.Up : PriceDirection.Down;
             predictions++;
             if (predicted == actual)

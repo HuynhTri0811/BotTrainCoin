@@ -41,8 +41,7 @@ public static class PredictionEndpoints
             var recent = new List<PredictionHistoryDto>();
             for (var i = Math.Max(settings.RequiredCandles, closed.Count - RecentCount); i < closed.Count; i++)
             {
-                var window = closed.Skip(i - settings.RequiredCandles).Take(settings.RequiredCandles).ToList();
-                var p = PriceDirectionPredictor.Predict(window, settings);
+                var p = PriceDirectionPredictor.PredictAt(closed, i, settings);
                 var previousClose = closed[i - 1].Close;
                 var actual = closed[i].Close == previousClose ? null
                     : closed[i].Close > previousClose ? "Up" : "Down";
