@@ -1,4 +1,5 @@
 using CryptoBot.Application.Abstractions;
+using CryptoBot.Domain.Common;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Strategies;
 using Microsoft.Extensions.Logging;
