@@ -2,13 +2,6 @@ using CryptoBot.Domain.MarketData;
 
 namespace CryptoBot.Domain.Prediction;
 
-/// <summary>Hướng dự đoán của nến kế tiếp: chỉ có lên hoặc xuống.</summary>
-public enum PriceDirection
-{
-    Up,
-    Down,
-}
-
 /// <summary>Kết quả dự đoán. Score &gt;= 0 là Up, &lt; 0 là Down; |Score| càng lớn càng "chắc".</summary>
 public sealed record PricePrediction(PriceDirection Direction, decimal Score, string Reason);
 
