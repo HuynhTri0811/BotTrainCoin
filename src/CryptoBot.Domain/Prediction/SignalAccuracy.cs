@@ -1,3 +1,4 @@
+using CryptoBot.Domain.Common;
 using CryptoBot.Domain.MarketData;
 
 namespace CryptoBot.Domain.Prediction;
@@ -72,7 +73,7 @@ public static class SignalAccuracy
         if (target >= candles.Count)
             return null;
 
-        decimal change = (candles[target].Close / candles[signal.Index].Close - 1) * 100;
+        decimal change = PercentChange.Between(candles[signal.Index].Close, candles[target].Close);
         return signal.Direction == PriceDirection.Up ? change : -change;
     }
 }

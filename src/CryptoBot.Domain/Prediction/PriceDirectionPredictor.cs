@@ -1,3 +1,4 @@
+using CryptoBot.Domain.Common;
 using CryptoBot.Domain.MarketData;
 
 namespace CryptoBot.Domain.Prediction;
@@ -57,11 +58,11 @@ public static class PriceDirectionPredictor
 
         // 1. Xu hướng: giá trên trung bình → nghiêng lên.
         decimal average = closedCandles.TakeLast(s.TrendPeriod).Average(c => c.Close);
-        decimal trend = (last.Close / average - 1) * 100;
+        decimal trend = PercentChange.Between(average, last.Close);
 
         // 2. Đà: mấy nến gần nhất đang đi lên → nghiêng lên.
         decimal before = closedCandles[^(s.MomentumPeriod + 1)].Close;
-        decimal momentum = (last.Close / before - 1) * 100;
+        decimal momentum = PercentChange.Between(before, last.Close);
 
         // 3. Lực mua/bán chủ động ở nến cuối: mua > 50% → nghiêng lên.
         VolumePressure? pressure = VolumePressure.From(last);
