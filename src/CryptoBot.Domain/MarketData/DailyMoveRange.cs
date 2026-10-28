@@ -1,3 +1,5 @@
+using CryptoBot.Domain.Common;
+
 namespace CryptoBot.Domain.MarketData;
 
 /// <summary>
