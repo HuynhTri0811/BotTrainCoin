@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace CryptoBot.Domain.MarketData;
 
 /// <summary>Khung nến được hỗ trợ. Code trùng với mã interval của Binance.</summary>
@@ -24,20 +26,14 @@ public sealed record CandleInterval
         Duration = duration;
     }
 
-    public static bool TryParse(string? code, out CandleInterval interval)
+    public static bool TryParse(string? code, [MaybeNullWhen(false)] out CandleInterval interval)
     {
-        if (code is not null && All.TryGetValue(code, out CandleInterval found))
-        {
-            interval = found;
-            return true;
-        }
-
-        interval = null!;
-        return false;
+        interval = null;
+        return code is not null && All.TryGetValue(code, out interval);
     }
 
     public static CandleInterval Parse(string code) =>
-        TryParse(code, out CandleInterval interval)
+        TryParse(code, out CandleInterval? interval)
             ? interval
             : throw new ArgumentException($"Interval không được hỗ trợ: '{code}'.", nameof(code));
 
