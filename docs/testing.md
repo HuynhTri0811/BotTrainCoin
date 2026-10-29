@@ -8,7 +8,7 @@ UPDATE_GOLDEN=1 dotnet test                          # ghi lại snapshot golden
 npm --prefix src/cryptobot-dashboard run typecheck   # frontend: chỉ typecheck, chưa có test
 ```
 
-Tại thời điểm 2026-10-29 (nhánh `test/more-unit-tests`): Domain 185, Application 104, Integration 7 test, tất cả pass.
+Tại thời điểm 2026-10-29 (sau PR #59): Domain 185, Application 104, Integration 7 test, tất cả pass.
 Framework: xUnit 2.9, `using Xunit;` là global using trong mỗi project test.
 
 ## Ba project test
@@ -16,7 +16,7 @@ Framework: xUnit 2.9, `using Xunit;` là global using trong mỗi project test.
 | Project | Tham chiếu | Test cái gì | Fake / hạ tầng |
 | --- | --- | --- | --- |
 | [`CryptoBot.Domain.Tests`](../tests/CryptoBot.Domain.Tests) | Domain | Công thức, entity, chiến lược, chỉ báo, dự đoán | Không cần fake. Helper [`TestCandles`](../tests/CryptoBot.Domain.Tests/TestCandles.cs) |
-| [`CryptoBot.Application.Tests`](../tests/CryptoBot.Application.Tests) | Application | Service: sync, đánh giá tín hiệu, paper futures, quy tắc tự động, registry, cache, golden | [`Fakes.cs`](../tests/CryptoBot.Application.Tests/Fakes.cs): `FakeClock`, `InMemoryCandleStore`, store/client giả |
+| [`CryptoBot.Application.Tests`](../tests/CryptoBot.Application.Tests) | Application | Service: sync, đánh giá tín hiệu, paper futures, quy tắc tự động, registry, cache, golden | [`Fakes.cs`](../tests/CryptoBot.Application.Tests/Fakes.cs): `FakeClock`, `InMemoryCandleStore`, `InMemoryStrategyInstanceStore`, `InMemorySignalStore`, `FakeMarketDataClient` |
 | [`CryptoBot.IntegrationTests`](../tests/CryptoBot.IntegrationTests) | Infrastructure | EF Core mapping, converter, index duy nhất, migration thật | File SQLite tạm trong `%TEMP%`, xóa sau test |
 
 Quy tắc chọn chỗ: test ở **tầng thấp nhất** chứa logic. Công thức → Domain test. Điều phối nhiều port → Application
@@ -51,9 +51,11 @@ Ví dụ tốt có sẵn:
 | --- | --- |
 | Công thức thuần túy | [`DailyMoveRangeTests`](../tests/CryptoBot.Domain.Tests/DailyMoveRangeTests.cs), [`FuturesMathTests`](../tests/CryptoBot.Domain.Tests/FuturesMathTests.cs) |
 | Chỉ báo (warm-up, cắt mức, bộ lọc) | [`MyRsiIndicatorTests`](../tests/CryptoBot.Domain.Tests/MyRsiIndicatorTests.cs) |
-| Entity và bất biến | [`CandleTests`](../tests/CryptoBot.Domain.Tests/CandleTests.cs) |
+| Entity và bất biến | [`CandleTests`](../tests/CryptoBot.Domain.Tests/CandleTests.cs), [`AutoOrderRuleTests`](../tests/CryptoBot.Domain.Tests/AutoOrderRuleTests.cs) |
+| Nhiều trường hợp từ chối bằng `[Theory]` | [`CandleIntervalTests`](../tests/CryptoBot.Domain.Tests/CandleIntervalTests.cs), [`StrategyConfiguratorTests`](../tests/CryptoBot.Application.Tests/StrategyConfiguratorTests.cs) |
 | Service với fake + đồng hồ giả | [`PaperFuturesServiceTests`](../tests/CryptoBot.Application.Tests/PaperFuturesServiceTests.cs), [`AutoOrderServiceTests`](../tests/CryptoBot.Application.Tests/AutoOrderServiceTests.cs) |
 | Cache và tính một lần | [`SimilarDaysServiceTests`](../tests/CryptoBot.Application.Tests/SimilarDaysServiceTests.cs) |
+| Tua đồng hồ qua đúng ngưỡng (stale, hết hạn) | [`MarketDataStatusRegistryTests`](../tests/CryptoBot.Application.Tests/MarketDataStatusRegistryTests.cs), [`MarkPriceCacheTests`](../tests/CryptoBot.Application.Tests/MarkPriceCacheTests.cs) |
 | SQLite thật | [`SqlitePersistenceTests`](../tests/CryptoBot.IntegrationTests/SqlitePersistenceTests.cs) |
 
 ## Golden test
