@@ -76,12 +76,7 @@ public sealed class CandleSyncService(
             var batchIssues = CandleSeriesValidator.Validate(candles, key.Interval);
             issues.AddRange(batchIssues);
 
-            // Không sửa dữ liệu âm thầm: nến có giá trị không hợp lệ không được lưu.
-            var invalid = batchIssues
-                .Where(i => i.Kind is CandleIssueKind.InvalidValues or CandleIssueKind.Duplicate or CandleIssueKind.OutOfOrder)
-                .Select(i => i.OpenTimeUtc)
-                .ToHashSet();
-            var valid = candles.Where(c => !invalid.Contains(c.OpenTimeUtc)).ToList();
+            var valid = CandleSeriesValidator.WithoutRejected(candles, batchIssues);
 
             var result = await store.UpsertAsync(key, valid, ct);
             inserted += result.Inserted;
