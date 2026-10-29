@@ -143,4 +143,63 @@ public class CandleTests
     {
         Assert.Equal("Số giao dịch âm.", WithStats(closed: true, trades: -1).Validate());
     }
+
+    private static Candle Ohlcv(decimal open, decimal high, decimal low, decimal close, decimal volume = 1) =>
+        new("Binance", "BTCUSDT", CandleInterval.H1, TestCandles.T0, open, high, low, close, volume, true,
+            TestCandles.T0);
+
+    [Theory]
+    [InlineData(0, 10, 5, 8)]
+    [InlineData(8, 10, 0, 8)]
+    [InlineData(8, 10, 5, -1)]
+    public void Non_positive_prices_are_invalid(int open, int high, int low, int close)
+    {
+        Assert.Equal("Giá phải dương.", Ohlcv(open, high, low, close).Validate());
+    }
+
+    [Fact]
+    public void Negative_volume_is_invalid()
+    {
+        Assert.Equal("Volume âm.", Ohlcv(8, 10, 5, 9, volume: -1).Validate());
+    }
+
+    [Theory]
+    [InlineData(8, 9, 5, 10)]  // High dưới Close
+    [InlineData(11, 10, 5, 9)] // High dưới Open
+    [InlineData(8, 10, 9, 9)]  // Low trên Open
+    [InlineData(8, 10, 6, 5)]  // Low trên Close
+    public void High_and_low_must_contain_open_and_close(int open, int high, int low, int close)
+    {
+        Assert.Equal("High/Low không bao Open/Close.", Ohlcv(open, high, low, close).Validate());
+    }
+
+    [Fact]
+    public void Valid_candle_has_no_reason_and_close_time_follows_interval()
+    {
+        var c = Ohlcv(8, 10, 5, 9);
+
+        Assert.Null(c.Validate());
+        Assert.Equal(TestCandles.T0.AddHours(1), c.CloseTimeUtc);
+        Assert.Equal("1h", c.Interval);
+    }
+
+    [Fact]
+    public void Gap_issue_says_how_many_candles_are_missing()
+    {
+        List<Candle> candles = [TestCandles.At(0, 10), TestCandles.At(3, 10)];
+
+        var issue = Assert.Single(CandleSeriesValidator.Validate(candles, CandleInterval.H1));
+
+        Assert.Equal(CandleIssueKind.Gap, issue.Kind);
+        Assert.Equal(TestCandles.At(3, 10).OpenTimeUtc, issue.OpenTimeUtc);
+        Assert.StartsWith("Thiếu khoảng 2 nến", issue.Detail);
+    }
+
+    [Fact]
+    public void Update_from_a_different_candle_is_a_programming_error()
+    {
+        var stored = TestCandles.At(0, 10, closed: false);
+
+        Assert.Throws<InvalidOperationException>(() => stored.ApplyUpdate(TestCandles.At(1, 10)));
+    }
 }
