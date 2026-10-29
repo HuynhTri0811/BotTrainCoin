@@ -128,19 +128,6 @@ public sealed class FuturesPosition
     }
 }
 
-/// <summary>Loại bút toán trong sổ vốn giả lập.</summary>
-public enum LedgerEntryType
-{
-    /// <summary>Nạp vốn (vốn giả lập ban đầu).</summary>
-    Deposit = 1,
-
-    /// <summary>Phí giao dịch (số âm).</summary>
-    Fee = 2,
-
-    /// <summary>Lãi/lỗ đã chốt khi đóng hoặc bị thanh lý.</summary>
-    RealizedPnl = 3,
-}
-
 /// <summary>Bút toán sổ vốn giả lập. Số dư ví = tổng Amount (tính trong ứng dụng, không SUM bằng SQL).</summary>
 public sealed class PaperLedgerEntry
 {
