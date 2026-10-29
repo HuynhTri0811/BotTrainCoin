@@ -59,4 +59,14 @@ public static class CandleSeriesValidator
 
         return issues;
     }
+
+    /// <summary>
+    /// Bỏ mọi nến có OpenTime trùng với một lỗi <see cref="CandleIssue.RejectsCandle"/>, giữ nguyên thứ tự còn lại.
+    /// Không sửa dữ liệu âm thầm: nến hỏng bị loại chứ không được chỉnh lại.
+    /// </summary>
+    public static List<Candle> WithoutRejected(IReadOnlyList<Candle> candles, IReadOnlyList<CandleIssue> issues)
+    {
+        HashSet<DateTime> rejected = issues.Where(i => i.RejectsCandle).Select(i => i.OpenTimeUtc).ToHashSet();
+        return candles.Where(c => !rejected.Contains(c.OpenTimeUtc)).ToList();
+    }
 }
