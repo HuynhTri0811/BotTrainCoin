@@ -95,7 +95,7 @@ public class MarketDataStatusRegistryTests
         _registry.RecordSuccess(Success(issues: issues));
 
         var recent = Status().RecentIssues;
-        Assert.Equal(20, recent.Count);
+        Assert.Equal(MarketDataStatusRegistry.MaxRecentIssues, recent.Count);
         Assert.Equal("issue 5", recent[0].Detail);
         Assert.Equal("issue 24", recent[^1].Detail);
     }
