@@ -60,6 +60,51 @@ public class FuturesMathTests
     }
 
     [Fact]
+    public void Zero_step_or_tick_leaves_value_unchanged()
+    {
+        Assert.Equal(0.0129m, FuturesMath.RoundDown(0.0129m, 0m));
+        Assert.Equal(81958.75m, FuturesMath.RoundToTick(81958.75m, 0m));
+    }
+
+    [Fact]
+    public void Tick_rounding_goes_away_from_zero_at_midpoint()
+    {
+        Assert.Equal(100.2m, FuturesMath.RoundToTick(100.15m, 0.1m));
+        Assert.Equal(100.1m, FuturesMath.RoundToTick(100.14m, 0.1m));
+    }
+
+    [Theory]
+    [InlineData(PositionSide.Long, 90, true)]
+    [InlineData(PositionSide.Long, 89, true)]
+    [InlineData(PositionSide.Long, 91, false)]
+    [InlineData(PositionSide.Short, 110, true)]
+    [InlineData(PositionSide.Short, 111, true)]
+    [InlineData(PositionSide.Short, 109, false)]
+    public void Liquidation_triggers_at_or_beyond_the_price(PositionSide side, int mark, bool expected)
+    {
+        var liquidation = side == PositionSide.Long ? 90m : 110m;
+
+        Assert.Equal(expected, FuturesMath.IsLiquidated(side, mark, liquidation));
+    }
+
+    [Theory]
+    [InlineData(PositionSide.Long, 95, true, false)]
+    [InlineData(PositionSide.Long, 105, false, true)]
+    [InlineData(PositionSide.Long, 100, false, false)]
+    [InlineData(PositionSide.Short, 105, true, false)]
+    [InlineData(PositionSide.Short, 95, false, true)]
+    [InlineData(PositionSide.Short, 100, false, false)]
+    public void Stop_and_take_profit_are_hit_on_the_side_that_loses_or_wins(PositionSide side, int mark,
+        bool stopHit, bool takeProfitHit)
+    {
+        // Long: SL 95 dưới giá vào, TP 105 trên. Short: ngược lại.
+        var (stop, takeProfit) = side == PositionSide.Long ? (95m, 105m) : (105m, 95m);
+
+        Assert.Equal(stopHit, FuturesMath.StopHit(side, mark, stop));
+        Assert.Equal(takeProfitHit, FuturesMath.TakeProfitHit(side, mark, takeProfit));
+    }
+
+    [Fact]
     public void Isolated_close_loss_is_capped_at_margin()
     {
         var p = new FuturesPosition(Guid.NewGuid(), "BTCUSDT", PositionSide.Long, 10, 1m, 100m, 10m, 90.36m,
