@@ -1,18 +1,5 @@
 namespace CryptoBot.Domain.MarketData;
 
-/// <summary>Phía nào đang áp đảo trong một nến.</summary>
-public enum VolumePressureSide
-{
-    /// <summary>Chênh lệch mua/bán chưa tới ngưỡng cảnh báo.</summary>
-    Balanced,
-
-    /// <summary>Mua chủ động lớn hơn bán chủ động từ ngưỡng trở lên.</summary>
-    BuyHeavy,
-
-    /// <summary>Bán chủ động lớn hơn mua chủ động từ ngưỡng trở lên.</summary>
-    SellHeavy,
-}
-
 /// <summary>
 /// So sánh khối lượng mua và bán chủ động (taker) của một nến.
 /// Mua chủ động = lệnh mua khớp ngay vào giá bán đang chờ (đẩy giá lên); bán chủ động là phần còn lại của Volume.
