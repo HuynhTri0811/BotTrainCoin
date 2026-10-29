@@ -1,13 +1,7 @@
+using CryptoBot.Domain.Common;
 using CryptoBot.Domain.MarketData;
 
 namespace CryptoBot.Domain.Prediction;
-
-/// <summary>Hướng dự đoán của nến kế tiếp: chỉ có lên hoặc xuống.</summary>
-public enum PriceDirection
-{
-    Up,
-    Down,
-}
 
 /// <summary>Kết quả dự đoán. Score &gt;= 0 là Up, &lt; 0 là Down; |Score| càng lớn càng "chắc".</summary>
 public sealed record PricePrediction(PriceDirection Direction, decimal Score, string Reason);
@@ -64,11 +58,11 @@ public static class PriceDirectionPredictor
 
         // 1. Xu hướng: giá trên trung bình → nghiêng lên.
         decimal average = closedCandles.TakeLast(s.TrendPeriod).Average(c => c.Close);
-        decimal trend = (last.Close / average - 1) * 100;
+        decimal trend = PercentChange.Between(average, last.Close);
 
         // 2. Đà: mấy nến gần nhất đang đi lên → nghiêng lên.
         decimal before = closedCandles[^(s.MomentumPeriod + 1)].Close;
-        decimal momentum = (last.Close / before - 1) * 100;
+        decimal momentum = PercentChange.Between(before, last.Close);
 
         // 3. Lực mua/bán chủ động ở nến cuối: mua > 50% → nghiêng lên.
         VolumePressure? pressure = VolumePressure.From(last);
@@ -82,6 +76,19 @@ public static class PriceDirectionPredictor
                             $"mua {pressure.BuyPercent:0.#}% × {s.PressureWeight}") +
                         $" → điểm {score:+0.####;-0.####;0}";
         return new PricePrediction(direction, score, reason);
+    }
+
+    /// <summary>
+    /// Dự đoán nến tại vị trí <paramref name="index"/> chỉ từ <see cref="PredictorSettings.RequiredCandles"/> nến
+    /// ngay trước nó (không sao chép danh sách). <paramref name="index"/> = số nến là đoán nến chưa có.
+    /// </summary>
+    public static PricePrediction PredictAt(IReadOnlyList<Candle> closedCandles, int index,
+        PredictorSettings? settings = null)
+    {
+        PredictorSettings s = settings ?? new PredictorSettings();
+        ArgumentOutOfRangeException.ThrowIfLessThan(index, s.RequiredCandles);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(index, closedCandles.Count);
+        return Predict(new ListSlice<Candle>(closedCandles, index - s.RequiredCandles, s.RequiredCandles), s);
     }
 
     /// <summary>
@@ -101,8 +108,7 @@ public static class PriceDirectionPredictor
             if (actualClose == previousClose)
                 continue;
 
-            List<Candle> window = closedCandles.Skip(i - s.RequiredCandles).Take(s.RequiredCandles).ToList();
-            PriceDirection predicted = Predict(window, s).Direction;
+            PriceDirection predicted = PredictAt(closedCandles, i, s).Direction;
             PriceDirection actual = actualClose > previousClose ? PriceDirection.Up : PriceDirection.Down;
             predictions++;
             if (predicted == actual)

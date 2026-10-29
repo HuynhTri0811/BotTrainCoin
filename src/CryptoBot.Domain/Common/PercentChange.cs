@@ -1,6 +1,6 @@
-namespace CryptoBot.Domain.MarketData;
+namespace CryptoBot.Domain.Common;
 
-/// <summary>Công thức % thay đổi giá dùng chung cho các phân tích theo ngày.</summary>
+/// <summary>Công thức % thay đổi giá dùng chung cho các phân tích giá.</summary>
 internal static class PercentChange
 {
     /// <summary>% thay đổi từ <paramref name="from"/> đến <paramref name="to"/>, ví dụ 100 → 101 là 1.</summary>
