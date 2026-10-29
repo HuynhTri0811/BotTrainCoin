@@ -65,13 +65,7 @@ public sealed class CandleSyncService(
             if (klines.Count == 0)
                 break;
 
-            var candles = klines
-                .Select(k => new Candle(key.Exchange, key.Symbol, key.Interval, k.OpenTimeUtc,
-                    k.Open, k.High, k.Low, k.Close, k.Volume,
-                    isClosed: serverTime >= k.OpenTimeUtc + key.Interval.Duration,
-                    receivedAtUtc: serverTime, quoteVolume: k.QuoteVolume, tradeCount: k.TradeCount,
-                    takerBuyVolume: k.TakerBuyVolume))
-                .ToList();
+            var candles = klines.Select(k => k.ToCandle(key, serverTime)).ToList();
 
             var batchIssues = CandleSeriesValidator.Validate(candles, key.Interval);
             issues.AddRange(batchIssues);
