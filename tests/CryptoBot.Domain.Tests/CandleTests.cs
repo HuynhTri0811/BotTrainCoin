@@ -35,6 +35,25 @@ public class CandleTests
     }
 
     [Fact]
+    public void Rejected_issues_remove_their_candles_but_gaps_keep_them()
+    {
+        List<Candle> candles =
+        [
+            TestCandles.At(0, 10),
+            TestCandles.At(1, 10),
+            TestCandles.At(1, 11), // trùng: cả hai nến 1 bị loại
+            TestCandles.At(4, 10), // sau khoảng thiếu: vẫn giữ
+            TestCandles.At(3, 10), // sai thứ tự: bị loại
+        ];
+        var issues = CandleSeriesValidator.Validate(candles, CandleInterval.H1);
+
+        var kept = CandleSeriesValidator.WithoutRejected(candles, issues);
+
+        Assert.Equal([TestCandles.T0, TestCandles.T0.AddHours(4)], kept.Select(c => c.OpenTimeUtc));
+        Assert.False(issues.Single(i => i.Kind == CandleIssueKind.Gap).RejectsCandle);
+    }
+
+    [Fact]
     public void Open_candle_is_updated_by_newer_version()
     {
         var open = TestCandles.At(0, 10, closed: false);

@@ -58,6 +58,19 @@ PR ghi `Closes #N` để đóng issue khi merge, hoặc `Refs #N` nếu chỉ l�
 - Refactor tách riêng khỏi thay đổi hành vi (không trộn trong một commit).
 - Commit có trợ lý AI tham gia kết thúc bằng dòng `Co-Authored-By: ...` tương ứng.
 
+### Email tác giả
+
+Email trong commit phải là email gắn với tài khoản GitHub, nếu không GitHub không biết commit là của ai và **không
+tính vào biểu đồ đóng góp**. Dùng địa chỉ noreply của GitHub (hoặc một email đã xác minh trong Settings → Emails):
+
+```bash
+git config --global user.email "43416834+HuynhTri0811@users.noreply.github.com"
+```
+
+157 commit đầu tiên của repo dùng `HuynhTri0811@github.com` (không gắn được với tài khoản vì GitHub không cho xác minh
+địa chỉ `@github.com`), nên không được tính; không viết lại lịch sử để sửa vì phải force-push `main` và `develop`.
+Biểu đồ đóng góp cũng chỉ tính commit đã vào nhánh mặc định (`main`), tức là sau PR "Develop".
+
 ## Pull request
 
 - Mở vào `develop`. Có thể mở **nháp** (`gh pr create --draft`) khi còn làm.

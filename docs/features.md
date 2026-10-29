@@ -1,6 +1,6 @@
 # Tính năng đã làm
 
-Trạng thái tính đến 2026-10-29 (sau PR #57). Mỗi mục nêu: tính năng làm gì, code nằm ở đâu, chạy theo quy tắc nào,
+Trạng thái tính đến 2026-10-29 (sau PR #60). Mỗi mục nêu: tính năng làm gì, code nằm ở đâu, chạy theo quy tắc nào,
 và **chưa làm** gì. Lịch sử theo PR xem ở [changelog.md](changelog.md).
 
 Chế độ cố định của bot: `DecisionMode = SignalOnly`, `Environment = Paper`, `LiveLocked = true`

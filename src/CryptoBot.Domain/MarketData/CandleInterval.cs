@@ -37,5 +37,12 @@ public sealed record CandleInterval
             ? interval
             : throw new ArgumentException($"Interval không được hỗ trợ: '{code}'.", nameof(code));
 
+    /// <summary>
+    /// OpenTime của nến chứa thời điểm <paramref name="timeUtc"/>: làm tròn xuống bội số của <see cref="Duration"/>
+    /// tính từ 0001-01-01 (trùng mốc 00:00 UTC, nên nến 1h bắt đầu đúng giờ, nến 1d bắt đầu lúc 00:00).
+    /// </summary>
+    public DateTime OpenTimeAt(DateTime timeUtc) =>
+        new(timeUtc.Ticks - timeUtc.Ticks % Duration.Ticks, DateTimeKind.Utc);
+
     public override string ToString() => Code;
 }

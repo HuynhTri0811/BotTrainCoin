@@ -1,7 +1,7 @@
 # Mục lục tài liệu
 
 Tài liệu viết cho người phát triển dự án: người sửa code, thêm tính năng, review PR (kể cả trợ lý AI).
-Cập nhật lần cuối: 2026-10-29, sau PR #57.
+Cập nhật lần cuối: 2026-10-29, sau PR #60 (`develop` và `main` giống nhau).
 
 ## Bắt đầu
 

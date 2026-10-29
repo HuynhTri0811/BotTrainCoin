@@ -55,8 +55,8 @@ CryptoBot.Domain/
 │   └── PercentChange.cs          # internal: % thay đổi Between(from, to), UpShare
 ├── MarketData/
 │   ├── Candle.cs                 # Entity nến OHLCV + ApplyUpdate (không ghi đè nến đã đóng) + Validate
-│   ├── CandleInterval.cs         # 15m / 1h / 1d; TryParse/Parse
-│   ├── CandleSeriesValidator.cs  # Trùng / sai thứ tự / thiếu / OHLCV không hợp lệ
+│   ├── CandleInterval.cs         # 15m / 1h / 1d; TryParse/Parse; OpenTimeAt (nến chứa một thời điểm)
+│   ├── CandleSeriesValidator.cs  # Trùng / sai thứ tự / thiếu / OHLCV không hợp lệ; WithoutRejected (bỏ nến hỏng)
 │   ├── DailyCloses.cs            # internal: kiểm tra chung cho chuỗi giá đóng ngày
 │   ├── DailyMoveRange.cs         # Biên độ ±1σ/±2σ sau N ngày
 │   ├── MonthlyChangeReport.cs    # % theo tháng/năm, thống kê theo tháng trong năm
@@ -219,7 +219,7 @@ tests/
 ├── CryptoBot.Domain.Tests/       # Tham chiếu chỉ Domain. Một file test cho mỗi kiểu: <Kiểu>Tests.cs
 │   └── TestCandles.cs            # Helper tạo nến (At, FromCloses)
 ├── CryptoBot.Application.Tests/  # Tham chiếu Application. Fake trong bộ nhớ
-│   ├── Fakes.cs                  # FakeClock, InMemoryCandleStore, …
+│   ├── Fakes.cs                  # FakeClock, InMemoryCandleStore/StrategyInstanceStore/SignalStore, FakeMarketDataClient
 │   ├── SignalGoldenTests.cs      # Khóa đầu ra hàm sinh tín hiệu
 │   └── Golden/signal_outputs.txt # Snapshot 3,026 dòng
 └── CryptoBot.IntegrationTests/   # Tham chiếu Infrastructure. SQLite file thật + migration thật

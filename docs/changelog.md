@@ -5,6 +5,13 @@ Chi tiết từng tính năng: [features.md](features.md).
 
 ## 2026-10-29
 
+- **#59 Thêm unit test cho entity Domain và các service Application**. Không đổi code chạy.
+  Domain: `AutoOrderRule`, `FuturesPosition`, `CandleInterval`, `StrategyInstance`/`TradingSignal`, `IndicatorWindow`/
+  `TemplateIndicator`, thêm trường hợp biên cho `FuturesMath` và `Candle`. Application: `StrategyConfigurator`/
+  `StrategyFactory`, `MarketDataStatusRegistry`, `MarkPriceCache`; thêm fake `InMemoryStrategyInstanceStore`.
+  Tổng số test: Domain 185, Application 104, Integration 7.
+- **#58 Tài liệu dự án**. Viết lại `README.md` thành trang vào; thêm 12 file trong `docs/` (mục lục, tính năng, kiến
+  trúc, thư mục, nguyên tắc, cách viết code, test, Git/PR, cấu hình, API, mở rộng, nhật ký thay đổi).
 - **#57 Refactor Domain/Prediction** (#55). Không đổi hành vi.
   `PercentChange` chuyển sang `Domain/Common` và dùng cho xu hướng/đà/`SignalAccuracy.MovePercent`;
   `PriceDirection` tách file riêng; thêm `PriceDirectionPredictor.PredictAt` đoán trên một `ListSlice` thay cho
@@ -80,4 +87,7 @@ Chi tiết từng tính năng: [features.md](features.md).
 ## Đưa lên `main`
 
 PR "Develop" (`develop → main`): #5 (2026-10-19), #16 (2026-10-23), #24 (2026-10-24), #41 (2026-10-26),
-#54 (2026-10-27). Các PR #56, #57 hiện mới ở `develop`.
+#54 (2026-10-27), #60 (2026-10-29, gồm #56–#59).
+
+Issue #55 (refactor `Domain/MarketData`, `Domain/Prediction`) vẫn mở: PR vào `develop` không tự đóng issue, cần
+đóng tay khi xong.
