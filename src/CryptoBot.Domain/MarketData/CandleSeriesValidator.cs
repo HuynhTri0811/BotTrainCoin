@@ -17,7 +17,14 @@ public enum CandleIssueKind
 }
 
 /// <summary>Một lỗi trong chuỗi nến, gắn với nến có OpenTime <paramref name="OpenTimeUtc"/>.</summary>
-public sealed record CandleIssue(CandleIssueKind Kind, DateTime OpenTimeUtc, string Detail);
+public sealed record CandleIssue(CandleIssueKind Kind, DateTime OpenTimeUtc, string Detail)
+{
+    /// <summary>
+    /// True khi nến mang lỗi này không được lưu (giá trị sai, trùng, sai thứ tự). Gap chỉ được ghi nhận:
+    /// nến sau khoảng thiếu vẫn đúng.
+    /// </summary>
+    public bool RejectsCandle => Kind is not CandleIssueKind.Gap;
+}
 
 /// <summary>Phát hiện nến trùng, sai thứ tự, thiếu và giá trị không hợp lệ trong một chuỗi nến.</summary>
 public static class CandleSeriesValidator
@@ -51,5 +58,15 @@ public static class CandleSeriesValidator
         }
 
         return issues;
+    }
+
+    /// <summary>
+    /// Bỏ mọi nến có OpenTime trùng với một lỗi <see cref="CandleIssue.RejectsCandle"/>, giữ nguyên thứ tự còn lại.
+    /// Không sửa dữ liệu âm thầm: nến hỏng bị loại chứ không được chỉnh lại.
+    /// </summary>
+    public static List<Candle> WithoutRejected(IReadOnlyList<Candle> candles, IReadOnlyList<CandleIssue> issues)
+    {
+        HashSet<DateTime> rejected = issues.Where(i => i.RejectsCandle).Select(i => i.OpenTimeUtc).ToHashSet();
+        return candles.Where(c => !rejected.Contains(c.OpenTimeUtc)).ToList();
     }
 }

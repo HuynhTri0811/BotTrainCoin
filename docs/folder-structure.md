@@ -55,8 +55,8 @@ CryptoBot.Domain/
 │   └── PercentChange.cs          # internal: % thay đổi Between(from, to), UpShare
 ├── MarketData/
 │   ├── Candle.cs                 # Entity nến OHLCV + ApplyUpdate (không ghi đè nến đã đóng) + Validate
-│   ├── CandleInterval.cs         # 15m / 1h / 1d; TryParse/Parse
-│   ├── CandleSeriesValidator.cs  # Trùng / sai thứ tự / thiếu / OHLCV không hợp lệ
+│   ├── CandleInterval.cs         # 15m / 1h / 1d; TryParse/Parse; OpenTimeAt (nến chứa một thời điểm)
+│   ├── CandleSeriesValidator.cs  # Trùng / sai thứ tự / thiếu / OHLCV không hợp lệ; WithoutRejected (bỏ nến hỏng)
 │   ├── DailyCloses.cs            # internal: kiểm tra chung cho chuỗi giá đóng ngày
 │   ├── DailyMoveRange.cs         # Biên độ ±1σ/±2σ sau N ngày
 │   ├── MonthlyChangeReport.cs    # % theo tháng/năm, thống kê theo tháng trong năm

@@ -17,6 +17,9 @@ public sealed record MarketDataStatus(
 /// <summary>Trạng thái đồng bộ trong bộ nhớ cho /api/status. Không phải nguồn dữ liệu bền vững.</summary>
 public sealed class MarketDataStatusRegistry(IClock clock, MarketDataOptions options)
 {
+    /// <summary>Số lỗi dữ liệu gần nhất giữ lại cho mỗi feed.</summary>
+    public const int MaxRecentIssues = 20;
+
     private sealed class Entry
     {
         public DateTime? LastSuccessAtUtc;
@@ -39,7 +42,7 @@ public sealed class MarketDataStatusRegistry(IClock clock, MarketDataOptions opt
             e.ConsecutiveFailures = 0;
             e.LatestClosedOpenTimeUtc = result.LatestClosedOpenTimeUtc ?? e.LatestClosedOpenTimeUtc;
             if (result.Issues.Count > 0)
-                e.RecentIssues = result.Issues.TakeLast(20).ToList();
+                e.RecentIssues = result.Issues.TakeLast(MaxRecentIssues).ToList();
         }
     }
 

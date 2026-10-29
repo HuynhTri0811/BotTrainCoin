@@ -1,3 +1,4 @@
+using System.Globalization;
 using CryptoBot.Domain.MarketData;
 
 namespace CryptoBot.Domain.Tests;
@@ -34,5 +35,21 @@ public class CandleIntervalTests
         var ex = Assert.Throws<ArgumentException>(() => CandleInterval.Parse("4h"));
 
         Assert.Contains("'4h'", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("15m", "2026-01-01T10:44:59", "2026-01-01T10:30:00")]
+    [InlineData("1h", "2026-01-01T10:59:59", "2026-01-01T10:00:00")]
+    [InlineData("1h", "2026-01-01T10:00:00", "2026-01-01T10:00:00")]
+    [InlineData("1d", "2026-01-01T23:59:59", "2026-01-01T00:00:00")]
+    public void OpenTimeAt_rounds_down_to_the_candle_containing_the_time(string code, string time, string expected)
+    {
+        var interval = CandleInterval.Parse(code);
+        var t = DateTime.SpecifyKind(DateTime.Parse(time, CultureInfo.InvariantCulture), DateTimeKind.Utc);
+
+        var open = interval.OpenTimeAt(t);
+
+        Assert.Equal(DateTime.Parse(expected, CultureInfo.InvariantCulture), open);
+        Assert.Equal(DateTimeKind.Utc, open.Kind);
     }
 }

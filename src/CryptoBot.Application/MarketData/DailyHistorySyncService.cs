@@ -44,23 +44,15 @@ public sealed class DailyHistorySyncService(
                 break;
 
             var now = clock.UtcNow;
-            var candles = klines
-                .Select(k => new Candle(key.Exchange, key.Symbol, key.Interval, k.OpenTimeUtc,
-                    k.Open, k.High, k.Low, k.Close, k.Volume,
-                    isClosed: now >= k.OpenTimeUtc + key.Interval.Duration, receivedAtUtc: now))
-                .ToList();
+            var candles = klines.Select(k => k.ToCandle(key, now)).ToList();
 
             // Sàn bỏ qua ngày không có giao dịch (Gap) nên chỉ loại nến sai giá trị/thứ tự.
             var batchIssues = CandleSeriesValidator.Validate(candles, key.Interval);
-            var invalid = batchIssues
-                .Where(i => i.Kind is CandleIssueKind.InvalidValues or CandleIssueKind.Duplicate or CandleIssueKind.OutOfOrder)
-                .ToList();
-            foreach (var issue in invalid)
+            foreach (var issue in batchIssues.Where(i => i.RejectsCandle))
                 logger.LogWarning("Daily history {Key}: {Kind} tại {OpenTime:O} - {Detail}",
                     key, issue.Kind, issue.OpenTimeUtc, issue.Detail);
 
-            var invalidTimes = invalid.Select(i => i.OpenTimeUtc).ToHashSet();
-            var valid = candles.Where(c => !invalidTimes.Contains(c.OpenTimeUtc)).ToList();
+            var valid = CandleSeriesValidator.WithoutRejected(candles, batchIssues);
             var result = await store.UpsertAsync(key, valid, ct);
             inserted += result.Inserted;
             foreach (var conflict in result.Conflicts)

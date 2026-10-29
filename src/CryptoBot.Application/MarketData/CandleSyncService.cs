@@ -46,7 +46,7 @@ public sealed class CandleSyncService(
     {
         var serverTime = await client.GetServerTimeAsync(ct);
         var latest = await store.GetLatestOpenTimeAsync(key, ct);
-        var windowStart = AlignDown(serverTime - key.Interval.Duration * options.BootstrapCandles, key.Interval);
+        var windowStart = key.Interval.OpenTimeAt(serverTime - key.Interval.Duration * options.BootstrapCandles);
         var start = latest ?? windowStart;
         // Nến lưu trước khi có số giao dịch/khối lượng USDT: tải lại từ nến thiếu sớm nhất trong cửa sổ
         // gần đây để bổ sung (nến đã đóng chỉ được điền thêm, giá không đổi).
@@ -65,23 +65,12 @@ public sealed class CandleSyncService(
             if (klines.Count == 0)
                 break;
 
-            var candles = klines
-                .Select(k => new Candle(key.Exchange, key.Symbol, key.Interval, k.OpenTimeUtc,
-                    k.Open, k.High, k.Low, k.Close, k.Volume,
-                    isClosed: serverTime >= k.OpenTimeUtc + key.Interval.Duration,
-                    receivedAtUtc: serverTime, quoteVolume: k.QuoteVolume, tradeCount: k.TradeCount,
-                    takerBuyVolume: k.TakerBuyVolume))
-                .ToList();
+            var candles = klines.Select(k => k.ToCandle(key, serverTime)).ToList();
 
             var batchIssues = CandleSeriesValidator.Validate(candles, key.Interval);
             issues.AddRange(batchIssues);
 
-            // Không sửa dữ liệu âm thầm: nến có giá trị không hợp lệ không được lưu.
-            var invalid = batchIssues
-                .Where(i => i.Kind is CandleIssueKind.InvalidValues or CandleIssueKind.Duplicate or CandleIssueKind.OutOfOrder)
-                .Select(i => i.OpenTimeUtc)
-                .ToHashSet();
-            var valid = candles.Where(c => !invalid.Contains(c.OpenTimeUtc)).ToList();
+            var valid = CandleSeriesValidator.WithoutRejected(candles, batchIssues);
 
             var result = await store.UpsertAsync(key, valid, ct);
             inserted += result.Inserted;
@@ -110,7 +99,4 @@ public sealed class CandleSyncService(
 
         return new SyncResult(key, inserted, updated, latestClosed, serverTime, issues);
     }
-
-    private static DateTime AlignDown(DateTime t, CandleInterval interval) =>
-        new(t.Ticks - t.Ticks % interval.Duration.Ticks, DateTimeKind.Utc);
 }
