@@ -1,21 +1,31 @@
 namespace CryptoBot.Domain.MarketData;
 
+/// <summary>Loại lỗi tìm thấy trong một chuỗi nến.</summary>
 public enum CandleIssueKind
 {
+    /// <summary>OHLCV không hợp lệ, xem <see cref="Candle.Validate"/>.</summary>
     InvalidValues,
+
+    /// <summary>Hai nến liền nhau có cùng OpenTime.</summary>
     Duplicate,
+
+    /// <summary>Nến đứng sau một nến mở muộn hơn.</summary>
     OutOfOrder,
+
+    /// <summary>Thiếu ít nhất một nến giữa hai nến liền nhau.</summary>
     Gap,
 }
 
+/// <summary>Một lỗi trong chuỗi nến, gắn với nến có OpenTime <paramref name="OpenTimeUtc"/>.</summary>
 public sealed record CandleIssue(CandleIssueKind Kind, DateTime OpenTimeUtc, string Detail);
 
 /// <summary>Phát hiện nến trùng, sai thứ tự, thiếu và giá trị không hợp lệ trong một chuỗi nến.</summary>
 public static class CandleSeriesValidator
 {
+    /// <summary>Chuỗi nến phải tăng dần theo OpenTime, cách nhau đúng một <paramref name="interval"/>.</summary>
     public static IReadOnlyList<CandleIssue> Validate(IReadOnlyList<Candle> candles, CandleInterval interval)
     {
-        List<CandleIssue> issues = new List<CandleIssue>();
+        List<CandleIssue> issues = [];
 
         for (int i = 0; i < candles.Count; i++)
         {

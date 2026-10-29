@@ -66,6 +66,27 @@ public class PriceDirectionPredictorTests
     }
 
     [Fact]
+    public void PredictAt_uses_only_the_candles_before_index()
+    {
+        // 5 nến giảm rồi 3 nến tăng mạnh: đoán tại vị trí 5 chỉ thấy đoạn giảm.
+        List<Candle> candles = TestCandles.FromCloses(105, 104, 103, 102, 101, 150, 160, 170);
+
+        PricePrediction p = PriceDirectionPredictor.PredictAt(candles, 5, Small);
+
+        Assert.Equal(PriceDirectionPredictor.Predict(candles[..5], Small), p);
+        Assert.Equal(PriceDirection.Down, p.Direction);
+    }
+
+    [Fact]
+    public void PredictAt_rejects_index_outside_the_series()
+    {
+        List<Candle> candles = TestCandles.FromCloses(1, 2, 3, 4, 5, 6);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => PriceDirectionPredictor.PredictAt(candles, 4, Small));
+        Assert.Throws<ArgumentOutOfRangeException>(() => PriceDirectionPredictor.PredictAt(candles, 7, Small));
+    }
+
+    [Fact]
     public void Backtest_counts_hits_using_only_past_candles()
     {
         // Tăng đều: mọi lần đoán đều Up và đều đúng.

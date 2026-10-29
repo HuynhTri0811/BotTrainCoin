@@ -1,3 +1,4 @@
+using CryptoBot.Domain.Common;
 using CryptoBot.Domain.Indicators;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Strategies;

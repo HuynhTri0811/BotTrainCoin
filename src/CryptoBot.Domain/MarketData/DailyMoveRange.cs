@@ -1,3 +1,5 @@
+using CryptoBot.Domain.Common;
+
 namespace CryptoBot.Domain.MarketData;
 
 /// <summary>
@@ -46,10 +48,7 @@ public sealed record DailyMoveRange(
     {
         if (price <= 0)
             throw new ArgumentOutOfRangeException(nameof(price), "Giá phải dương.");
-        if (horizonDays <= 0)
-            throw new ArgumentOutOfRangeException(nameof(horizonDays), "Số ngày phải lớn hơn 0.");
-        if (dailyCloses.Any(c => c <= 0))
-            throw new ArgumentException("Giá đóng cửa phải dương.", nameof(dailyCloses));
+        DailyCloses.Validate(dailyCloses, horizonDays);
         if (dailyCloses.Count - 1 < MinDays || dailyCloses.Count - horizonDays < MinDays)
             return null;
 
@@ -65,7 +64,7 @@ public sealed record DailyMoveRange(
         // Thay đổi thực tế sau horizonDays ngày, trượt từng ngày một.
         List<decimal> changes = new(dailyCloses.Count - horizonDays);
         for (int i = horizonDays; i < dailyCloses.Count; i++)
-            changes.Add((dailyCloses[i] / dailyCloses[i - horizonDays] - 1) * 100);
+            changes.Add(PercentChange.Between(dailyCloses[i - horizonDays], dailyCloses[i]));
 
         return new DailyMoveRange(
             HorizonDays: horizonDays,
@@ -79,7 +78,7 @@ public sealed record DailyMoveRange(
             AverageMovePercent: changes.Average(Math.Abs),
             LargestRisePercent: changes.Max(),
             LargestDropPercent: changes.Min(),
-            UpDaysPercent: (decimal)changes.Count(c => c > 0) / changes.Count * 100,
+            UpDaysPercent: PercentChange.UpShare(changes),
             Samples: changes.Count);
     }
 }

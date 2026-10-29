@@ -106,25 +106,19 @@ public sealed class Candle
     /// </summary>
     public bool ApplyUpdate(Candle newer)
     {
-        if (newer.Exchange != Exchange || newer.Symbol != Symbol ||
-            newer.Interval != Interval || newer.OpenTimeUtc != OpenTimeUtc)
-        {
+        if (!HasSameKey(newer))
             throw new InvalidOperationException("Chỉ cập nhật được từ cùng một nến.");
-        }
 
         if (IsClosed)
         {
-            bool same = newer.Open == Open && newer.High == High && newer.Low == Low &&
-                        newer.Close == Close && newer.Volume == Volume;
-            // Nến đã đóng lưu trước khi có số giao dịch: bổ sung khi sàn trả lại cùng nến.
-            if (same)
-            {
-                QuoteVolume ??= newer.QuoteVolume;
-                TradeCount ??= newer.TradeCount;
-                TakerBuyVolume ??= newer.TakerBuyVolume;
-            }
+            if (!HasSameOhlcv(newer))
+                return false;
 
-            return same;
+            // Nến đã đóng lưu trước khi có số giao dịch: bổ sung khi sàn trả lại cùng nến.
+            QuoteVolume ??= newer.QuoteVolume;
+            TradeCount ??= newer.TradeCount;
+            TakerBuyVolume ??= newer.TakerBuyVolume;
+            return true;
         }
 
         Open = newer.Open;
@@ -139,6 +133,14 @@ public sealed class Candle
         ReceivedAtUtc = newer.ReceivedAtUtc;
         return true;
     }
+
+    private bool HasSameKey(Candle other) =>
+        other.Exchange == Exchange && other.Symbol == Symbol && other.Interval == Interval &&
+        other.OpenTimeUtc == OpenTimeUtc;
+
+    private bool HasSameOhlcv(Candle other) =>
+        other.Open == Open && other.High == High && other.Low == Low && other.Close == Close &&
+        other.Volume == Volume;
 
     /// <summary>Kiểm tra tính hợp lệ của OHLCV; trả về lý do nếu không hợp lệ.</summary>
     public string? Validate()

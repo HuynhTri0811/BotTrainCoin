@@ -1,3 +1,4 @@
+using CryptoBot.Domain.Common;
 using CryptoBot.Domain.Indicators;
 using CryptoBot.Domain.Strategies;
 
@@ -81,7 +82,7 @@ public sealed record SimilarDaysForecast(
                 continue;
 
             // Hòa (đúng 50% ngày tương tự tăng) là không đoán; giá đứng yên thì không có hướng để chấm.
-            decimal up = UpShare(outcomes);
+            decimal up = PercentChange.UpShare(outcomes);
             if (up == 50m || dailyCloses[i + horizonDays] == dailyCloses[i])
                 continue;
 
@@ -100,12 +101,9 @@ public sealed record SimilarDaysForecast(
 
     private static void Validate(IReadOnlyList<decimal> dailyCloses, int horizonDays, int neighbors)
     {
-        if (horizonDays <= 0)
-            throw new ArgumentOutOfRangeException(nameof(horizonDays), "Số ngày phải lớn hơn 0.");
+        DailyCloses.Validate(dailyCloses, horizonDays);
         if (neighbors <= 0)
             throw new ArgumentOutOfRangeException(nameof(neighbors), "Số ngày tương tự phải lớn hơn 0.");
-        if (dailyCloses.Any(c => c <= 0))
-            throw new ArgumentException("Giá đóng cửa phải dương.", nameof(dailyCloses));
     }
 
     /// <summary>% thay đổi sau horizon ngày của <paramref name="neighbors"/> ngày (≤ lastCandidate) giống ngày target nhất.</summary>
@@ -127,13 +125,13 @@ public sealed record SimilarDaysForecast(
         Array.Sort(distances, days);
         List<decimal> outcomes = new(neighbors);
         for (int k = 0; k < neighbors; k++)
-            outcomes.Add((closes[days[k] + horizonDays] / closes[days[k]] - 1) * 100);
+            outcomes.Add(PercentChange.Between(closes[days[k]], closes[days[k] + horizonDays]));
         return outcomes;
     }
 
     private static SimilarDaysForecast Summarize(List<decimal> outcomes, int horizonDays)
     {
-        decimal up = UpShare(outcomes);
+        decimal up = PercentChange.UpShare(outcomes);
         outcomes.Sort();
         ForecastLean lean = up >= StrongLeanPercent ? ForecastLean.Up
             : up <= 100m - StrongLeanPercent ? ForecastLean.Down
@@ -141,9 +139,6 @@ public sealed record SimilarDaysForecast(
         return new SimilarDaysForecast(horizonDays, outcomes.Count, up, Percentile(outcomes, 0.5),
             Percentile(outcomes, 0.16), Percentile(outcomes, 0.84), lean);
     }
-
-    private static decimal UpShare(List<decimal> outcomes) =>
-        (decimal)outcomes.Count(o => o > 0) / outcomes.Count * 100;
 
     /// <summary>Phân vị đơn giản (không nội suy) trên danh sách đã sắp xếp.</summary>
     private static decimal Percentile(List<decimal> sorted, double p) => sorted[(int)(p * (sorted.Count - 1))];
@@ -201,7 +196,7 @@ public sealed record SimilarDaysForecast(
             return sum;
         }
 
-        private static double Pct(decimal value, decimal reference) => (double)((value / reference - 1) * 100);
+        private static double Pct(decimal value, decimal reference) => (double)PercentChange.Between(reference, value);
     }
 }
 
