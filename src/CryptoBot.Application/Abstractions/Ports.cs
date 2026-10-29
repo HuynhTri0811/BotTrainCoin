@@ -13,7 +13,7 @@ public sealed record CandleKey(string Exchange, string Symbol, CandleInterval In
     public override string ToString() => $"{Exchange}:{Symbol}:{Interval.Code}";
 }
 
-/// <summary>Một kline thô từ sàn. CloseTimeUtc là thời điểm kết thúc nến do sàn báo.</summary>
+/// <summary>Một kline thô từ sàn. Các cột thống kê để null khi sàn không trả (ví dụ Bitfinex).</summary>
 public sealed record KlineDto(
     DateTime OpenTimeUtc,
     decimal Open,
