@@ -44,11 +44,7 @@ public sealed class DailyHistorySyncService(
                 break;
 
             var now = clock.UtcNow;
-            var candles = klines
-                .Select(k => new Candle(key.Exchange, key.Symbol, key.Interval, k.OpenTimeUtc,
-                    k.Open, k.High, k.Low, k.Close, k.Volume,
-                    isClosed: now >= k.OpenTimeUtc + key.Interval.Duration, receivedAtUtc: now))
-                .ToList();
+            var candles = klines.Select(k => k.ToCandle(key, now)).ToList();
 
             // Sàn bỏ qua ngày không có giao dịch (Gap) nên chỉ loại nến sai giá trị/thứ tự.
             var batchIssues = CandleSeriesValidator.Validate(candles, key.Interval);
