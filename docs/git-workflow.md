@@ -13,6 +13,7 @@ main  ←  develop  ←  feature/… | fix/… | refactor/… | docs/…
 | `feature/<tên>` | Tính năng mới, ví dụ `feature/similar-days`, `feature/auto-close-on-reverse` |
 | `fix/<tên>` | Sửa lỗi hoặc sửa theo review, ví dụ `fix/rsi-trend-filter`, `fix/similar-days-review` |
 | `refactor/<tên>` | Dọn code không đổi hành vi, ví dụ `refactor/market-data`, `refactor/prediction` |
+| `test/<tên>` | Chỉ thêm/sửa test, ví dụ `test/more-unit-tests` |
 | `docs/<tên>` | Chỉ tài liệu, ví dụ `docs/signal-functions` |
 
 Tên nhánh tiếng Anh, chữ thường, nối bằng `-`. Tạo nhánh mới từ `origin/develop` mới nhất:
