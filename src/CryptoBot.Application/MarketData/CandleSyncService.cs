@@ -46,7 +46,7 @@ public sealed class CandleSyncService(
     {
         var serverTime = await client.GetServerTimeAsync(ct);
         var latest = await store.GetLatestOpenTimeAsync(key, ct);
-        var windowStart = AlignDown(serverTime - key.Interval.Duration * options.BootstrapCandles, key.Interval);
+        var windowStart = key.Interval.OpenTimeAt(serverTime - key.Interval.Duration * options.BootstrapCandles);
         var start = latest ?? windowStart;
         // Nến lưu trước khi có số giao dịch/khối lượng USDT: tải lại từ nến thiếu sớm nhất trong cửa sổ
         // gần đây để bổ sung (nến đã đóng chỉ được điền thêm, giá không đổi).
@@ -99,7 +99,4 @@ public sealed class CandleSyncService(
 
         return new SyncResult(key, inserted, updated, latestClosed, serverTime, issues);
     }
-
-    private static DateTime AlignDown(DateTime t, CandleInterval interval) =>
-        new(t.Ticks - t.Ticks % interval.Duration.Ticks, DateTimeKind.Utc);
 }
