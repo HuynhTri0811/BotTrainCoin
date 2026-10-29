@@ -11,7 +11,7 @@ Có hai nguồn tín hiệu, cùng tuân theo một quy tắc:
 | Nguồn | File | Tín hiệu |
 | --- | --- | --- |
 | Chiến lược EMA 9/21 | [`EmaCrossStrategy.cs`](../src/CryptoBot.Domain/Strategies/EmaCrossStrategy.cs) | BUY khi EMA nhanh cắt lên EMA chậm, SELL khi cắt xuống (chỉ khi đang giữ) |
-| Chỉ báo MyRsi | [`MyRsiIndicator.cs`](../src/CryptoBot.Domain/Indicators/MyRsiIndicator.cs) | Long khi RSI cắt lên 30, Short khi RSI cắt xuống 70, có thể lọc theo EMA xu hướng |
+| Chỉ báo MyRsi | [`MyRsiIndicator.cs`](../src/CryptoBot.Domain/Indicators/MyRsiIndicator.cs) | Không EMA: Long khi RSI cắt lên 30, Short khi cắt xuống 70. Có EMA xu hướng: Long khi giá trên EMA và RSI cắt lên 40, Short khi giá dưới EMA và RSI cắt xuống 60 |
 
 **Quy tắc chung: cửa sổ cố định.** Mỗi nến được tính trên đúng N nến đã đóng gần nhất, kết thúc tại nến đó: 300 nến với EMA, 200 nến với MyRsi. EMA và RSI phụ thuộc điểm bắt đầu, nên cố định cửa sổ giúp chart, lệnh tự động và backtest luôn ra cùng một giá trị trên cùng dữ liệu. Đổi lại, mỗi nến phải tính lại từ đầu cửa sổ.
 
@@ -68,10 +68,19 @@ Compute(closedCandles)
 ├── 4a ReadRsi(closes)       → RSI nến trước (Prev) và nến vừa đóng (Now)
 ├── 4b ReadTrendEma(closes)  → EMA xu hướng, hoặc null nếu TrendEmaPeriod = 0
 ├── 4c BuildValues(...)      → giá trị để vẽ: "rsi" (làm tròn 2 số), "ema" nếu có
-├── RSI cắt lên Oversold?    → 4d LongSignal : Long, trừ khi giá đóng cửa dưới EMA xu hướng
-├── RSI cắt xuống Overbought?→ 4e ShortSignal: Short, trừ khi giá đóng cửa trên EMA xu hướng
-└── còn lại                  → None "RSI x, không cắt mức."
+├── không có EMA → 4d ReversalSignal
+│   ├── RSI cắt lên Oversold (30)     → Long
+│   ├── RSI cắt xuống Overbought (70) → Short
+│   └── còn lại                       → None "RSI x, không cắt mức."
+└── có EMA      → 4e PullbackSignal (hồi trong xu hướng)
+    ├── RSI cắt lên PullbackLong (40)   → Long nếu giá đóng cửa trên EMA, ngược lại None kèm lý do
+    ├── RSI cắt xuống PullbackShort (60)→ Short nếu giá đóng cửa dưới EMA, ngược lại None kèm lý do
+    └── còn lại                         → None "RSI x, không cắt mức hồi."
 ```
+
+Vì sao có EMA thì không dùng 30/70 (sửa ở PR #48): RSI vừa dưới 30 thì giá gần như luôn dưới EMA, nên điều kiện
+"cắt lên 30 **và** giá trên EMA" hầu như không xảy ra (0 tín hiệu trên nến 15m/1h). Trong xu hướng tăng RSI thường chỉ
+lùi về quanh 40 rồi bật lên, trong xu hướng giảm chỉ hồi lên quanh 60 rồi quay xuống.
 
 Khi tự viết chỉ báo, bạn có thể dùng lại các khối sẵn có thay vì tự viết lại vòng lặp:
 
@@ -93,7 +102,7 @@ Quy tắc cửa sổ cố định được giữ nguyên, tức là mỗi nến 
 | --- | --- | --- |
 | Tạo mảng `decimal?[]` cho cả cửa sổ, chỉ dùng 2 phần tử cuối | `Ema.LastTwo` / `Rsi.LastTwo` chỉ giữ giá trị đang chạy, không cấp phát mảng | `Ema.cs`, `Rsi.cs` |
 | Tính lại `1 − alpha` ở mỗi vòng lặp EMA | Tính một lần trước vòng lặp | `Ema.cs` |
-| `List.GetRange` sao chép 200–300 tham chiếu nến cho **mỗi** nến | `ListSlice` chỉ là một view trên danh sách gốc | [`ListSlice.cs`](../src/CryptoBot.Domain/MarketData/ListSlice.cs), `SignalEvaluationService.cs`, `IndicatorService.cs` |
+| `List.GetRange` sao chép 200–300 tham chiếu nến cho **mỗi** nến | `ListSlice` chỉ là một view trên danh sách gốc | [`ListSlice.cs`](../src/CryptoBot.Domain/Common/ListSlice.cs), `SignalEvaluationService.cs`, `IndicatorService.cs` |
 | Chart EMA tạo lại cửa sổ nến rồi trích giá cho mỗi nến | Trích giá đóng cửa một lần, mỗi nến chỉ truyền một đoạn `span` | [`ChartQueryService.cs`](../src/CryptoBot.Application/Signals/ChartQueryService.cs) |
 | Chỉ báo quét lại cả cửa sổ để tìm nến thiếu ở mỗi nến | `GapIndex` tính một lần cho cả chuỗi, mỗi cửa sổ chỉ tra mảng | [`IndicatorService.cs`](../src/CryptoBot.Application/Indicators/IndicatorService.cs) |
 
@@ -119,7 +128,7 @@ Phần EMA gần như không nhanh hơn vì thời gian còn lại là chính c�
 
 ## 6. Golden test: bảo đảm kết quả không đổi
 
-[`SignalGoldenTests.cs`](../tests/CryptoBot.Application.Tests/SignalGoldenTests.cs) chạy cả ba đường (đánh giá tín hiệu, chart EMA, chỉ báo MyRsi có và không có bộ lọc xu hướng) trên 1,500 nến giả lập cố định, có xen một nến thiếu. Toàn bộ đầu ra được so với file [`Golden/signal_outputs.txt`](../tests/CryptoBot.Application.Tests/Golden/signal_outputs.txt), dài 3,026 dòng. File này được tạo từ code **trước khi** tối ưu.
+[`SignalGoldenTests.cs`](../tests/CryptoBot.Application.Tests/SignalGoldenTests.cs) chạy cả ba đường (đánh giá tín hiệu, chart EMA, chỉ báo MyRsi có và không có bộ lọc xu hướng) trên 1,500 nến giả lập cố định, có xen một nến thiếu. Toàn bộ đầu ra được so với file [`Golden/signal_outputs.txt`](../tests/CryptoBot.Application.Tests/Golden/signal_outputs.txt), dài 3,026 dòng. File này được tạo từ code **trước khi** tối ưu (PR #9), và cập nhật có chủ đích một lần ở PR #48 khi đổi luật MyRsi có EMA.
 
 - **Tối ưu hoặc tách hàm:** golden test phải pass. Nếu fail nghĩa là kết quả đã đổi, cần xem lại.
 - **Cố ý đổi công thức** (ví dụ đổi luật vào lệnh): golden test sẽ fail, đó là điều mong đợi. Cập nhật snapshot bằng lệnh dưới đây, rồi đọc kỹ diff của `signal_outputs.txt` trước khi commit để thấy chính xác tín hiệu nào thay đổi.
