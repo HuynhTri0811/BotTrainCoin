@@ -2,14 +2,6 @@ using CryptoBot.Domain.MarketData;
 
 namespace CryptoBot.Domain.Indicators;
 
-/// <summary>Tín hiệu một chỉ báo phát ra tại một nến đã đóng.</summary>
-public enum IndicatorSignal
-{
-    None = 0,
-    Long = 1,
-    Short = 2,
-}
-
 /// <summary>
 /// Mô tả một đường để vẽ trên chart. <see cref="Key"/> trùng với khóa trong <see cref="IndicatorResult.Values"/>.
 /// <see cref="Overlay"/> = true: vẽ chung với nến (ví dụ đường MA); false: vẽ ở khung riêng bên dưới (ví dụ RSI).
