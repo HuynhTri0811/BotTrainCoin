@@ -1,6 +1,7 @@
 using CryptoBot.Application.Abstractions;
 using CryptoBot.Domain.Futures;
 using CryptoBot.Domain.MarketData;
+using CryptoBot.Domain.News;
 using CryptoBot.Domain.Strategies;
 using CryptoBot.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -218,6 +219,37 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
             Assert.Equal(3, (await store.GetRecentAsync(null, 10, default)).Count);
 
             db.DailyReports.Add(Report("BTCUSDT", 2));
+            await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        }
+    }
+
+    [Fact]
+    public async Task News_is_unique_per_source_and_filtered_by_coin_and_time()
+    {
+        NewsArticle Article(string source, string id, string[] coins, int hour) =>
+            new(source, id, $"Tin {id}", $"https://news.test/{id}", "", coins, T0.AddHours(hour), T0);
+
+        await using (var db = NewContext())
+        {
+            db.NewsArticles.AddRange(
+                Article("CoinDesk", "a", ["BTC", "ETH"], 1),
+                Article("CoinDesk", "b", ["ETH"], 2),
+                Article("Decrypt", "a", ["ETC"], 3),
+                Article("Decrypt", "c", [], 4));
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = NewContext())
+        {
+            var store = new NewsStore(db);
+            Assert.Equal(["a"], await store.GetExistingIdsAsync("CoinDesk", ["a", "z"], default));
+            Assert.Equal(["b", "a"], (await store.QueryAsync("ETH", null, null, 10, default)).Select(a => a.ExternalId));
+            Assert.Equal(["Decrypt"], (await store.QueryAsync("ETC", null, null, 10, default)).Select(a => a.Source));
+            Assert.Equal(["b", "a"],
+                (await store.QueryAsync(null, T0.AddHours(1), T0.AddHours(3), 10, default)).Select(a => a.ExternalId));
+            Assert.Equal(["c"], (await store.QueryAsync(null, null, null, 1, default)).Select(a => a.ExternalId));
+
+            db.NewsArticles.Add(Article("CoinDesk", "a", [], 5));
             await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
         }
     }

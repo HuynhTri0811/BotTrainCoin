@@ -3,10 +3,12 @@ using CryptoBot.Application.Futures;
 using CryptoBot.Application.Indicators;
 using CryptoBot.Application.LivePrices;
 using CryptoBot.Application.MarketData;
+using CryptoBot.Application.News;
 using CryptoBot.Application.Reports;
 using CryptoBot.Application.Signals;
 using CryptoBot.Infrastructure.Exchanges.Binance;
 using CryptoBot.Infrastructure.Exchanges.Bitfinex;
+using CryptoBot.Infrastructure.News;
 using CryptoBot.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -95,6 +97,17 @@ public static class DependencyInjection
         services.AddSingleton(config.GetSection("DailyReports").Get<DailyReportOptions>() ?? new DailyReportOptions());
         services.AddScoped<IDailyReportStore, DailyReportStore>();
         services.AddScoped<DailyReportService>();
+        // Tin tức từ RSS công khai (không cần API key), đồng bộ mỗi NewsOptions.PollInterval.
+        var news = config.GetSection("News").Get<NewsOptions>() ?? new NewsOptions();
+        services.AddSingleton(news);
+        services.AddHttpClient<INewsFeedClient, RssNewsFeedClient>(http =>
+        {
+            http.Timeout = news.RequestTimeout;
+            // Một số trang chặn request không có User-Agent.
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("CryptoBot/1.0");
+        });
+        services.AddScoped<INewsStore, NewsStore>();
+        services.AddScoped<NewsSyncService>();
         // Sự kiện thị trường ghi tay (marketevents.json) để đối chiếu với các tháng tăng/giảm mạnh.
         services.AddSingleton(new MarketEventCatalog(config.GetSection("MarketEvents").Get<List<MarketEvent>>() ?? []));
 

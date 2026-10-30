@@ -1,8 +1,10 @@
 using CryptoBot.Application.Abstractions;
 using CryptoBot.Application.Futures;
+using CryptoBot.Application.News;
 using CryptoBot.Application.Reports;
 using CryptoBot.Domain.Futures;
 using CryptoBot.Domain.MarketData;
+using CryptoBot.Domain.News;
 using CryptoBot.Domain.Strategies;
 using Microsoft.EntityFrameworkCore;
 
@@ -238,6 +240,34 @@ public sealed class DailyReportStore(BotDbContext db) : IDailyReportStore
             .Take(limit).ToListAsync(ct);
 
     public void Add(DailyReport report) => db.DailyReports.Add(report);
+
+    public Task SaveAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
+}
+
+public sealed class NewsStore(BotDbContext db) : INewsStore
+{
+    public async Task<IReadOnlySet<string>> GetExistingIdsAsync(string source, IReadOnlyCollection<string> externalIds,
+        CancellationToken ct) =>
+        (await db.NewsArticles
+            .Where(a => a.Source == source && externalIds.Contains(a.ExternalId))
+            .Select(a => a.ExternalId).ToListAsync(ct)).ToHashSet();
+
+    public async Task<IReadOnlyList<NewsArticle>> QueryAsync(string? coin, DateTime? fromUtc, DateTime? toUtc, int limit,
+        CancellationToken ct)
+    {
+        var query = db.NewsArticles.AsNoTracking();
+        // Coins là "BTC,ETH": mã coin không trùng một phần với nhau nên tìm chuỗi con là đủ.
+        if (coin is not null)
+            query = query.Where(a => a.Coins.Contains(coin));
+        if (fromUtc is not null)
+            query = query.Where(a => a.PublishedAtUtc >= fromUtc);
+        if (toUtc is not null)
+            query = query.Where(a => a.PublishedAtUtc < toUtc);
+        return await query.OrderByDescending(a => a.PublishedAtUtc).ThenByDescending(a => a.Id)
+            .Take(limit).ToListAsync(ct);
+    }
+
+    public void AddRange(IEnumerable<NewsArticle> articles) => db.NewsArticles.AddRange(articles);
 
     public Task SaveAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 }
