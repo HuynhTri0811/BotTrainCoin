@@ -152,6 +152,17 @@ mmr 0.005). Cần kiểm tra lại với `exchangeInfo` của Binance khi tích 
 
 Đổi `RunAt`/`Period` chỉ áp dụng cho báo cáo mới; báo cáo đã lưu giữ nguyên.
 
+## News — `NewsOptions` ([`NewsSyncService.cs`](../src/CryptoBot.Application/News/NewsSyncService.cs))
+
+| Khóa | Mặc định | Ý nghĩa |
+| --- | --- | --- |
+| `PollInterval` | `05:00:00` | Chu kỳ đồng bộ tin (cũng chạy một lượt khi khởi động) |
+| `MaxSummaryLength` | 500 | Tóm tắt dài hơn bị cắt |
+| `RequestTimeout` | `00:00:20` | Timeout mỗi request tới feed |
+| `Feeds[]` | `[]` | `Name` (tên nguồn, lưu cùng bài; đổi tên = nguồn mới) và `Url` (RSS 2.0 hoặc Atom). Hiện tại: CoinDesk, Cointelegraph, Decrypt |
+
+Feed chỉ giữ 20–60 bài mới nhất: nguồn đăng dày nên dùng `PollInterval` ngắn hơn để không lỡ bài.
+
 ## MarketEvents — `marketevents.json`
 
 ```json
