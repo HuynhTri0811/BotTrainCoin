@@ -137,6 +137,21 @@ mmr 0.005). Cần kiểm tra lại với `exchangeInfo` của Binance khi tích 
 | `BatchSize` | 10000 | Bitfinex tối đa 10000 nến/request |
 | `Symbols` | `[]` | Ký hiệu Bitfinex: hiện tại `BTCUSD`, `ETCUSD`, `ETHUSD`. `BTCUSDT` (bảng giá) được nối với `BTCUSD` cho dự báo ngày tương tự |
 
+## DailyReports — `DailyReportOptions` ([`DailyReportService.cs`](../src/CryptoBot.Application/Reports/DailyReportService.cs))
+
+| Khóa | Mặc định | Ý nghĩa |
+| --- | --- | --- |
+| `RunAt` | `06:00:00` | Giờ lập báo cáo mỗi ngày, theo `TimeZone` |
+| `TimeZone` | `Asia/Ho_Chi_Minh` | Múi giờ IANA |
+| `Period` | `1.00:00:00` | Độ dài khoảng báo cáo (24 giờ), kết thúc đúng lúc lập |
+| `Interval` | `1h` | Khung nến Binance dùng để lập báo cáo |
+| `BaselineCandles` | 20 | Số nến trước mỗi nến dùng làm trung bình khối lượng |
+| `VolumeSpikeMultiplier` | 3 | Khối lượng ≥ ngần này × trung bình → giờ khối lượng bất thường |
+| `RetryAfter` | `00:05:00` | Sàn lỗi thì thử lại sau khoảng này |
+| `Symbols` | `[]` | Symbol Binance; hiện tại `BTCUSDT`, `ETHUSDT` |
+
+Đổi `RunAt`/`Period` chỉ áp dụng cho báo cáo mới; báo cáo đã lưu giữ nguyên.
+
 ## MarketEvents — `marketevents.json`
 
 ```json

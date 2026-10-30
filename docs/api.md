@@ -113,6 +113,18 @@ Quy tắc trả về có `status` (`Active`/`Triggered`/`Rejected`/`Cancelled`),
 | --- | --- | --- | --- |
 | GET | `/api/history/monthly` | `symbol?` (mặc định symbol đầu tiên của `DailyHistory:Symbols`) | `months[]`, `years[]`, `monthStats[]`, `events[]`, `firstDayUtc`, `lastDayUtc`, `symbols[]` |
 
+## Báo cáo biến động hằng ngày — [`ReportEndpoints.cs`](../src/CryptoBot.Api/Endpoints/ReportEndpoints.cs)
+
+| Method | Đường dẫn | Tham số | Trả về |
+| --- | --- | --- | --- |
+| GET | `/api/reports/daily` | `symbol?` (phải có trong `DailyReports:Symbols`), `limit` (14, 1–100) | `symbols[]`, `runAt` (`"06:00"`), `timeZone`, `nextRunUtc`, `reports[]` mới → cũ |
+| POST | `/api/reports/daily/run` | — | Lập báo cáo còn thiếu của giờ lập gần nhất: `periodEndUtc`, `created`, `errors[]` (lỗi sàn theo symbol). Báo cáo đã có thì `created = 0` |
+
+Mỗi báo cáo: `symbol`, `interval`, `createdAtUtc`, `report` gồm `fromUtc`, `toUtc`, `candleCount`, `open`, `close`,
+`changePercent`, `high`/`highTimeUtc`, `low`/`lowTimeUtc`, `rangePercent`, `maxDrawdownPercent`, `maxRallyPercent`,
+`volume`, `buyPercent`, `biggestRise`, `biggestDrop`, `volumeSpikes[]`. Mỗi nến trong đó có `openTimeUtc`, `open`,
+`close`, `changePercent`, `volume`, `volumeRatio` (× trung bình), `buyPercent`.
+
 ## Thêm endpoint mới
 
 Xem [extending.md → Thêm endpoint](extending.md#3-thêm-một-endpoint) và cập nhật bảng trong file này.

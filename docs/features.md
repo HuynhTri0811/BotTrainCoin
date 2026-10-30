@@ -23,7 +23,8 @@ Chế độ cố định của bot: `DecisionMode = SignalOnly`, `Environment = 
 13. [Lịch sử theo tháng và sự kiện thị trường](#13-lịch-sử-theo-tháng-và-sự-kiện-thị-trường)
 14. [Dashboard](#14-dashboard)
 15. [Trạng thái, health check, log](#15-trạng-thái-health-check-log)
-16. [Chưa làm / giới hạn đã biết](#16-chưa-làm--giới-hạn-đã-biết)
+16. [Báo cáo biến động hằng ngày](#16-báo-cáo-biến-động-hằng-ngày)
+17. [Chưa làm / giới hạn đã biết](#17-chưa-làm--giới-hạn-đã-biết)
 
 ---
 
@@ -267,10 +268,10 @@ UI: trang **Lịch sử theo tháng** ([`HistoryPage.tsx`](../src/cryptobot-dash
 **Code:** [`src/cryptobot-dashboard`](../src/cryptobot-dashboard). Chi tiết thư mục ở
 [folder-structure.md](folder-structure.md#srccryptobot-dashboard--frontend).
 
-- Menu trái 5 trang: Biểu đồ, Giao dịch Paper, Dự đoán, Tín hiệu, Lịch sử theo tháng. Trang hiện tại nằm trong `#hash`
-  (tải lại hoặc gửi link vẫn mở đúng trang).
-- Nút chọn chiến lược (`BTCUSDT 1h`, `BTCUSDT 15m`, …) ở góc phải; các trang (trừ Lịch sử) dùng symbol/khung của chiến
-  lược đang chọn.
+- Menu trái 6 trang: Biểu đồ, Giao dịch Paper, Dự đoán, Tín hiệu, Lịch sử theo tháng, Báo cáo ngày. Trang hiện tại
+  nằm trong `#hash` (tải lại hoặc gửi link vẫn mở đúng trang).
+- Nút chọn chiến lược (`BTCUSDT 1h`, `BTCUSDT 15m`, …) ở góc phải; các trang (trừ Lịch sử và Báo cáo ngày) dùng
+  symbol/khung của chiến lược đang chọn.
 - Thanh trạng thái: chế độ, môi trường, feed nào stale, lỗi đồng bộ.
 - Thời gian hiển thị theo giờ Việt Nam (`Asia/Ho_Chi_Minh`); backend luôn trả UTC.
 - Giao diện tiếng Việt (`antd/locale/vi_VN`).
@@ -290,7 +291,30 @@ UI: trang **Lịch sử theo tháng** ([`HistoryPage.tsx`](../src/cryptobot-dash
   chuỗi.
 - `/api/...` không tồn tại trả 404 JSON, không bao giờ rơi vào trang SPA.
 
-## 16. Chưa làm / giới hạn đã biết
+## 16. Báo cáo biến động hằng ngày
+
+**Code:** [`DailyMoveReport`](../src/CryptoBot.Domain/MarketData/DailyMoveReport.cs),
+[`DailyReportService`](../src/CryptoBot.Application/Reports/DailyReportService.cs),
+[`DailyReportWorker`](../src/CryptoBot.Api/Workers/DailyReportWorker.cs).
+UI: trang **Báo cáo ngày** ([`ReportsPage.tsx`](../src/cryptobot-dashboard/src/pages/ReportsPage.tsx),
+[`DailyReportCard.tsx`](../src/cryptobot-dashboard/src/features/reports/DailyReportCard.tsx)).
+
+- Mỗi ngày lúc **06:00 giờ Việt Nam** (`DailyReports:RunAt`, `TimeZone`), bot lấy nến `1h` đã đóng của 24 giờ vừa qua
+  từ Binance cho từng symbol (`BTCUSDT`, `ETHUSDT`) và lưu một báo cáo vào bảng `DailyReports`.
+- Báo cáo gồm: giá mở → đóng và % thay đổi, cao nhất/thấp nhất kèm giờ, biên độ cao–thấp, **cú giảm sâu nhất tính từ
+  đỉnh trước đó** và **cú hồi mạnh nhất tính từ đáy trước đó**, tỷ lệ mua chủ động, giờ tăng/giảm mạnh nhất, và các
+  **giờ khối lượng bất thường** (≥ 3 lần trung bình 20 nến trước, kèm bên mua/bán chiếm ưu thế).
+- Trong một nến không biết đỉnh hay đáy đến trước, nên cú giảm/hồi chỉ so với đỉnh/đáy của các nến trước (và giá mở
+  của chính nến): không bao giờ phóng đại.
+- Mỗi (symbol, giờ lập) chỉ có **một** báo cáo (index duy nhất `(Symbol, PeriodEndUtc)`), nên chạy lại không tạo trùng.
+- Bot tắt lúc 06:00 → khi bật lại sẽ **tạo bù** báo cáo của giờ lập gần nhất. Sàn lỗi → thử lại sau 5 phút. Worker
+  ngủ tối đa 1 giờ mỗi lần để máy ngủ/thức cũng không lỡ giờ lập.
+- Nút **Tạo ngay** (`POST /api/reports/daily/run`) lập báo cáo còn thiếu mà không cần chờ.
+- Chỉ mô tả chuyện đã xảy ra, không dự đoán và không giải thích nguyên nhân (bot không có nguồn tin tức).
+- **Chưa làm:** chỉ tạo bù báo cáo của giờ lập gần nhất (không bù nhiều ngày bị lỡ), chưa gửi thông báo ra ngoài
+  (Telegram, email).
+
+## 17. Chưa làm / giới hạn đã biết
 
 | Hạng mục | Hiện trạng |
 | --- | --- |

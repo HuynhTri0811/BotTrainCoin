@@ -549,3 +549,65 @@ export interface MonthlyHistory {
 export const historyApi = {
   monthly: (symbol: string) => getJson<MonthlyHistory>(`/api/history/monthly?symbol=${encodeURIComponent(symbol)}`),
 };
+
+// Báo cáo biến động hằng ngày (xem CryptoBot.Api/Endpoints/ReportEndpoints.cs).
+
+export interface ReportCandle {
+  openTimeUtc: string;
+  open: number;
+  close: number;
+  changePercent: number;
+  volume: number;
+  /** Khối lượng gấp bao nhiêu lần trung bình các nến trước; null khi chưa đủ nến để so. */
+  volumeRatio: number | null;
+  buyPercent: number | null;
+}
+
+export interface DailyMoveReport {
+  fromUtc: string;
+  toUtc: string;
+  candleCount: number;
+  open: number;
+  close: number;
+  changePercent: number;
+  high: number;
+  highTimeUtc: string;
+  low: number;
+  lowTimeUtc: string;
+  rangePercent: number;
+  maxDrawdownPercent: number;
+  maxRallyPercent: number;
+  volume: number;
+  buyPercent: number | null;
+  biggestRise: ReportCandle;
+  biggestDrop: ReportCandle;
+  volumeSpikes: ReportCandle[];
+}
+
+export interface SavedDailyReport {
+  symbol: string;
+  interval: string;
+  createdAtUtc: string;
+  report: DailyMoveReport;
+}
+
+export interface DailyReportList {
+  symbols: string[];
+  /** Giờ lập báo cáo, dạng "06:00", theo `timeZone`. */
+  runAt: string;
+  timeZone: string;
+  nextRunUtc: string;
+  reports: SavedDailyReport[];
+}
+
+export interface DailyReportRun {
+  periodEndUtc: string;
+  created: number;
+  errors: string[];
+}
+
+export const reportApi = {
+  daily: (symbol: string, limit = 14) =>
+    getJson<DailyReportList>(`/api/reports/daily?symbol=${encodeURIComponent(symbol)}&limit=${limit}`),
+  run: () => postJson<DailyReportRun>('/api/reports/daily/run', {}),
+};
