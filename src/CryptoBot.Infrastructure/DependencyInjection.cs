@@ -3,6 +3,7 @@ using CryptoBot.Application.Futures;
 using CryptoBot.Application.Indicators;
 using CryptoBot.Application.LivePrices;
 using CryptoBot.Application.MarketData;
+using CryptoBot.Application.Reports;
 using CryptoBot.Application.Signals;
 using CryptoBot.Infrastructure.Exchanges.Binance;
 using CryptoBot.Infrastructure.Exchanges.Bitfinex;
@@ -90,6 +91,10 @@ public static class DependencyInjection
         });
         services.AddSingleton(config.GetSection("DailyHistory").Get<DailyHistoryOptions>() ?? new DailyHistoryOptions());
         services.AddScoped<DailyHistorySyncService>();
+        // Báo cáo biến động hằng ngày (06:00 giờ Việt Nam) từ nến Binance đã đóng.
+        services.AddSingleton(config.GetSection("DailyReports").Get<DailyReportOptions>() ?? new DailyReportOptions());
+        services.AddScoped<IDailyReportStore, DailyReportStore>();
+        services.AddScoped<DailyReportService>();
         // Sự kiện thị trường ghi tay (marketevents.json) để đối chiếu với các tháng tăng/giảm mạnh.
         services.AddSingleton(new MarketEventCatalog(config.GetSection("MarketEvents").Get<List<MarketEvent>>() ?? []));
 

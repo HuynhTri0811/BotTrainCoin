@@ -15,6 +15,7 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<FuturesPosition> FuturesPositions => Set<FuturesPosition>();
     public DbSet<PaperLedgerEntry> PaperLedger => Set<PaperLedgerEntry>();
     public DbSet<AutoOrderRule> AutoOrderRules => Set<AutoOrderRule>();
+    public DbSet<DailyReport> DailyReports => Set<DailyReport>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
@@ -89,6 +90,15 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
             e.Ignore(x => x.IsWatchingClose);
             e.HasIndex(x => x.CommandId).IsUnique();
             e.HasIndex(x => new { x.Environment, x.Status });
+        });
+
+        b.Entity<DailyReport>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Symbol).HasMaxLength(32);
+            e.Property(x => x.Interval).HasMaxLength(8);
+            // Một báo cáo cho mỗi (symbol, giờ lập): chạy lại hoặc tạo bù không sinh bản trùng.
+            e.HasIndex(x => new { x.Symbol, x.PeriodEndUtc }).IsUnique();
         });
 
         b.Entity<PaperLedgerEntry>(e =>

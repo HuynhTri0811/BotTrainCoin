@@ -1,5 +1,6 @@
 using CryptoBot.Application.Abstractions;
 using CryptoBot.Application.Futures;
+using CryptoBot.Application.Reports;
 using CryptoBot.Domain.Futures;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Strategies;
@@ -221,6 +222,22 @@ public sealed class AutoOrderStore(BotDbContext db) : IAutoOrderStore
         db.AutoOrderRules.FirstOrDefaultAsync(r => r.Environment == Env && r.Id == id, ct);
 
     public void Add(AutoOrderRule rule) => db.AutoOrderRules.Add(rule);
+
+    public Task SaveAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
+}
+
+public sealed class DailyReportStore(BotDbContext db) : IDailyReportStore
+{
+    public Task<bool> ExistsAsync(string symbol, DateTime periodEndUtc, CancellationToken ct) =>
+        db.DailyReports.AnyAsync(r => r.Symbol == symbol && r.PeriodEndUtc == periodEndUtc, ct);
+
+    public async Task<IReadOnlyList<DailyReport>> GetRecentAsync(string? symbol, int limit, CancellationToken ct) =>
+        await db.DailyReports.AsNoTracking()
+            .Where(r => symbol == null || r.Symbol == symbol)
+            .OrderByDescending(r => r.PeriodEndUtc).ThenBy(r => r.Symbol)
+            .Take(limit).ToListAsync(ct);
+
+    public void Add(DailyReport report) => db.DailyReports.Add(report);
 
     public Task SaveAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 }
