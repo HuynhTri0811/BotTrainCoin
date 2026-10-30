@@ -1,4 +1,5 @@
 using CryptoBot.Application.Abstractions;
+using CryptoBot.Application.Reports;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Strategies;
 
@@ -130,5 +131,28 @@ internal sealed class FakeMarketDataClient(FakeClock clock) : IMarketDataClient
         return Task.FromResult<IReadOnlyList<KlineDto>>(Klines
             .Where(k => k.OpenTimeUtc >= startTimeUtc && k.OpenTimeUtc <= clock.UtcNow)
             .OrderBy(k => k.OpenTimeUtc).Take(limit).ToList());
+    }
+}
+
+internal sealed class InMemoryDailyReportStore : IDailyReportStore
+{
+    public readonly List<DailyReport> Reports = [];
+    private readonly List<DailyReport> _pending = [];
+
+    public Task<bool> ExistsAsync(string symbol, DateTime periodEndUtc, CancellationToken ct) =>
+        Task.FromResult(Reports.Any(r => r.Symbol == symbol && r.PeriodEndUtc == periodEndUtc));
+
+    public Task<IReadOnlyList<DailyReport>> GetRecentAsync(string? symbol, int limit, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<DailyReport>>(Reports
+            .Where(r => symbol is null || r.Symbol == symbol)
+            .OrderByDescending(r => r.PeriodEndUtc).Take(limit).ToList());
+
+    public void Add(DailyReport report) => _pending.Add(report);
+
+    public Task SaveAsync(CancellationToken ct)
+    {
+        Reports.AddRange(_pending);
+        _pending.Clear();
+        return Task.CompletedTask;
     }
 }
