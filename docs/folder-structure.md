@@ -40,6 +40,7 @@ domain rất dễ đoán:
 | Giá trực tiếp, biên độ, ngày tương tự | `MarketData/` (công thức) | `LivePrices/` | `LivePriceEndpoints.cs` | `features/live/` |
 | Dự đoán, độ chính xác | `Prediction/` | — | `PredictionEndpoints.cs` | `features/prediction/` |
 | Báo cáo biến động hằng ngày | `MarketData/` (công thức, entity) | `Reports/` | `ReportEndpoints.cs` | `features/reports/`, `pages/ReportsPage.tsx` |
+| Tin tức | `News/` | `News/` | `NewsEndpoints.cs` | `features/news/`, `pages/NewsPage.tsx` |
 | Dùng chung | `Common/` | `Abstractions/` | — | `components/`, `time.ts` |
 
 Không có thư mục kiểu `Models/`, `Services/`, `Helpers/`, `Utils/` gom theo loại kỹ thuật. Service, record, enum và
@@ -86,6 +87,9 @@ CryptoBot.Domain/
 │   ├── AutoOrderRule.cs          # Entity quy tắc tự mở lệnh
 │   └── Enums/                    # PositionSide, PositionStatus, CloseReason, LedgerEntryType,
 │                                 # TriggerCondition, RuleTriggerType, AutoRuleStatus
+├── News/
+│   ├── NewsArticle.cs            # Entity: một bài tin (tiêu đề, tóm tắt, link, coin, giờ đăng)
+│   └── NewsText.cs               # Bỏ HTML khỏi tóm tắt, nhận ra coin (BTC/ETH/ETC) theo từ khóa
 └── Prediction/
     ├── PriceDirectionPredictor.cs# Predict, PredictAt, Backtest + PredictorSettings
     ├── SignalAccuracy.cs         # Chấm tín hiệu sau 1/3/6/12 nến
@@ -131,6 +135,8 @@ CryptoBot.Application/
 │   ├── PaperFuturesContracts.cs  # Options, IMarkPriceClient, MarkPriceCache, PaperFuturesLock, IPaperFuturesStore, DTO nội bộ
 │   ├── PaperFuturesService.cs    # Quote / Open / Close / EvaluateTriggers / Account
 │   └── AutoOrderService.cs       # + AutoOrderOptions, IAutoOrderStore
+├── News/
+│   └── NewsSyncService.cs        # + NewsOptions, INewsFeedClient, INewsStore; lấy bài mới từ các feed RSS
 ├── LivePrices/
 │   ├── LivePrices.cs             # LivePriceOptions, LivePriceSample, LivePriceHistory, LivePriceSampler
 │   ├── DailyRangeService.cs      # Nến ngày Binance (cache) → DailyMoveRange
@@ -158,10 +164,12 @@ CryptoBot.Infrastructure/
 │   │   └── BinanceFuturesMarkPriceClient.cs# IMarkPriceClient
 │   └── Bitfinex/
 │       └── BitfinexDailyHistoryClient.cs   # IDailyHistoryClient (+ BitfinexOptions)
+├── News/
+│   └── RssNewsFeedClient.cs      # INewsFeedClient: đọc RSS 2.0 / Atom
 └── Persistence/
     ├── BotDbContext.cs           # DbSet, mapping, converter decimal→TEXT, DateTime→Unix ms
     ├── Stores.cs                 # CandleStore, StrategyInstanceStore, SignalStore, PaperFuturesStore, AutoOrderStore,
-    │                             # DailyReportStore
+    │                             # DailyReportStore, NewsStore
     └── Migrations/               # Sinh bởi dotnet-ef, KHÔNG sửa tay (trừ khi thật cần và có ghi chú)
 ```
 
@@ -185,8 +193,9 @@ CryptoBot.Api/
 │   ├── LivePriceEndpoints.cs     # /api/live/*
 │   ├── PredictionEndpoints.cs    # /api/prediction, /api/prediction/indicators
 │   ├── HistoryEndpoints.cs       # /api/history/monthly
-│   └── ReportEndpoints.cs        # /api/reports/daily, /api/reports/daily/run
-├── Workers/                      # 5 BackgroundService (architecture.md §3)
+│   ├── ReportEndpoints.cs        # /api/reports/daily, /api/reports/daily/run
+│   └── NewsEndpoints.cs          # /api/news, /api/news/sync
+├── Workers/                      # 6 BackgroundService (architecture.md §3)
 ├── data/                         # cryptobot.db khi chạy từ thư mục này (bị .gitignore)
 └── wwwroot/                      # Bản build dashboard (bị .gitignore)
 ```
@@ -205,7 +214,7 @@ cryptobot-dashboard/
 ├── vite.config.ts                # Cổng 8090, proxy /api + /health → 5080, build ra ../CryptoBot.Api/wwwroot
 └── src/
     ├── main.tsx                  # QueryClient, ConfigProvider vi_VN
-    ├── App.tsx                   # Layout, menu 6 trang (#hash), chọn chiến lược
+    ├── App.tsx                   # Layout, menu 7 trang (#hash), chọn chiến lược
     ├── time.ts                   # Định dạng giờ Việt Nam (formatVn, formatVnUnix, ago…)
     ├── api/
     │   └── client.ts             # MỌI kiểu dữ liệu REST + các object gọi API (api, futuresApi, autoApi…)
@@ -213,6 +222,7 @@ cryptobot-dashboard/
     │   └── StatusBar.tsx         # Component dùng ở nhiều trang
     ├── pages/                    # Mỗi trang một file, chỉ ghép các card
     │   ├── MarketPage.tsx  TradingPage.tsx  PredictionPage.tsx  SignalsPage.tsx  HistoryPage.tsx  ReportsPage.tsx
+    │   │   NewsPage.tsx
     └── features/                 # Card/biểu đồ theo tính năng
         ├── market/               # CandleChart, SessionStatsCard
         ├── live/                 # LivePricePanel, DailyRangeBar, Sparkline
@@ -220,7 +230,8 @@ cryptobot-dashboard/
         ├── auto/                 # AutoOrdersCard
         ├── prediction/           # PredictionCard, IndicatorAccuracyCard
         ├── history/              # MonthlyHeatmap, MoveEventsCard
-        └── reports/              # DailyReportCard
+        ├── reports/              # DailyReportCard
+        └── news/                 # NewsList
 ```
 
 - `pages/` chỉ bố cục (Row/Col/Space) và truyền `symbol`/`interval`/`strategy` xuống. Gọi API nằm trong card ở
