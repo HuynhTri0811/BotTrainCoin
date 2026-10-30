@@ -125,6 +125,13 @@ Mỗi báo cáo: `symbol`, `interval`, `createdAtUtc`, `report` gồm `fromUtc`,
 `volume`, `buyPercent`, `biggestRise`, `biggestDrop`, `volumeSpikes[]`. Mỗi nến trong đó có `openTimeUtc`, `open`,
 `close`, `changePercent`, `volume`, `volumeRatio` (× trung bình), `buyPercent`.
 
+## Tin tức — [`NewsEndpoints.cs`](../src/CryptoBot.Api/Endpoints/NewsEndpoints.cs)
+
+| Method | Đường dẫn | Tham số | Trả về |
+| --- | --- | --- | --- |
+| GET | `/api/news` | `coin?` (`BTC`/`ETH`/`ETC`), `fromUtc?`, `toUtc?` (ISO 8601, lọc giờ đăng trong [from, to)), `limit` (50, 1–200) | `coins[]`, `sources[]`, `pollIntervalHours`, `articles[]` mới → cũ: `id`, `source`, `title`, `url`, `summary`, `coins[]`, `publishedAtUtc` |
+| POST | `/api/news/sync` | — | Đồng bộ ngay: `added`, `errors[]` (lỗi theo nguồn) |
+
 ## Thêm endpoint mới
 
 Xem [extending.md → Thêm endpoint](extending.md#3-thêm-một-endpoint) và cập nhật bảng trong file này.
