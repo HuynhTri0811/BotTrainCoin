@@ -39,7 +39,7 @@ Quy tắc chính:
 2. Nạp `appsettings.json` + `marketevents.json`, cấu hình Serilog.
 3. `AddInfrastructure(config)` ([`DependencyInjection.cs`](../src/CryptoBot.Infrastructure/DependencyInjection.cs))
    đăng ký mọi service, store, client, options.
-4. Đăng ký 4 worker (`BackgroundService`).
+4. Đăng ký 5 worker (`BackgroundService`).
 5. JSON cho phép đọc số từ chuỗi (`"50.5"`) để số tiền không mất chính xác qua JSON number.
 6. `InitializeDatabaseAsync`: tạo thư mục `data/`, chạy migration, bật `PRAGMA journal_mode=WAL`.
 7. Tạo `IndicatorRegistry` ngay để lỗi cấu hình chỉ báo hiện trong log lúc khởi động.
@@ -55,6 +55,7 @@ Quy tắc chính:
 | [`PaperFuturesWorker`](../src/CryptoBot.Api/Workers/PaperFuturesWorker.cs) | `PaperFutures:MarkPollInterval` (2s) | Lấy mark price → `PaperFuturesService.EvaluateTriggersAsync` (thanh lý/SL/TP) → `AutoOrderService.EvaluateAsync` (quy tắc tự mở/đóng) |
 | [`LivePriceWorker`](../src/CryptoBot.Api/Workers/LivePriceWorker.cs) | `LivePrices:PollInterval` (15s, `PeriodicTimer`) | `LivePriceSampler.SampleAsync`: Spot + Mark song song, ghi vào `LivePriceHistory` |
 | [`DailyHistoryWorker`](../src/CryptoBot.Api/Workers/DailyHistoryWorker.cs) | `DailyHistory:PollInterval` (1h, `PeriodicTimer`) | `DailyHistorySyncService.SyncAsync` cho từng symbol Bitfinex |
+| [`DailyReportWorker`](../src/CryptoBot.Api/Workers/DailyReportWorker.cs) | Mỗi ngày lúc `DailyReports:RunAt` (06:00 giờ VN); ngủ tối đa 1h mỗi lần, lỗi thì thử lại sau 5 phút | `DailyReportService.RunDueAsync`: lập báo cáo còn thiếu của giờ lập gần nhất (cũng tạo bù khi khởi động) |
 
 Quy ước chung của worker:
 
@@ -130,6 +131,7 @@ tính bằng đúng quy tắc cửa sổ của chiến lược, nên chart luôn
 | `FuturesPositions` | `FuturesPosition` | `(Environment, OpenCommandId)` duy nhất (chống mở trùng) |
 | `PaperLedger` | `PaperLedgerEntry` | `(Environment, TimeUtc)` |
 | `AutoOrderRules` | `AutoOrderRule` | `CommandId` duy nhất |
+| `DailyReports` | `DailyReport` | `(Symbol, PeriodEndUtc)` duy nhất; nội dung báo cáo lưu dạng JSON (`ContentJson`) |
 
 Quy ước lưu (áp cho **mọi** cột cùng kiểu, trong `ConfigureConventions`):
 

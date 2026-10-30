@@ -4,15 +4,6 @@ using CryptoBot.Domain.Strategies;
 
 namespace CryptoBot.Domain.MarketData;
 
-/// <summary>Hướng nghiêng của dự báo "ngày tương tự".</summary>
-public enum ForecastLean
-{
-    /// <summary>Xác suất tăng trong khoảng (40%, 60%): gần như tung đồng xu.</summary>
-    Neutral,
-    Up,
-    Down,
-}
-
 /// <summary>
 /// Dự báo bằng "những ngày tương tự hôm nay": mô tả mỗi ngày bằng 5 con số (khoảng cách giá tới EMA200 và EMA50,
 /// RSI14, % thay đổi 7 ngày, % thay đổi 1 ngày), tìm <see cref="Neighbors"/> ngày trong lịch sử giống hôm nay nhất,

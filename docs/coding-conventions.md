@@ -23,9 +23,11 @@ viết code mới giống code xung quanh nó.
 
 ### Bố cục file
 
-- **File-scoped namespace**: `namespace CryptoBot.Domain.MarketData;`. Namespace = tên project + thư mục.
+- **File-scoped namespace**: `namespace CryptoBot.Domain.MarketData;`. Namespace = tên project + thư mục, trừ thư
+  mục `Enums/`: enum giữ namespace của mảng chứa nó (`Futures/Enums/PositionSide.cs` → `CryptoBot.Domain.Futures`).
 - `using` ở đầu file, sắp theo alphabet, `System.*` trước.
-- Thứ tự trong file: enum/record nhỏ đi kèm → class chính. DTO của endpoint ở **cuối** file endpoint.
+- Thứ tự trong file: record nhỏ đi kèm → class chính. Enum không nằm chung file: mỗi enum một file trong
+  `<Mảng>/Enums/` (Domain). DTO của endpoint ở **cuối** file endpoint.
 
 ### Kiểu và từ khóa
 

@@ -326,6 +326,43 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                     b.ToTable("Candles");
                 });
 
+            modelBuilder.Entity("CryptoBot.Domain.MarketData.DailyReport", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ContentJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Interval")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("PeriodEndUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("PeriodStartUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Symbol", "PeriodEndUtc")
+                        .IsUnique();
+
+                    b.ToTable("DailyReports");
+                });
+
             modelBuilder.Entity("CryptoBot.Domain.Strategies.StrategyInstance", b =>
                 {
                     b.Property<int>("Id")

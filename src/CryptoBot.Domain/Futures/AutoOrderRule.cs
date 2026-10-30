@@ -1,41 +1,5 @@
 namespace CryptoBot.Domain.Futures;
 
-/// <summary>Hướng so sánh giữa mark price và giá đặt của quy tắc theo giá.</summary>
-public enum TriggerCondition
-{
-    /// <summary>Kích hoạt khi mark price ≤ giá đặt (ví dụ mua khi giá giảm về một mức).</summary>
-    AtOrBelow = 1,
-
-    /// <summary>Kích hoạt khi mark price ≥ giá đặt.</summary>
-    AtOrAbove = 2,
-}
-
-/// <summary>Quy tắc kích hoạt theo mức giá hay theo tín hiệu của một chỉ báo tự viết.</summary>
-public enum RuleTriggerType
-{
-    /// <summary>Kích hoạt khi mark price chạm mức giá đặt.</summary>
-    Price = 1,
-
-    /// <summary>Kích hoạt khi chỉ báo tự viết phát tín hiệu cùng hướng với quy tắc.</summary>
-    Indicator = 2,
-}
-
-/// <summary>Trạng thái của quy tắc. Chỉ trạng thái <see cref="Active"/> mới còn được kiểm tra.</summary>
-public enum AutoRuleStatus
-{
-    /// <summary>Đang chờ điều kiện xảy ra.</summary>
-    Active = 1,
-
-    /// <summary>Đã kích hoạt và mở được vị thế.</summary>
-    Triggered = 2,
-
-    /// <summary>Điều kiện đã xảy ra nhưng engine từ chối mở lệnh; lý do nằm trong <see cref="AutoOrderRule.Note"/>.</summary>
-    Rejected = 3,
-
-    /// <summary>Người dùng đã hủy trước khi kích hoạt.</summary>
-    Cancelled = 4,
-}
-
 /// <summary>
 /// Quy tắc "khi giá chạm mức này (hoặc chỉ báo phát tín hiệu) thì tự mở lệnh Paper". Chạy một lần: sau khi kích hoạt
 /// (thành công hoặc bị từ chối) quy tắc không tự bật lại. <see cref="CommandId"/> cũng là
