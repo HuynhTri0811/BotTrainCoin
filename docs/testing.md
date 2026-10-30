@@ -8,8 +8,8 @@ UPDATE_GOLDEN=1 dotnet test                          # ghi lại snapshot golden
 npm --prefix src/cryptobot-dashboard run typecheck   # frontend: chỉ typecheck, chưa có test
 ```
 
-Tại thời điểm 2026-10-30 (nhánh `feature/daily-move-report`): Domain 200, Application 112, Integration 8 test,
-tất cả pass.
+Tại thời điểm 2026-10-30 (nhánh `feature/news-sync`): Domain 209, Application 117, Integration 12 test, tất cả
+pass.
 Framework: xUnit 2.9, `using Xunit;` là global using trong mỗi project test.
 
 ## Ba project test
@@ -18,7 +18,7 @@ Framework: xUnit 2.9, `using Xunit;` là global using trong mỗi project test.
 | --- | --- | --- | --- |
 | [`CryptoBot.Domain.Tests`](../tests/CryptoBot.Domain.Tests) | Domain | Công thức, entity, chiến lược, chỉ báo, dự đoán | Không cần fake. Helper [`TestCandles`](../tests/CryptoBot.Domain.Tests/TestCandles.cs) |
 | [`CryptoBot.Application.Tests`](../tests/CryptoBot.Application.Tests) | Application | Service: sync, đánh giá tín hiệu, paper futures, quy tắc tự động, registry, cache, golden | [`Fakes.cs`](../tests/CryptoBot.Application.Tests/Fakes.cs): `FakeClock`, `InMemoryCandleStore`, `InMemoryStrategyInstanceStore`, `InMemorySignalStore`, `FakeMarketDataClient` |
-| [`CryptoBot.IntegrationTests`](../tests/CryptoBot.IntegrationTests) | Infrastructure | EF Core mapping, converter, index duy nhất, migration thật | File SQLite tạm trong `%TEMP%`, xóa sau test |
+| [`CryptoBot.IntegrationTests`](../tests/CryptoBot.IntegrationTests) | Infrastructure | EF Core mapping, converter, index duy nhất, migration thật; đọc RSS qua `HttpClient` với handler giả | File SQLite tạm trong `%TEMP%`, xóa sau test |
 
 Quy tắc chọn chỗ: test ở **tầng thấp nhất** chứa logic. Công thức → Domain test. Điều phối nhiều port → Application
 test với fake. Chỉ những gì phụ thuộc SQLite thật (decimal round-trip, UTC, unique index, transaction) → Integration.
