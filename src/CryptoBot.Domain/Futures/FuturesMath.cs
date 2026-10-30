@@ -1,11 +1,5 @@
 namespace CryptoBot.Domain.Futures;
 
-public enum PositionSide
-{
-    Long = 1,
-    Short = 2,
-}
-
 /// <summary>Quy tắc giao dịch của một symbol (lấy từ exchangeInfo, cần kiểm tra lại khi tích hợp testnet).</summary>
 public sealed record FuturesSymbolRules(
     string Symbol,

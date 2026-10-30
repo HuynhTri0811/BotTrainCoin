@@ -1,37 +1,5 @@
 namespace CryptoBot.Domain.Futures;
 
-/// <summary>Trạng thái vị thế.</summary>
-public enum PositionStatus
-{
-    /// <summary>Đang mở, còn được kiểm tra SL/TP/thanh lý.</summary>
-    Open = 1,
-
-    /// <summary>Đã đóng (tay, chạm SL hoặc chạm TP).</summary>
-    Closed = 2,
-
-    /// <summary>Bị thanh lý: mất toàn bộ margin.</summary>
-    Liquidated = 3,
-}
-
-/// <summary>Lý do vị thế kết thúc.</summary>
-public enum CloseReason
-{
-    /// <summary>Người dùng bấm đóng.</summary>
-    Manual = 1,
-
-    /// <summary>Mark price chạm stop loss.</summary>
-    StopLoss = 2,
-
-    /// <summary>Mark price chạm take profit.</summary>
-    TakeProfit = 3,
-
-    /// <summary>Mark price chạm giá thanh lý.</summary>
-    Liquidation = 4,
-
-    /// <summary>Quy tắc tự động đóng vì chỉ báo phát tín hiệu ngược hướng vị thế.</summary>
-    Signal = 5,
-}
-
 /// <summary>
 /// Vị thế Futures giả lập, isolated margin, one-way mode (mỗi symbol tối đa một vị thế mở).
 /// Môi trường luôn là Paper; tiền thật không đi qua entity này.
@@ -158,19 +126,6 @@ public sealed class FuturesPosition
         if (Status != PositionStatus.Open)
             throw new InvalidOperationException($"Vị thế {Id} đã {Status}.");
     }
-}
-
-/// <summary>Loại bút toán trong sổ vốn giả lập.</summary>
-public enum LedgerEntryType
-{
-    /// <summary>Nạp vốn (vốn giả lập ban đầu).</summary>
-    Deposit = 1,
-
-    /// <summary>Phí giao dịch (số âm).</summary>
-    Fee = 2,
-
-    /// <summary>Lãi/lỗ đã chốt khi đóng hoặc bị thanh lý.</summary>
-    RealizedPnl = 3,
 }
 
 /// <summary>Bút toán sổ vốn giả lập. Số dư ví = tổng Amount (tính trong ứng dụng, không SUM bằng SQL).</summary>

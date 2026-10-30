@@ -56,32 +56,37 @@ CryptoBot.Domain/
 ├── MarketData/
 │   ├── Candle.cs                 # Entity nến OHLCV + ApplyUpdate (không ghi đè nến đã đóng) + Validate
 │   ├── CandleInterval.cs         # 15m / 1h / 1d; TryParse/Parse; OpenTimeAt (nến chứa một thời điểm)
-│   ├── CandleSeriesValidator.cs  # Trùng / sai thứ tự / thiếu / OHLCV không hợp lệ; WithoutRejected (bỏ nến hỏng)
+│   ├── CandleSeriesValidator.cs  # CandleIssue + Validate: trùng / sai thứ tự / thiếu / OHLCV không hợp lệ; WithoutRejected
 │   ├── DailyCloses.cs            # internal: kiểm tra chung cho chuỗi giá đóng ngày
 │   ├── DailyMoveRange.cs         # Biên độ ±1σ/±2σ sau N ngày
 │   ├── MonthlyChangeReport.cs    # % theo tháng/năm, thống kê theo tháng trong năm
 │   ├── SimilarDaysForecast.cs    # Dự báo "ngày tương tự" + backtest walk-forward
-│   └── VolumePressure.cs         # Mua/bán chủ động, cảnh báo áp đảo
+│   ├── VolumePressure.cs         # Mua/bán chủ động, cảnh báo áp đảo
+│   └── Enums/                    # CandleIssueKind, ForecastLean, VolumePressureSide
 ├── Strategies/
-│   ├── StrategyContracts.cs      # IStrategy, StrategyContext, StrategyDecision, SignalAction
+│   ├── StrategyContracts.cs      # IStrategy, StrategyContext, StrategyDecision, IndicatorValues
 │   ├── EmaCrossStrategy.cs       # Chiến lược EMA cross (+ EmaCrossParameters)
 │   ├── Ema.cs                    # EMA: Calculate (cả chuỗi), LastTwo (2 giá trị cuối, không cấp phát)
 │   ├── Crossover.cs              # Up/Down (2 đường), UpThrough/DownThrough (qua mức cố định)
 │   ├── StrategyInstance.cs       # Entity: cấu hình + Version + checkpoint
-│   └── TradingSignal.cs          # Entity: tín hiệu BUY/SELL đã phát
+│   ├── TradingSignal.cs          # Entity: tín hiệu BUY/SELL đã phát
+│   └── Enums/                    # SignalAction
 ├── Indicators/
 │   ├── IndicatorContracts.cs     # ICustomIndicator, [Indicator], IndicatorResult, IndicatorLine, IndicatorWindow
 │   ├── Rsi.cs                    # RSI Wilder: Calculate, LastTwo
 │   ├── MyRsiIndicator.cs         # Chỉ báo mẫu đầy đủ (đọc file này trước khi viết chỉ báo mới)
-│   └── TemplateIndicator.cs      # Khung trống để copy (không có [Indicator] nên không được đăng ký)
+│   ├── TemplateIndicator.cs      # Khung trống để copy (không có [Indicator] nên không được đăng ký)
+│   └── Enums/                    # IndicatorSignal
 ├── Futures/
-│   ├── FuturesMath.cs            # Làm tròn, slippage, giá thanh lý, PnL, SL/TP hit; PositionSide; FuturesSymbolRules
-│   ├── FuturesPosition.cs        # Entity vị thế + PaperLedgerEntry + các enum trạng thái
-│   └── AutoOrderRule.cs          # Entity quy tắc tự mở lệnh + trạng thái
+│   ├── FuturesMath.cs            # Làm tròn, slippage, giá thanh lý, PnL, SL/TP hit; FuturesSymbolRules
+│   ├── FuturesPosition.cs        # Entity vị thế + PaperLedgerEntry
+│   ├── AutoOrderRule.cs          # Entity quy tắc tự mở lệnh
+│   └── Enums/                    # PositionSide, PositionStatus, CloseReason, LedgerEntryType,
+│                                 # TriggerCondition, RuleTriggerType, AutoRuleStatus
 └── Prediction/
-    ├── PriceDirection.cs         # enum Up / Down
     ├── PriceDirectionPredictor.cs# Predict, PredictAt, Backtest + PredictorSettings
-    └── SignalAccuracy.cs         # Chấm tín hiệu sau 1/3/6/12 nến
+    ├── SignalAccuracy.cs         # Chấm tín hiệu sau 1/3/6/12 nến
+    └── Enums/                    # PriceDirection (Up / Down)
 ```
 
 Đặt gì ở đây:
@@ -89,11 +94,14 @@ CryptoBot.Domain/
 - Entity (class có `private set`, constructor kiểm tra bất biến, constructor rỗng `private` cho EF Core).
 - Công thức và quy tắc nghiệp vụ dưới dạng `static class` hoặc `record` có `static` factory (`Compute`, `Build`, `From`).
 - Chiến lược (`IStrategy`) và chỉ báo (`ICustomIndicator`).
+- Enum: **mỗi enum một file** trong thư mục `Enums/` của mảng (`Futures/Enums/CloseReason.cs`), có `/// <summary>`
+  cho enum và từng giá trị. Namespace vẫn là namespace của mảng (`CryptoBot.Domain.Futures`), không thêm `.Enums`,
+  để code dùng enum không cần thêm `using`.
 
 Không đặt ở đây: bất cứ thứ gì cần `await`, `ILogger`, `HttpClient`, `DbContext`, `DateTime.UtcNow`, cấu hình.
 
-Một file có thể chứa vài kiểu nhỏ đi cùng nhau (ví dụ `SimilarDaysForecast` + `SimilarDaysBacktest`,
-`FuturesPosition` + `PaperLedgerEntry`). Tách kiểu ra file riêng khi **nhiều file khác** cùng dùng nó (ví dụ
+Một file có thể chứa vài record/class nhỏ đi cùng nhau (ví dụ `SimilarDaysForecast` + `SimilarDaysBacktest`,
+`FuturesPosition` + `PaperLedgerEntry`); enum thì luôn nằm trong `Enums/`. Tách kiểu ra file riêng khi **nhiều file khác** cùng dùng nó (ví dụ
 `PriceDirection` được tách ở PR #57 vì cả `PriceDirectionPredictor` và `SignalAccuracy` dùng).
 
 ## `src/CryptoBot.Application` — điều phối
