@@ -196,6 +196,32 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task Daily_report_is_unique_per_symbol_and_period_end_and_listed_newest_first()
+    {
+        DailyReport Report(string symbol, int day) =>
+            new(symbol, "1h", T0.AddDays(day - 1), T0.AddDays(day), T0.AddDays(day), "{}");
+
+        await using (var db = NewContext())
+        {
+            db.DailyReports.AddRange(Report("BTCUSDT", 1), Report("BTCUSDT", 2), Report("ETHUSDT", 2));
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = NewContext())
+        {
+            var store = new DailyReportStore(db);
+            Assert.True(await store.ExistsAsync("BTCUSDT", T0.AddDays(2), default));
+            Assert.False(await store.ExistsAsync("BTCUSDT", T0.AddDays(3), default));
+            Assert.Equal([T0.AddDays(2), T0.AddDays(1)],
+                (await store.GetRecentAsync("BTCUSDT", 10, default)).Select(r => r.PeriodEndUtc));
+            Assert.Equal(3, (await store.GetRecentAsync(null, 10, default)).Count);
+
+            db.DailyReports.Add(Report("BTCUSDT", 2));
+            await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        }
+    }
+
     private static TradingSignal Signal(int instanceId) =>
         new(instanceId, 1, "BTCUSDT", "1h", T0, SignalAction.Buy, "test", 100.5m, 101m, 100m, T0, isBackfill: true);
 }
