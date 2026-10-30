@@ -611,3 +611,34 @@ export const reportApi = {
     getJson<DailyReportList>(`/api/reports/daily?symbol=${encodeURIComponent(symbol)}&limit=${limit}`),
   run: () => postJson<DailyReportRun>('/api/reports/daily/run', {}),
 };
+
+// Tin tức từ RSS công khai (xem CryptoBot.Api/Endpoints/NewsEndpoints.cs).
+
+export interface NewsArticle {
+  id: number;
+  source: string;
+  title: string;
+  url: string;
+  summary: string;
+  coins: string[];
+  publishedAtUtc: string;
+}
+
+export interface NewsList {
+  coins: string[];
+  sources: string[];
+  pollIntervalHours: number;
+  articles: NewsArticle[];
+}
+
+export const newsApi = {
+  list: (opts: { coin?: string; fromUtc?: string; toUtc?: string; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (opts.coin) q.set('coin', opts.coin);
+    if (opts.fromUtc) q.set('fromUtc', opts.fromUtc);
+    if (opts.toUtc) q.set('toUtc', opts.toUtc);
+    q.set('limit', String(opts.limit ?? 50));
+    return getJson<NewsList>(`/api/news?${q}`);
+  },
+  sync: () => postJson<{ added: number; errors: string[] }>('/api/news/sync', {}),
+};
