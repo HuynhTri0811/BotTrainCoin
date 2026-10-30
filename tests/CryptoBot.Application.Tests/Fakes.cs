@@ -1,6 +1,8 @@
 using CryptoBot.Application.Abstractions;
+using CryptoBot.Application.News;
 using CryptoBot.Application.Reports;
 using CryptoBot.Domain.MarketData;
+using CryptoBot.Domain.News;
 using CryptoBot.Domain.Strategies;
 
 namespace CryptoBot.Application.Tests;
@@ -155,4 +157,37 @@ internal sealed class InMemoryDailyReportStore : IDailyReportStore
         _pending.Clear();
         return Task.CompletedTask;
     }
+}
+
+internal sealed class FakeNewsFeedClient : INewsFeedClient
+{
+    public readonly Dictionary<string, List<NewsItemDto>> Feeds = [];
+    public readonly HashSet<string> Failing = [];
+
+    public Task<IReadOnlyList<NewsItemDto>> GetItemsAsync(string url, CancellationToken ct) =>
+        Failing.Contains(url)
+            ? throw new NewsFeedUnavailableException("503 Service Unavailable")
+            : Task.FromResult<IReadOnlyList<NewsItemDto>>(Feeds.GetValueOrDefault(url) ?? []);
+}
+
+internal sealed class InMemoryNewsStore : INewsStore
+{
+    public readonly List<NewsArticle> Articles = [];
+
+    public Task<IReadOnlySet<string>> GetExistingIdsAsync(string source, IReadOnlyCollection<string> externalIds,
+        CancellationToken ct) =>
+        Task.FromResult<IReadOnlySet<string>>(Articles
+            .Where(a => a.Source == source && externalIds.Contains(a.ExternalId))
+            .Select(a => a.ExternalId).ToHashSet());
+
+    public Task<IReadOnlyList<NewsArticle>> QueryAsync(string? coin, DateTime? fromUtc, DateTime? toUtc, int limit,
+        CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<NewsArticle>>(Articles
+            .Where(a => coin is null || a.Coins.Split(',').Contains(coin))
+            .Where(a => (fromUtc is null || a.PublishedAtUtc >= fromUtc) && (toUtc is null || a.PublishedAtUtc < toUtc))
+            .OrderByDescending(a => a.PublishedAtUtc).Take(limit).ToList());
+
+    public void AddRange(IEnumerable<NewsArticle> articles) => Articles.AddRange(articles);
+
+    public Task SaveAsync(CancellationToken ct) => Task.CompletedTask;
 }

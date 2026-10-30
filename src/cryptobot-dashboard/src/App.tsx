@@ -5,6 +5,7 @@ import { api } from './api/client';
 import { StatusBar } from './components/StatusBar';
 import { HistoryPage } from './pages/HistoryPage';
 import { MarketPage } from './pages/MarketPage';
+import { NewsPage } from './pages/NewsPage';
 import { PredictionPage } from './pages/PredictionPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SignalsPage } from './pages/SignalsPage';
@@ -17,6 +18,7 @@ const PAGES = [
   { key: 'signals', label: 'Tín hiệu' },
   { key: 'history', label: 'Lịch sử theo tháng' },
   { key: 'reports', label: 'Báo cáo ngày' },
+  { key: 'news', label: 'Tin tức' },
 ] as const;
 
 type Page = (typeof PAGES)[number]['key'];
@@ -40,8 +42,8 @@ export function App() {
 
   const strategies = status.data?.strategies.filter((s) => s.enabled) ?? [];
   const current = strategies.find((s) => s.id === selected) ?? strategies[0];
-  // Lịch sử theo tháng và báo cáo ngày có danh sách symbol riêng, không theo cặp/khung nến của chiến lược.
-  const usesStrategy = page !== 'history' && page !== 'reports';
+  // Lịch sử theo tháng, báo cáo ngày và tin tức có danh sách riêng, không theo cặp/khung nến của chiến lược.
+  const usesStrategy = page !== 'history' && page !== 'reports' && page !== 'news';
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -83,6 +85,7 @@ export function App() {
 
             {page === 'history' && <HistoryPage />}
             {page === 'reports' && <ReportsPage />}
+            {page === 'news' && <NewsPage />}
             {usesStrategy && current && (
               <>
                 {page === 'market' && <MarketPage key={current.id} strategy={current} />}

@@ -1,7 +1,9 @@
-import { Card, Col, Row, Statistic, Table, Tag, Typography } from 'antd';
-import type { ReportCandle, SavedDailyReport } from '../../api/client';
+import { Card, Col, Row, Spin, Statistic, Table, Tag, Typography } from 'antd';
+import { useQuery } from '@tanstack/react-query';
+import { newsApi, type ReportCandle, type SavedDailyReport } from '../../api/client';
 import { formatVn } from '../../time';
 import { fmtPrice2 } from '../futures/format';
+import { NewsList } from '../news/NewsList';
 
 export const fmtPct2 = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(2)}%`;
 export const pctColor = (v: number) => (v > 0 ? '#16a34a' : v < 0 ? '#dc2626' : undefined);
@@ -23,6 +25,11 @@ export function DailyReportCard({ saved }: { saved: SavedDailyReport }) {
   const r = saved.report;
   const coin = saved.symbol.replace(/USDT$/, '');
   const verb = r.changePercent > 0 ? 'tăng' : r.changePercent < 0 ? 'giảm' : 'đi ngang';
+  // Tin nhắc tới coin này, đăng trong đúng khoảng báo cáo: gợi ý nguyên nhân, không khẳng định.
+  const news = useQuery({
+    queryKey: ['report-news', coin, r.fromUtc, r.toUtc],
+    queryFn: () => newsApi.list({ coin, fromUtc: r.fromUtc, toUtc: r.toUtc, limit: 10 }),
+  });
 
   return (
     <Card size="small" title={`${coin} · ${formatVn(r.fromUtc)} → ${formatVn(r.toUtc)}`}>
@@ -96,10 +103,15 @@ export function DailyReportCard({ saved }: { saved: SavedDailyReport }) {
         />
       )}
 
+      <Typography.Title level={5} style={{ marginTop: 16 }}>
+        Tin nhắc tới {coin} trong khoảng này
+      </Typography.Title>
+      {news.isPending ? <Spin size="small" /> : <NewsList articles={news.data?.articles ?? []} showSummary={false} />}
+
       <Typography.Paragraph type="secondary" style={{ margin: '8px 0 0', fontSize: 12 }}>
         Từ {r.candleCount} nến {saved.interval} đã đóng của Binance, lập lúc {formatVn(saved.createdAtUtc)}. "Giảm sâu
         nhất từ đỉnh" so đáy của mỗi nến với đỉnh của các nến trước nó. Khối lượng bất thường là giờ có khối lượng gấp
-        từ 3 lần trung bình 20 nến trước. Báo cáo chỉ mô tả chuyện đã xảy ra, không dự đoán.
+        từ 3 lần trung bình 20 nến trước. Báo cáo chỉ mô tả chuyện đã xảy ra, không dự đoán; tin cùng khoảng thời gian không chắc là nguyên nhân.
       </Typography.Paragraph>
     </Card>
   );

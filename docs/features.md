@@ -24,7 +24,8 @@ Chế độ cố định của bot: `DecisionMode = SignalOnly`, `Environment = 
 14. [Dashboard](#14-dashboard)
 15. [Trạng thái, health check, log](#15-trạng-thái-health-check-log)
 16. [Báo cáo biến động hằng ngày](#16-báo-cáo-biến-động-hằng-ngày)
-17. [Chưa làm / giới hạn đã biết](#17-chưa-làm--giới-hạn-đã-biết)
+17. [Tin tức (RSS, mỗi 5 giờ)](#17-tin-tức-rss-mỗi-5-giờ)
+18. [Chưa làm / giới hạn đã biết](#18-chưa-làm--giới-hạn-đã-biết)
 
 ---
 
@@ -268,10 +269,10 @@ UI: trang **Lịch sử theo tháng** ([`HistoryPage.tsx`](../src/cryptobot-dash
 **Code:** [`src/cryptobot-dashboard`](../src/cryptobot-dashboard). Chi tiết thư mục ở
 [folder-structure.md](folder-structure.md#srccryptobot-dashboard--frontend).
 
-- Menu trái 6 trang: Biểu đồ, Giao dịch Paper, Dự đoán, Tín hiệu, Lịch sử theo tháng, Báo cáo ngày. Trang hiện tại
-  nằm trong `#hash` (tải lại hoặc gửi link vẫn mở đúng trang).
-- Nút chọn chiến lược (`BTCUSDT 1h`, `BTCUSDT 15m`, …) ở góc phải; các trang (trừ Lịch sử và Báo cáo ngày) dùng
-  symbol/khung của chiến lược đang chọn.
+- Menu trái 7 trang: Biểu đồ, Giao dịch Paper, Dự đoán, Tín hiệu, Lịch sử theo tháng, Báo cáo ngày, Tin tức. Trang
+  hiện tại nằm trong `#hash` (tải lại hoặc gửi link vẫn mở đúng trang).
+- Nút chọn chiến lược (`BTCUSDT 1h`, `BTCUSDT 15m`, …) ở góc phải; các trang (trừ Lịch sử, Báo cáo ngày, Tin tức)
+  dùng symbol/khung của chiến lược đang chọn.
 - Thanh trạng thái: chế độ, môi trường, feed nào stale, lỗi đồng bộ.
 - Thời gian hiển thị theo giờ Việt Nam (`Asia/Ho_Chi_Minh`); backend luôn trả UTC.
 - Giao diện tiếng Việt (`antd/locale/vi_VN`).
@@ -310,11 +311,35 @@ UI: trang **Báo cáo ngày** ([`ReportsPage.tsx`](../src/cryptobot-dashboard/sr
 - Bot tắt lúc 06:00 → khi bật lại sẽ **tạo bù** báo cáo của giờ lập gần nhất. Sàn lỗi → thử lại sau 5 phút. Worker
   ngủ tối đa 1 giờ mỗi lần để máy ngủ/thức cũng không lỡ giờ lập.
 - Nút **Tạo ngay** (`POST /api/reports/daily/run`) lập báo cáo còn thiếu mà không cần chờ.
-- Chỉ mô tả chuyện đã xảy ra, không dự đoán và không giải thích nguyên nhân (bot không có nguồn tin tức).
+- Dưới mỗi báo cáo có **tin nhắc tới coin đó, đăng trong đúng khoảng báo cáo** (mục 17), để gợi ý nguyên nhân.
+- Chỉ mô tả chuyện đã xảy ra, không dự đoán; tin cùng khoảng thời gian không chắc là nguyên nhân.
 - **Chưa làm:** chỉ tạo bù báo cáo của giờ lập gần nhất (không bù nhiều ngày bị lỡ), chưa gửi thông báo ra ngoài
   (Telegram, email).
 
-## 17. Chưa làm / giới hạn đã biết
+## 17. Tin tức (RSS, mỗi 5 giờ)
+
+**Code:** [`NewsText`](../src/CryptoBot.Domain/News/NewsText.cs),
+[`NewsArticle`](../src/CryptoBot.Domain/News/NewsArticle.cs),
+[`NewsSyncService`](../src/CryptoBot.Application/News/NewsSyncService.cs),
+[`RssNewsFeedClient`](../src/CryptoBot.Infrastructure/News/RssNewsFeedClient.cs),
+[`NewsWorker`](../src/CryptoBot.Api/Workers/NewsWorker.cs).
+UI: trang **Tin tức** ([`NewsPage.tsx`](../src/cryptobot-dashboard/src/pages/NewsPage.tsx),
+[`NewsList.tsx`](../src/cryptobot-dashboard/src/features/news/NewsList.tsx)) và trong card báo cáo ngày.
+
+- Nguồn: RSS công khai của **CoinDesk, Cointelegraph, Decrypt** (không cần API key), khai báo trong `News:Feeds`.
+  Đọc được cả RSS 2.0 và Atom.
+- `NewsWorker` đồng bộ ngay khi khởi động, sau đó **mỗi 5 giờ** (`News:PollInterval`). Nút **Đồng bộ ngay**
+  (`POST /api/news/sync`) chạy ngay một lượt.
+- Mỗi bài lưu tiêu đề, tóm tắt (bỏ HTML, cắt còn 500 ký tự), link bài gốc, giờ đăng (UTC). Khóa duy nhất
+  `(Source, ExternalId)` với `ExternalId` là guid của RSS (không có thì là link): đồng bộ lại không lưu trùng.
+- Coin (BTC/ETH/ETC) gắn theo từ khóa nguyên từ trong tiêu đề + tóm tắt: `bitcoin`/`btc`, `ether`/`ethereum`/`eth`,
+  `ethereum classic`/`ETC` viết hoa ("etc." trong câu tiếng Anh không tính). Có thể sót hoặc nhầm.
+- Một nguồn lỗi (mạng, 4xx/5xx, XML hỏng) chỉ ghi log và trả trong `errors`, các nguồn khác vẫn chạy. Bài thiếu tiêu
+  đề hoặc ngày đăng bị bỏ qua.
+- **Giới hạn:** feed chỉ giữ 20–60 bài mới nhất; nguồn đăng dày có thể đẩy bài ra khỏi feed trước lượt đồng bộ sau
+  5 giờ, nên có thể lỡ một ít bài. Không dịch, không tóm tắt bằng AI, không đánh giá tin tốt/xấu.
+
+## 18. Chưa làm / giới hạn đã biết
 
 | Hạng mục | Hiện trạng |
 | --- | --- |

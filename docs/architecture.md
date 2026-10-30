@@ -39,7 +39,7 @@ Quy tắc chính:
 2. Nạp `appsettings.json` + `marketevents.json`, cấu hình Serilog.
 3. `AddInfrastructure(config)` ([`DependencyInjection.cs`](../src/CryptoBot.Infrastructure/DependencyInjection.cs))
    đăng ký mọi service, store, client, options.
-4. Đăng ký 5 worker (`BackgroundService`).
+4. Đăng ký 6 worker (`BackgroundService`).
 5. JSON cho phép đọc số từ chuỗi (`"50.5"`) để số tiền không mất chính xác qua JSON number.
 6. `InitializeDatabaseAsync`: tạo thư mục `data/`, chạy migration, bật `PRAGMA journal_mode=WAL`.
 7. Tạo `IndicatorRegistry` ngay để lỗi cấu hình chỉ báo hiện trong log lúc khởi động.
@@ -56,6 +56,7 @@ Quy tắc chính:
 | [`LivePriceWorker`](../src/CryptoBot.Api/Workers/LivePriceWorker.cs) | `LivePrices:PollInterval` (15s, `PeriodicTimer`) | `LivePriceSampler.SampleAsync`: Spot + Mark song song, ghi vào `LivePriceHistory` |
 | [`DailyHistoryWorker`](../src/CryptoBot.Api/Workers/DailyHistoryWorker.cs) | `DailyHistory:PollInterval` (1h, `PeriodicTimer`) | `DailyHistorySyncService.SyncAsync` cho từng symbol Bitfinex |
 | [`DailyReportWorker`](../src/CryptoBot.Api/Workers/DailyReportWorker.cs) | Mỗi ngày lúc `DailyReports:RunAt` (06:00 giờ VN); ngủ tối đa 1h mỗi lần, lỗi thì thử lại sau 5 phút | `DailyReportService.RunDueAsync`: lập báo cáo còn thiếu của giờ lập gần nhất (cũng tạo bù khi khởi động) |
+| [`NewsWorker`](../src/CryptoBot.Api/Workers/NewsWorker.cs) | `News:PollInterval` (5h, `PeriodicTimer`), chạy một lượt khi khởi động | `NewsSyncService.SyncAsync`: lấy bài mới từ từng feed RSS |
 
 Quy ước chung của worker:
 
@@ -132,6 +133,7 @@ tính bằng đúng quy tắc cửa sổ của chiến lược, nên chart luôn
 | `PaperLedger` | `PaperLedgerEntry` | `(Environment, TimeUtc)` |
 | `AutoOrderRules` | `AutoOrderRule` | `CommandId` duy nhất |
 | `DailyReports` | `DailyReport` | `(Symbol, PeriodEndUtc)` duy nhất; nội dung báo cáo lưu dạng JSON (`ContentJson`) |
+| `NewsArticles` | `NewsArticle` | `(Source, ExternalId)` duy nhất; index `PublishedAtUtc` |
 
 Quy ước lưu (áp cho **mọi** cột cùng kiểu, trong `ConfigureConventions`):
 
@@ -153,6 +155,7 @@ khởi động. Cách thêm migration: [extending.md](extending.md#5-thêm-hoặ
 | --- | --- | --- | --- |
 | Binance Spot | [`BinanceMarketDataClient`](../src/CryptoBot.Infrastructure/Exchanges/Binance/BinanceMarketDataClient.cs) | `/api/v3/time`, `/api/v3/klines`, `/api/v3/ticker/price` | Công khai, không key, tối đa 1000 nến/request |
 | Binance USDⓈ-M | [`BinanceFuturesMarkPriceClient`](../src/CryptoBot.Infrastructure/Exchanges/Binance/BinanceFuturesMarkPriceClient.cs) | `/fapi/v1/premiumIndex` | Mark price |
+| RSS tin tức | [`RssNewsFeedClient`](../src/CryptoBot.Infrastructure/News/RssNewsFeedClient.cs) | Feed trong `News:Feeds` (CoinDesk, Cointelegraph, Decrypt) | RSS 2.0/Atom, gửi `User-Agent`; lỗi → `NewsFeedUnavailableException` |
 | Bitfinex | [`BitfinexDailyHistoryClient`](../src/CryptoBot.Infrastructure/Exchanges/Bitfinex/BitfinexDailyHistoryClient.cs) | Nến 1d công khai | Cần `User-Agent`, tối đa 10000 nến/request |
 
 Client dùng typed `HttpClient` đăng ký qua `AddHttpClient`, base URL và timeout lấy từ options. Lỗi tạm thời của sàn
