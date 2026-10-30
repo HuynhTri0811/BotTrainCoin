@@ -1,6 +1,7 @@
 using System.Globalization;
 using CryptoBot.Domain.Futures;
 using CryptoBot.Domain.MarketData;
+using CryptoBot.Domain.News;
 using CryptoBot.Domain.Strategies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -16,6 +17,7 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<PaperLedgerEntry> PaperLedger => Set<PaperLedgerEntry>();
     public DbSet<AutoOrderRule> AutoOrderRules => Set<AutoOrderRule>();
     public DbSet<DailyReport> DailyReports => Set<DailyReport>();
+    public DbSet<NewsArticle> NewsArticles => Set<NewsArticle>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
@@ -99,6 +101,20 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
             e.Property(x => x.Interval).HasMaxLength(8);
             // Một báo cáo cho mỗi (symbol, giờ lập): chạy lại hoặc tạo bù không sinh bản trùng.
             e.HasIndex(x => new { x.Symbol, x.PeriodEndUtc }).IsUnique();
+        });
+
+        b.Entity<NewsArticle>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Source).HasMaxLength(64);
+            e.Property(x => x.ExternalId).HasMaxLength(500);
+            e.Property(x => x.Title).HasMaxLength(500);
+            e.Property(x => x.Url).HasMaxLength(1000);
+            e.Property(x => x.Summary).HasMaxLength(2000);
+            e.Property(x => x.Coins).HasMaxLength(32);
+            // Đồng bộ lại không lưu trùng một bài của cùng nguồn.
+            e.HasIndex(x => new { x.Source, x.ExternalId }).IsUnique();
+            e.HasIndex(x => x.PublishedAtUtc);
         });
 
         b.Entity<PaperLedgerEntry>(e =>
