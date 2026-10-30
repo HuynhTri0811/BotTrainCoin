@@ -8,7 +8,8 @@ UPDATE_GOLDEN=1 dotnet test                          # ghi lại snapshot golden
 npm --prefix src/cryptobot-dashboard run typecheck   # frontend: chỉ typecheck, chưa có test
 ```
 
-Tại thời điểm 2026-10-29 (sau PR #59): Domain 185, Application 104, Integration 7 test, tất cả pass.
+Tại thời điểm 2026-10-30 (nhánh `feature/daily-move-report`): Domain 200, Application 112, Integration 8 test,
+tất cả pass.
 Framework: xUnit 2.9, `using Xunit;` là global using trong mỗi project test.
 
 ## Ba project test
