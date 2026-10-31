@@ -104,8 +104,12 @@ export const api = {
   status: () => getJson<Status>('/api/status'),
   chart: (strategyId: number, limit = 300) =>
     getJson<ChartData>(`/api/strategies/${strategyId}/chart?limit=${limit}`),
-  signals: (strategyId: number, limit = 50) =>
-    getJson<Signal[]>(`/api/signals?strategyId=${strategyId}&limit=${limit}`),
+  signals: (strategyId: number, filter: { action?: string; isBackfill?: string } = {}, limit = 50) => {
+    const q = new URLSearchParams({ strategyId: String(strategyId), limit: String(limit) });
+    if (filter.action) q.set('action', filter.action);
+    if (filter.isBackfill) q.set('isBackfill', filter.isBackfill);
+    return getJson<Signal[]>(`/api/signals?${q}`);
+  },
 };
 
 // ---- Paper futures (môi trường nằm trong đường dẫn /api/paper/...) ----
@@ -205,7 +209,13 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 
 export const futuresApi = {
   account: () => getJson<FuturesAccount>('/api/paper/futures/account'),
-  history: (limit = 50) => getJson<FuturesPosition[]>(`/api/paper/futures/positions/history?limit=${limit}`),
+  history: (filter: { symbol?: string; side?: string; closeReason?: string } = {}, limit = 50) => {
+    const q = new URLSearchParams({ limit: String(limit) });
+    if (filter.symbol) q.set('symbol', filter.symbol);
+    if (filter.side) q.set('side', filter.side);
+    if (filter.closeReason) q.set('closeReason', filter.closeReason);
+    return getJson<FuturesPosition[]>(`/api/paper/futures/positions/history?${q}`);
+  },
   quote: (req: OpenRequest) => postJson<FuturesQuote>('/api/paper/futures/quote', req),
   open: (req: OpenRequest) =>
     postJson<{ accepted: boolean; duplicate: boolean; position: FuturesPosition }>('/api/paper/futures/orders', req),
