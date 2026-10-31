@@ -252,17 +252,25 @@ public sealed class NewsStore(BotDbContext db) : INewsStore
             .Where(a => a.Source == source && externalIds.Contains(a.ExternalId))
             .Select(a => a.ExternalId).ToListAsync(ct)).ToHashSet();
 
-    public async Task<IReadOnlyList<NewsArticle>> QueryAsync(string? coin, DateTime? fromUtc, DateTime? toUtc, int limit,
-        CancellationToken ct)
+    public async Task<IReadOnlyList<NewsArticle>> QueryAsync(NewsFilter filter, int limit, CancellationToken ct)
     {
         var query = db.NewsArticles.AsNoTracking();
         // Coins là "BTC,ETH": mã coin không trùng một phần với nhau nên tìm chuỗi con là đủ.
-        if (coin is not null)
+        if (filter.Coin is { } coin)
             query = query.Where(a => a.Coins.Contains(coin));
-        if (fromUtc is not null)
-            query = query.Where(a => a.PublishedAtUtc >= fromUtc);
-        if (toUtc is not null)
-            query = query.Where(a => a.PublishedAtUtc < toUtc);
+        if (filter.Source is { } source)
+            query = query.Where(a => a.Source == source);
+        if (filter.Search is { } search)
+        {
+            // Giữ nguyên %, _ người dùng gõ. LIKE của SQLite chỉ không phân biệt hoa thường với ký tự ASCII.
+            var pattern = $"%{search.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_")}%";
+            query = query.Where(a => EF.Functions.Like(a.Title, pattern, @"\") ||
+                                     EF.Functions.Like(a.Summary, pattern, @"\"));
+        }
+        if (filter.FromUtc is { } from)
+            query = query.Where(a => a.PublishedAtUtc >= from);
+        if (filter.ToUtc is { } to)
+            query = query.Where(a => a.PublishedAtUtc < to);
         return await query.OrderByDescending(a => a.PublishedAtUtc).ThenByDescending(a => a.Id)
             .Take(limit).ToListAsync(ct);
     }

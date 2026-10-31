@@ -1,4 +1,5 @@
 using CryptoBot.Application.Abstractions;
+using CryptoBot.Application.News;
 using CryptoBot.Domain.Futures;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.News;
@@ -243,14 +244,43 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
         {
             var store = new NewsStore(db);
             Assert.Equal(["a"], await store.GetExistingIdsAsync("CoinDesk", ["a", "z"], default));
-            Assert.Equal(["b", "a"], (await store.QueryAsync("ETH", null, null, 10, default)).Select(a => a.ExternalId));
-            Assert.Equal(["Decrypt"], (await store.QueryAsync("ETC", null, null, 10, default)).Select(a => a.Source));
-            Assert.Equal(["b", "a"],
-                (await store.QueryAsync(null, T0.AddHours(1), T0.AddHours(3), 10, default)).Select(a => a.ExternalId));
-            Assert.Equal(["c"], (await store.QueryAsync(null, null, null, 1, default)).Select(a => a.ExternalId));
+            Assert.Equal(["b", "a"], (await store.QueryAsync(new NewsFilter("ETH"), 10, default)).Select(a => a.ExternalId));
+            Assert.Equal(["Decrypt"], (await store.QueryAsync(new NewsFilter("ETC"), 10, default)).Select(a => a.Source));
+            Assert.Equal(["b", "a"], (await store.QueryAsync(
+                new NewsFilter(FromUtc: T0.AddHours(1), ToUtc: T0.AddHours(3)), 10, default)).Select(a => a.ExternalId));
+            Assert.Equal(["c"], (await store.QueryAsync(new NewsFilter(), 1, default)).Select(a => a.ExternalId));
 
             db.NewsArticles.Add(Article("CoinDesk", "a", [], 5));
             await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        }
+    }
+
+    [Fact]
+    public async Task News_is_filtered_by_source_and_keyword()
+    {
+        NewsArticle Article(string source, string id, string title, string summary = "") =>
+            new(source, id, title, $"https://news.test/{id}", summary, [], T0, T0);
+
+        await using (var db = NewContext())
+        {
+            db.NewsArticles.AddRange(
+                Article("CoinDesk", "a", "Binance hack shakes market"),
+                Article("Decrypt", "b", "Market recap", "A hack at BINANCE"),
+                Article("Decrypt", "c", "Fees fall 100% this week"),
+                Article("Decrypt", "d", "Fees fall 100 percent"));
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = NewContext())
+        {
+            var store = new NewsStore(db);
+            async Task<IEnumerable<string>> Ids(NewsFilter filter) =>
+                (await store.QueryAsync(filter, 10, default)).Select(a => a.ExternalId).Order();
+
+            Assert.Equal(["b", "c", "d"], await Ids(new NewsFilter(Source: "Decrypt")));
+            Assert.Equal(["a", "b"], await Ids(new NewsFilter(Search: "binance")));
+            Assert.Equal(["b"], await Ids(new NewsFilter(Source: "Decrypt", Search: "binance")));
+            Assert.Equal(["c"], await Ids(new NewsFilter(Search: "100%")));
         }
     }
 

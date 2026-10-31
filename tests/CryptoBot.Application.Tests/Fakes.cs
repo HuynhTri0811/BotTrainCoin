@@ -180,11 +180,13 @@ internal sealed class InMemoryNewsStore : INewsStore
             .Where(a => a.Source == source && externalIds.Contains(a.ExternalId))
             .Select(a => a.ExternalId).ToHashSet());
 
-    public Task<IReadOnlyList<NewsArticle>> QueryAsync(string? coin, DateTime? fromUtc, DateTime? toUtc, int limit,
-        CancellationToken ct) =>
+    public Task<IReadOnlyList<NewsArticle>> QueryAsync(NewsFilter filter, int limit, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<NewsArticle>>(Articles
-            .Where(a => coin is null || a.Coins.Split(',').Contains(coin))
-            .Where(a => (fromUtc is null || a.PublishedAtUtc >= fromUtc) && (toUtc is null || a.PublishedAtUtc < toUtc))
+            .Where(a => filter.Coin is null || a.Coins.Split(',').Contains(filter.Coin))
+            .Where(a => filter.Source is null || a.Source == filter.Source)
+            .Where(a => filter.Search is null || a.Title.Contains(filter.Search) || a.Summary.Contains(filter.Search))
+            .Where(a => (filter.FromUtc is null || a.PublishedAtUtc >= filter.FromUtc) &&
+                        (filter.ToUtc is null || a.PublishedAtUtc < filter.ToUtc))
             .OrderByDescending(a => a.PublishedAtUtc).Take(limit).ToList());
 
     public void AddRange(IEnumerable<NewsArticle> articles) => Articles.AddRange(articles);
