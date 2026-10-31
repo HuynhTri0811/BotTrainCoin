@@ -182,10 +182,23 @@ public sealed class PaperFuturesStore(BotDbContext db) : IPaperFuturesStore
     public Task<FuturesPosition?> FindByOpenCommandAsync(Guid commandId, CancellationToken ct) =>
         db.FuturesPositions.FirstOrDefaultAsync(p => p.Environment == Env && p.OpenCommandId == commandId, ct);
 
-    public async Task<IReadOnlyList<FuturesPosition>> GetClosedAsync(int limit, CancellationToken ct) =>
-        await db.FuturesPositions.AsNoTracking()
-            .Where(p => p.Environment == Env && p.Status != PositionStatus.Open)
-            .OrderByDescending(p => p.Id).Take(limit).ToListAsync(ct);
+    public async Task<IReadOnlyList<FuturesPosition>> GetClosedAsync(ClosedPositionFilter filter, int limit,
+        CancellationToken ct)
+    {
+        var q = db.FuturesPositions.AsNoTracking()
+            .Where(p => p.Environment == Env && p.Status != PositionStatus.Open);
+        if (filter.Symbol is { } symbol)
+            q = q.Where(p => p.Symbol == symbol);
+        if (filter.Side is { } side)
+            q = q.Where(p => p.Side == side);
+        if (filter.CloseReason is { } reason)
+            q = q.Where(p => p.CloseReason == reason);
+        if (filter.FromUtc is { } from)
+            q = q.Where(p => p.ClosedAtUtc >= from);
+        if (filter.ToUtc is { } to)
+            q = q.Where(p => p.ClosedAtUtc < to);
+        return await q.OrderByDescending(p => p.Id).Take(limit).ToListAsync(ct);
+    }
 
     public async Task<IReadOnlyList<PaperLedgerEntry>> GetLedgerAsync(CancellationToken ct)
     {

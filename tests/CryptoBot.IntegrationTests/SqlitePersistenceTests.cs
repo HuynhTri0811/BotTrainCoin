@@ -1,4 +1,5 @@
 using CryptoBot.Application.Abstractions;
+using CryptoBot.Application.Futures;
 using CryptoBot.Application.News;
 using CryptoBot.Domain.Futures;
 using CryptoBot.Domain.MarketData;
@@ -312,6 +313,40 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
             Assert.Equal([3], await Hours(new SignalFilter(IsBackfill: false)));
             Assert.Equal([1], await Hours(new SignalFilter(Action: SignalAction.Buy, IsBackfill: true)));
             Assert.Equal([2, 3], await Hours(new SignalFilter(FromUtc: T0.AddHours(2))));
+        }
+    }
+
+    [Fact]
+    public async Task Closed_positions_are_filtered_by_symbol_side_reason_and_time()
+    {
+        FuturesPosition Closed(string symbol, PositionSide side, CloseReason reason, int hour)
+        {
+            var p = new FuturesPosition(Guid.NewGuid(), symbol, side, 10, 1m, 100m, 10m, 90m, 95m, null, 0.1m, T0);
+            p.Close(reason, 101m, 0.1m, Guid.NewGuid(), T0.AddHours(hour));
+            return p;
+        }
+
+        await using (var db = NewContext())
+        {
+            db.FuturesPositions.AddRange(
+                Closed("BTCUSDT", PositionSide.Long, CloseReason.Manual, 1),
+                Closed("BTCUSDT", PositionSide.Short, CloseReason.StopLoss, 2),
+                Closed("ETHUSDT", PositionSide.Long, CloseReason.StopLoss, 3),
+                new FuturesPosition(Guid.NewGuid(), "BTCUSDT", PositionSide.Long, 10, 1m, 100m, 10m, 90m, 95m, null, 0.1m, T0));
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = NewContext())
+        {
+            var store = new PaperFuturesStore(db);
+            async Task<IEnumerable<int>> Hours(ClosedPositionFilter filter) =>
+                (await store.GetClosedAsync(filter, 10, default)).Select(p => p.ClosedAtUtc!.Value.Hour);
+
+            Assert.Equal([3, 2, 1], await Hours(new ClosedPositionFilter()));
+            Assert.Equal([2, 1], await Hours(new ClosedPositionFilter("BTCUSDT")));
+            Assert.Equal([3, 1], await Hours(new ClosedPositionFilter(Side: PositionSide.Long)));
+            Assert.Equal([3, 2], await Hours(new ClosedPositionFilter(CloseReason: CloseReason.StopLoss)));
+            Assert.Equal([2], await Hours(new ClosedPositionFilter(FromUtc: T0.AddHours(2), ToUtc: T0.AddHours(3))));
         }
     }
 
