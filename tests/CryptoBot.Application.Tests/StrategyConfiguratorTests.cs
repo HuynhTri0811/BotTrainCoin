@@ -26,7 +26,7 @@ public class StrategyConfiguratorTests
     {
         await CreateConfigurator().ApplyAsync([Definition(), Definition("eth-15m-ema", "ETHUSDT", "15m")], default);
 
-        Assert.Equal(["btc-1h-ema", "eth-15m-ema"], _store.Instances.Select(i => i.Name));
+        Assert.Equal(["btc-1h-ema", "eth-15m-ema"], _store.Instances.Select(instance => instance.Name));
         var btc = _store.Instances[0];
         Assert.Equal(StrategyTypes.EmaCross, btc.StrategyType);
         Assert.Equal("Binance", btc.Exchange);

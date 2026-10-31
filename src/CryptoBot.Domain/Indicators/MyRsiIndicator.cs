@@ -109,8 +109,8 @@ public sealed class MyRsiIndicator : ICustomIndicator
         decimal close = closes[^1];            // giá đóng cửa của nến vừa đóng (^1 = phần tử cuối)
         Dictionary<string, decimal?> values = BuildValues(rsi.Now, ema); // 4c: số liệu để vẽ
 
-        return ema is { } e
-            ? PullbackSignal(rsi, close, e, values)   // 4e: có EMA → hồi trong xu hướng
+        return ema is { } emaValue
+            ? PullbackSignal(rsi, close, emaValue, values)   // 4e: có EMA → hồi trong xu hướng
             : ReversalSignal(rsi, values);            // 4d: không EMA → quá bán / quá mua
     }
 

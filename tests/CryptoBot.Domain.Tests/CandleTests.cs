@@ -20,7 +20,7 @@ public class CandleTests
             bad,
         ];
 
-        var kinds = CandleSeriesValidator.Validate(candles, CandleInterval.H1).Select(i => i.Kind).ToList();
+        var kinds = CandleSeriesValidator.Validate(candles, CandleInterval.H1).Select(issue => issue.Kind).ToList();
 
         Assert.Equal(
             [CandleIssueKind.Duplicate, CandleIssueKind.Gap, CandleIssueKind.OutOfOrder,
@@ -49,8 +49,8 @@ public class CandleTests
 
         var kept = CandleSeriesValidator.WithoutRejected(candles, issues);
 
-        Assert.Equal([TestCandles.T0, TestCandles.T0.AddHours(4)], kept.Select(c => c.OpenTimeUtc));
-        Assert.False(issues.Single(i => i.Kind == CandleIssueKind.Gap).RejectsCandle);
+        Assert.Equal([TestCandles.T0, TestCandles.T0.AddHours(4)], kept.Select(candle => candle.OpenTimeUtc));
+        Assert.False(issues.Single(issue => issue.Kind == CandleIssueKind.Gap).RejectsCandle);
     }
 
     [Fact]
@@ -84,25 +84,25 @@ public class CandleTests
     [Fact]
     public void Strategy_instance_version_bumps_and_checkpoint_resets_on_parameter_change()
     {
-        var s = new StrategyInstance("x", "EmaCross", "{\"a\":1}", "Binance", "BTCUSDT", "1h", true);
-        s.MarkEvaluated(TestCandles.T0);
+        var instance = new StrategyInstance("x", "EmaCross", "{\"a\":1}", "Binance", "BTCUSDT", "1h", true);
+        instance.MarkEvaluated(TestCandles.T0);
 
-        s.Configure("EmaCross", "{\"a\":1}", "Binance", "BTCUSDT", "1h", enabled: false);
-        Assert.Equal(1, s.Version);
-        Assert.Equal(TestCandles.T0, s.LastEvaluatedCandleOpenTimeUtc);
+        instance.Configure("EmaCross", "{\"a\":1}", "Binance", "BTCUSDT", "1h", enabled: false);
+        Assert.Equal(1, instance.Version);
+        Assert.Equal(TestCandles.T0, instance.LastEvaluatedCandleOpenTimeUtc);
 
-        s.Configure("EmaCross", "{\"a\":2}", "Binance", "BTCUSDT", "1h", enabled: true);
-        Assert.Equal(2, s.Version);
-        Assert.Null(s.LastEvaluatedCandleOpenTimeUtc);
+        instance.Configure("EmaCross", "{\"a\":2}", "Binance", "BTCUSDT", "1h", enabled: true);
+        Assert.Equal(2, instance.Version);
+        Assert.Null(instance.LastEvaluatedCandleOpenTimeUtc);
     }
 
     [Fact]
     public void Strategy_instance_rejects_evaluating_same_candle_twice()
     {
-        var s = new StrategyInstance("x", "EmaCross", "{}", "Binance", "BTCUSDT", "1h", true);
-        s.MarkEvaluated(TestCandles.T0);
+        var instance = new StrategyInstance("x", "EmaCross", "{}", "Binance", "BTCUSDT", "1h", true);
+        instance.MarkEvaluated(TestCandles.T0);
 
-        Assert.Throws<InvalidOperationException>(() => s.MarkEvaluated(TestCandles.T0));
+        Assert.Throws<InvalidOperationException>(() => instance.MarkEvaluated(TestCandles.T0));
     }
 
     private static Candle WithStats(bool closed, decimal close = 10, long? trades = 5) =>
@@ -151,10 +151,10 @@ public class CandleTests
     [Fact]
     public void Taker_buy_volume_above_volume_is_invalid()
     {
-        Candle c = new("Binance", "BTCUSDT", CandleInterval.H1, TestCandles.T0, 10, 10, 10, 10, 1, true,
+        Candle candle = new("Binance", "BTCUSDT", CandleInterval.H1, TestCandles.T0, 10, 10, 10, 10, 1, true,
             TestCandles.T0, takerBuyVolume: 2);
 
-        Assert.Equal("Khối lượng mua chủ động phải nằm trong [0, Volume].", c.Validate());
+        Assert.Equal("Khối lượng mua chủ động phải nằm trong [0, Volume].", candle.Validate());
     }
 
     [Fact]
@@ -195,11 +195,11 @@ public class CandleTests
     [Fact]
     public void Valid_candle_has_no_reason_and_close_time_follows_interval()
     {
-        var c = Ohlcv(8, 10, 5, 9);
+        var candle = Ohlcv(8, 10, 5, 9);
 
-        Assert.Null(c.Validate());
-        Assert.Equal(TestCandles.T0.AddHours(1), c.CloseTimeUtc);
-        Assert.Equal("1h", c.Interval);
+        Assert.Null(candle.Validate());
+        Assert.Equal(TestCandles.T0.AddHours(1), candle.CloseTimeUtc);
+        Assert.Equal("1h", candle.Interval);
     }
 
     [Fact]

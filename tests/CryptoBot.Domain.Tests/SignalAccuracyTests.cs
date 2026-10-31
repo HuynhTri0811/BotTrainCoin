@@ -12,16 +12,16 @@ public class SignalAccuracyTests
     {
         List<DirectionSignal> signals = [new(0, PriceDirection.Up), new(1, PriceDirection.Down)];
 
-        IReadOnlyList<HorizonAccuracy> r = SignalAccuracy.Evaluate(Candles, signals, [1, 3]);
+        IReadOnlyList<HorizonAccuracy> results = SignalAccuracy.Evaluate(Candles, signals, [1, 3]);
 
         // Sau 1 nến: Up 100→110 đúng (+10%), Down 110→99 đúng (+10%).
-        Assert.Equal(2, r[0].Signals);
-        Assert.Equal(2, r[0].Correct);
-        Assert.Equal(10m, r[0].AverageMovePercent);
+        Assert.Equal(2, results[0].Signals);
+        Assert.Equal(2, results[0].Correct);
+        Assert.Equal(10m, results[0].AverageMovePercent);
         // Sau 3 nến: Up 100→99 sai (−1%), Down 110→120 sai.
-        Assert.Equal(0, r[1].Correct);
-        Assert.Equal(0m, r[1].HitRatePercent);
-        Assert.True(r[1].AverageMovePercent < 0);
+        Assert.Equal(0, results[1].Correct);
+        Assert.Equal(0m, results[1].HitRatePercent);
+        Assert.True(results[1].AverageMovePercent < 0);
     }
 
     [Fact]
@@ -29,10 +29,10 @@ public class SignalAccuracyTests
     {
         List<DirectionSignal> signals = [new(2, PriceDirection.Up), new(4, PriceDirection.Down)];
 
-        HorizonAccuracy r = SignalAccuracy.Evaluate(Candles, signals, [1])[0];
+        HorizonAccuracy accuracy = SignalAccuracy.Evaluate(Candles, signals, [1])[0];
 
         // 99→99 không đổi; nến cuối chưa có nến sau.
-        Assert.Equal(0, r.Signals);
+        Assert.Equal(0, accuracy.Signals);
         Assert.Null(SignalAccuracy.MovePercent(Candles, new DirectionSignal(4, PriceDirection.Up), 1));
     }
 

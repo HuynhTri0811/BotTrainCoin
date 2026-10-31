@@ -28,7 +28,7 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
         var connectionString = config.GetConnectionString("Bot") ?? "Data Source=data/cryptobot.db";
-        services.AddDbContext<BotDbContext>(o => o.UseSqlite(connectionString));
+        services.AddDbContext<BotDbContext>(builder => builder.UseSqlite(connectionString));
 
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<ICandleStore, CandleStore>();
@@ -38,9 +38,9 @@ public static class DependencyInjection
         services.Configure<BinanceOptions>(config.GetSection("Binance"));
         services.AddHttpClient<IMarketDataClient, BinanceMarketDataClient>((sp, http) =>
         {
-            var o = sp.GetRequiredService<IOptions<BinanceOptions>>().Value;
-            http.BaseAddress = new Uri(o.MarketDataBaseUrl);
-            http.Timeout = o.RequestTimeout;
+            var options = sp.GetRequiredService<IOptions<BinanceOptions>>().Value;
+            http.BaseAddress = new Uri(options.MarketDataBaseUrl);
+            http.Timeout = options.RequestTimeout;
         });
 
         services.AddSingleton(config.GetSection("MarketData").Get<MarketDataOptions>() ?? new MarketDataOptions());
@@ -68,9 +68,9 @@ public static class DependencyInjection
         services.AddScoped<AutoOrderService>();
         services.AddHttpClient<IMarkPriceClient, BinanceFuturesMarkPriceClient>((sp, http) =>
         {
-            var o = sp.GetRequiredService<IOptions<BinanceOptions>>().Value;
-            http.BaseAddress = new Uri(o.FuturesMarketDataBaseUrl);
-            http.Timeout = o.RequestTimeout;
+            var options = sp.GetRequiredService<IOptions<BinanceOptions>>().Value;
+            http.BaseAddress = new Uri(options.FuturesMarketDataBaseUrl);
+            http.Timeout = options.RequestTimeout;
         });
 
         // Bảng giá trực tiếp: lấy Spot + Mark mỗi PollInterval để quan sát nguồn dữ liệu.
@@ -85,9 +85,9 @@ public static class DependencyInjection
         services.Configure<BitfinexOptions>(config.GetSection("Bitfinex"));
         services.AddHttpClient<IDailyHistoryClient, BitfinexDailyHistoryClient>((sp, http) =>
         {
-            var o = sp.GetRequiredService<IOptions<BitfinexOptions>>().Value;
-            http.BaseAddress = new Uri(o.BaseUrl);
-            http.Timeout = o.RequestTimeout;
+            var options = sp.GetRequiredService<IOptions<BitfinexOptions>>().Value;
+            http.BaseAddress = new Uri(options.BaseUrl);
+            http.Timeout = options.RequestTimeout;
             // Bitfinex trả 403 cho request không có User-Agent.
             http.DefaultRequestHeaders.UserAgent.ParseAdd("CryptoBot/1.0");
         });

@@ -21,28 +21,32 @@ public sealed class StrategyConfigurator(IStrategyInstanceStore store, ILogger<S
 {
     public async Task ApplyAsync(IReadOnlyList<StrategyDefinition> definitions, CancellationToken ct)
     {
-        foreach (var d in definitions)
+        foreach (var definition in definitions)
         {
-            if (Validate(d) is { } error)
+            if (Validate(definition) is { } error)
             {
-                logger.LogError("Bỏ qua cấu hình chiến lược '{Name}': {Error}", d.Name, error);
+                logger.LogError("Bỏ qua cấu hình chiến lược '{Name}': {Error}", definition.Name, error);
                 continue;
             }
 
-            var json = StrategyFactory.Serialize(d.Parameters);
-            var existing = await store.FindByNameAsync(d.Name, ct);
+            var json = StrategyFactory.Serialize(definition.Parameters);
+            var existing = await store.FindByNameAsync(definition.Name, ct);
             if (existing is null)
             {
-                await store.AddAsync(new StrategyInstance(d.Name, d.Type, json, d.Exchange, d.Symbol, d.Interval, d.Enabled), ct);
-                logger.LogInformation("Tạo strategy instance '{Name}' {Symbol} {Interval}", d.Name, d.Symbol, d.Interval);
+                await store.AddAsync(new StrategyInstance(definition.Name, definition.Type, json, definition.Exchange,
+                    definition.Symbol, definition.Interval, definition.Enabled), ct);
+                logger.LogInformation("Tạo strategy instance '{Name}' {Symbol} {Interval}", definition.Name,
+                    definition.Symbol, definition.Interval);
             }
             else
             {
                 var oldVersion = existing.Version;
-                if (existing.Configure(d.Type, json, d.Exchange, d.Symbol, d.Interval, d.Enabled) &&
+                if (existing.Configure(definition.Type, json, definition.Exchange, definition.Symbol,
+                    definition.Interval, definition.Enabled) &&
                     existing.Version != oldVersion)
                 {
-                    logger.LogInformation("Strategy '{Name}' đổi cấu hình: v{Old} -> v{New}", d.Name, oldVersion, existing.Version);
+                    logger.LogInformation("Strategy '{Name}' đổi cấu hình: v{Old} -> v{New}", definition.Name,
+                        oldVersion, existing.Version);
                 }
             }
         }
@@ -50,16 +54,16 @@ public sealed class StrategyConfigurator(IStrategyInstanceStore store, ILogger<S
         await store.SaveAsync(ct);
     }
 
-    private static string? Validate(StrategyDefinition d)
+    private static string? Validate(StrategyDefinition definition)
     {
-        if (string.IsNullOrWhiteSpace(d.Name))
+        if (string.IsNullOrWhiteSpace(definition.Name))
             return "Thiếu Name.";
-        if (d.Type != StrategyTypes.EmaCross)
-            return $"Type không hỗ trợ: {d.Type}.";
-        if (string.IsNullOrWhiteSpace(d.Symbol) || !d.Symbol.All(char.IsAsciiLetterOrDigit))
+        if (definition.Type != StrategyTypes.EmaCross)
+            return $"Type không hỗ trợ: {definition.Type}.";
+        if (string.IsNullOrWhiteSpace(definition.Symbol) || !definition.Symbol.All(char.IsAsciiLetterOrDigit))
             return "Symbol không hợp lệ.";
-        if (!CandleInterval.TryParse(d.Interval, out _))
-            return $"Interval không hỗ trợ: {d.Interval}.";
-        return d.Parameters.Validate();
+        if (!CandleInterval.TryParse(definition.Interval, out _))
+            return $"Interval không hỗ trợ: {definition.Interval}.";
+        return definition.Parameters.Validate();
     }
 }

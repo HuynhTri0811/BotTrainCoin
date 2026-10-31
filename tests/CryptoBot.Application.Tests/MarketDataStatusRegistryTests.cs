@@ -33,10 +33,10 @@ public class MarketDataStatusRegistryTests
     {
         _registry.RecordSuccess(Success());
 
-        var s = Status();
-        Assert.False(s.IsStale);
-        Assert.Equal(T0, s.LastSuccessAtUtc);
-        Assert.Equal(T0.AddHours(-1), s.LatestClosedOpenTimeUtc);
+        var status = Status();
+        Assert.False(status.IsStale);
+        Assert.Equal(T0, status.LastSuccessAtUtc);
+        Assert.Equal(T0.AddHours(-1), status.LatestClosedOpenTimeUtc);
         Assert.False(_registry.IsStale(Key));
     }
 
@@ -89,7 +89,7 @@ public class MarketDataStatusRegistryTests
     public void Keeps_only_the_last_20_issues()
     {
         var issues = Enumerable.Range(0, 25)
-            .Select(i => new CandleIssue(CandleIssueKind.Gap, T0.AddHours(-i), $"issue {i}"))
+            .Select(index => new CandleIssue(CandleIssueKind.Gap, T0.AddHours(-index), $"issue {index}"))
             .ToList();
 
         _registry.RecordSuccess(Success(issues: issues));

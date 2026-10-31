@@ -35,9 +35,9 @@ public static class SignalAccuracy
     public static IReadOnlyList<HorizonAccuracy> Evaluate(IReadOnlyList<Candle> candles,
         IReadOnlyList<DirectionSignal> signals, IReadOnlyList<int> horizons)
     {
-        if (horizons.Any(h => h <= 0))
+        if (horizons.Any(candidate => candidate <= 0))
             throw new ArgumentOutOfRangeException(nameof(horizons), "Số nến phải lớn hơn 0.");
-        if (signals.Any(s => s.Index < 0 || s.Index >= candles.Count))
+        if (signals.Any(signal => signal.Index < 0 || signal.Index >= candles.Count))
             throw new ArgumentOutOfRangeException(nameof(signals), "Vị trí tín hiệu nằm ngoài chuỗi nến.");
 
         List<HorizonAccuracy> result = new(horizons.Count);

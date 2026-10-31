@@ -12,14 +12,14 @@ public class FuturesPositionTests
     [Fact]
     public void New_position_is_open_in_paper_without_exit()
     {
-        var p = Open();
+        var position = Open();
 
-        Assert.Equal(PositionStatus.Open, p.Status);
-        Assert.Equal("Paper", p.Environment);
-        Assert.Null(p.CloseReason);
-        Assert.Null(p.ExitPrice);
-        Assert.Null(p.RealizedPnl);
-        Assert.Null(p.ClosedAtUtc);
+        Assert.Equal(PositionStatus.Open, position.Status);
+        Assert.Equal("Paper", position.Environment);
+        Assert.Null(position.CloseReason);
+        Assert.Null(position.ExitPrice);
+        Assert.Null(position.RealizedPnl);
+        Assert.Null(position.ClosedAtUtc);
     }
 
     [Theory]
@@ -29,66 +29,67 @@ public class FuturesPositionTests
     [InlineData(PositionSide.Short, 104, -4)]
     public void Close_records_price_pnl_by_side(PositionSide side, int exit, int expectedPnl)
     {
-        var p = Open(side);
+        var position = Open(side);
         var at = TestCandles.T0.AddHours(1);
         var command = Guid.NewGuid();
 
-        p.Close(CloseReason.Manual, exit, 0.04m, command, at);
+        position.Close(CloseReason.Manual, exit, 0.04m, command, at);
 
-        Assert.Equal(PositionStatus.Closed, p.Status);
-        Assert.Equal(CloseReason.Manual, p.CloseReason);
-        Assert.Equal(exit, p.ExitPrice);
-        Assert.Equal(expectedPnl, p.RealizedPnl);
-        Assert.Equal(command, p.CloseCommandId);
-        Assert.Equal(at, p.ClosedAtUtc);
+        Assert.Equal(PositionStatus.Closed, position.Status);
+        Assert.Equal(CloseReason.Manual, position.CloseReason);
+        Assert.Equal(exit, position.ExitPrice);
+        Assert.Equal(expectedPnl, position.RealizedPnl);
+        Assert.Equal(command, position.CloseCommandId);
+        Assert.Equal(at, position.ClosedAtUtc);
     }
 
     [Fact]
     public void Net_pnl_subtracts_open_and_close_fees()
     {
-        var p = Open();
-        Assert.Equal(-0.05m, p.NetPnl);
+        var position = Open();
+        Assert.Equal(-0.05m, position.NetPnl);
 
-        p.Close(CloseReason.TakeProfit, 104m, 0.04m, null, TestCandles.T0);
+        position.Close(CloseReason.TakeProfit, 104m, 0.04m, null, TestCandles.T0);
 
-        Assert.Equal(4m - 0.05m - 0.04m, p.NetPnl);
+        Assert.Equal(4m - 0.05m - 0.04m, position.NetPnl);
     }
 
     [Fact]
     public void Liquidation_loses_exactly_the_margin_without_close_fee()
     {
-        var p = Open(PositionSide.Short);
+        var position = Open(PositionSide.Short);
 
-        p.Liquidate(110m, TestCandles.T0);
+        position.Liquidate(110m, TestCandles.T0);
 
-        Assert.Equal(PositionStatus.Liquidated, p.Status);
-        Assert.Equal(CloseReason.Liquidation, p.CloseReason);
-        Assert.Equal(110m, p.ExitPrice);
-        Assert.Equal(-10m, p.RealizedPnl);
-        Assert.Equal(0m, p.CloseFee);
-        Assert.Null(p.CloseCommandId);
+        Assert.Equal(PositionStatus.Liquidated, position.Status);
+        Assert.Equal(CloseReason.Liquidation, position.CloseReason);
+        Assert.Equal(110m, position.ExitPrice);
+        Assert.Equal(-10m, position.RealizedPnl);
+        Assert.Equal(0m, position.CloseFee);
+        Assert.Null(position.CloseCommandId);
     }
 
     [Fact]
     public void Closed_position_cannot_be_closed_again()
     {
-        var p = Open();
-        p.Close(CloseReason.StopLoss, 95m, 0.04m, null, TestCandles.T0);
+        var position = Open();
+        position.Close(CloseReason.StopLoss, 95m, 0.04m, null, TestCandles.T0);
 
         Assert.Throws<InvalidOperationException>(() =>
-            p.Close(CloseReason.Manual, 96m, 0.04m, Guid.NewGuid(), TestCandles.T0));
+            position.Close(CloseReason.Manual, 96m, 0.04m, Guid.NewGuid(), TestCandles.T0));
     }
 
     [Fact]
     public void Ledger_entry_keeps_sign_type_and_position()
     {
-        var p = Open();
+        var position = Open();
 
-        var fee = new PaperLedgerEntry(-p.OpenFee, LedgerEntryType.Fee, p, "Phí mở vị thế", TestCandles.T0);
+        var fee = new PaperLedgerEntry(-position.OpenFee, LedgerEntryType.Fee, position, "Phí mở vị thế",
+            TestCandles.T0);
         var deposit = new PaperLedgerEntry(1000m, LedgerEntryType.Deposit, null, "Vốn ban đầu", TestCandles.T0);
 
         Assert.Equal(-0.05m, fee.Amount);
-        Assert.Same(p, fee.Position);
+        Assert.Same(position, fee.Position);
         Assert.Equal("USDT", fee.Asset);
         Assert.Equal("Paper", fee.Environment);
         Assert.Null(deposit.Position);

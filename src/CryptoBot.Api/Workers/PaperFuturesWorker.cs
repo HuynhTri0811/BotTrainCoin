@@ -19,16 +19,16 @@ public sealed class PaperFuturesWorker(
             {
                 await using var scope = scopes.CreateAsyncScope();
                 var client = scope.ServiceProvider.GetRequiredService<IMarkPriceClient>();
-                foreach (var s in options.Symbols)
+                foreach (var symbolOptions in options.Symbols)
                 {
                     try
                     {
-                        cache.Set(await client.GetMarkPriceAsync(s.Symbol, stoppingToken));
+                        cache.Set(await client.GetMarkPriceAsync(symbolOptions.Symbol, stoppingToken));
                     }
                     catch (MarketDataUnavailableException ex)
                     {
                         // Không cập nhật cache: giá cũ sẽ hết hạn và chặn mở/đóng/trigger trên giá stale.
-                        logger.LogWarning("Mark price {Symbol}: {Error}", s.Symbol, ex.Message);
+                        logger.LogWarning("Mark price {Symbol}: {Error}", symbolOptions.Symbol, ex.Message);
                         if (ex.RetryAfter is { } ra && ra > delay)
                             delay = ra;
                     }

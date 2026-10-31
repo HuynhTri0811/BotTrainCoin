@@ -18,7 +18,7 @@ public class MarketEventCatalogTests
 
         var etc = catalog.For("etcusd");
 
-        Assert.Equal(["ETC 51%", "Terra"], etc.Select(e => e.Title));
+        Assert.Equal(["ETC 51%", "Terra"], etc.Select(monthEvent => monthEvent.Title));
         Assert.Equal((2019, 1, false), (etc[0].Year, etc[0].Month, etc[0].MarketWide));
         Assert.True(etc[1].MarketWide);
     }

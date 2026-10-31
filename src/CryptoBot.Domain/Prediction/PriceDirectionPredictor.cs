@@ -48,32 +48,33 @@ public static class PriceDirectionPredictor
     /// <summary>Dự đoán từ <paramref name="closedCandles"/> (tăng dần theo thời gian, chỉ nến đã đóng).</summary>
     public static PricePrediction Predict(IReadOnlyList<Candle> closedCandles, PredictorSettings? settings = null)
     {
-        PredictorSettings s = settings ?? new PredictorSettings();
-        if (closedCandles.Count < s.RequiredCandles)
-            throw new ArgumentException($"Cần ít nhất {s.RequiredCandles} nến đã đóng.", nameof(closedCandles));
-        if (closedCandles.Any(c => !c.IsClosed))
+        PredictorSettings effectiveSettings = settings ?? new PredictorSettings();
+        if (closedCandles.Count < effectiveSettings.RequiredCandles)
+            throw new ArgumentException($"Cần ít nhất {effectiveSettings.RequiredCandles} nến đã đóng.",
+                nameof(closedCandles));
+        if (closedCandles.Any(candle => !candle.IsClosed))
             throw new ArgumentException("Chỉ dùng nến đã đóng.", nameof(closedCandles));
 
         Candle last = closedCandles[^1];
 
         // 1. Xu hướng: giá trên trung bình → nghiêng lên.
-        decimal average = closedCandles.TakeLast(s.TrendPeriod).Average(c => c.Close);
+        decimal average = closedCandles.TakeLast(effectiveSettings.TrendPeriod).Average(candle => candle.Close);
         decimal trend = PercentChange.Between(average, last.Close);
 
         // 2. Đà: mấy nến gần nhất đang đi lên → nghiêng lên.
-        decimal before = closedCandles[^(s.MomentumPeriod + 1)].Close;
+        decimal before = closedCandles[^(effectiveSettings.MomentumPeriod + 1)].Close;
         decimal momentum = PercentChange.Between(before, last.Close);
 
         // 3. Lực mua/bán chủ động ở nến cuối: mua > 50% → nghiêng lên.
         VolumePressure? pressure = VolumePressure.From(last);
         decimal pressureScore = pressure is null ? 0 : pressure.BuyPercent - 50;
 
-        decimal score = s.TrendWeight * trend + s.MomentumWeight * momentum + s.PressureWeight * pressureScore;
+        decimal score = effectiveSettings.TrendWeight * trend + effectiveSettings.MomentumWeight * momentum + effectiveSettings.PressureWeight * pressureScore;
         PriceDirection direction = score >= 0 ? PriceDirection.Up : PriceDirection.Down;
-        string reason = $"Xu hướng {trend:+0.###;-0.###;0}% × {s.TrendWeight}, " +
-                        $"đà {momentum:+0.###;-0.###;0}% × {s.MomentumWeight}, " +
+        string reason = $"Xu hướng {trend:+0.###;-0.###;0}% × {effectiveSettings.TrendWeight}, " +
+                        $"đà {momentum:+0.###;-0.###;0}% × {effectiveSettings.MomentumWeight}, " +
                         (pressure is null ? "lực mua/bán: chưa có dữ liệu" :
-                            $"mua {pressure.BuyPercent:0.#}% × {s.PressureWeight}") +
+                            $"mua {pressure.BuyPercent:0.#}% × {effectiveSettings.PressureWeight}") +
                         $" → điểm {score:+0.####;-0.####;0}";
         return new PricePrediction(direction, score, reason);
     }
@@ -85,10 +86,11 @@ public static class PriceDirectionPredictor
     public static PricePrediction PredictAt(IReadOnlyList<Candle> closedCandles, int index,
         PredictorSettings? settings = null)
     {
-        PredictorSettings s = settings ?? new PredictorSettings();
-        ArgumentOutOfRangeException.ThrowIfLessThan(index, s.RequiredCandles);
+        PredictorSettings effectiveSettings = settings ?? new PredictorSettings();
+        ArgumentOutOfRangeException.ThrowIfLessThan(index, effectiveSettings.RequiredCandles);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(index, closedCandles.Count);
-        return Predict(new ListSlice<Candle>(closedCandles, index - s.RequiredCandles, s.RequiredCandles), s);
+        return Predict(new ListSlice<Candle>(closedCandles, index - effectiveSettings.RequiredCandles,
+            effectiveSettings.RequiredCandles), effectiveSettings);
     }
 
     /// <summary>
@@ -98,17 +100,17 @@ public static class PriceDirectionPredictor
     /// </summary>
     public static PredictionAccuracy Backtest(IReadOnlyList<Candle> closedCandles, PredictorSettings? settings = null)
     {
-        PredictorSettings s = settings ?? new PredictorSettings();
+        PredictorSettings effectiveSettings = settings ?? new PredictorSettings();
         int predictions = 0;
         int correct = 0;
-        for (int i = s.RequiredCandles; i < closedCandles.Count; i++)
+        for (int index = effectiveSettings.RequiredCandles; index < closedCandles.Count; index++)
         {
-            decimal previousClose = closedCandles[i - 1].Close;
-            decimal actualClose = closedCandles[i].Close;
+            decimal previousClose = closedCandles[index - 1].Close;
+            decimal actualClose = closedCandles[index].Close;
             if (actualClose == previousClose)
                 continue;
 
-            PriceDirection predicted = PredictAt(closedCandles, i, s).Direction;
+            PriceDirection predicted = PredictAt(closedCandles, index, effectiveSettings).Direction;
             PriceDirection actual = actualClose > previousClose ? PriceDirection.Up : PriceDirection.Down;
             predictions++;
             if (predicted == actual)

@@ -87,15 +87,15 @@ public sealed record DailyMoveReport(
             throw new ArgumentOutOfRangeException(nameof(volumeSpikeMultiplier), "Ngưỡng khối lượng phải lớn hơn 1.");
 
         List<int> window = [];
-        for (int i = 0; i < candles.Count; i++)
+        for (int candleIndex = 0; candleIndex < candles.Count; candleIndex++)
         {
-            Candle c = candles[i];
-            if (!c.IsClosed)
+            Candle candle = candles[candleIndex];
+            if (!candle.IsClosed)
                 throw new ArgumentException("Báo cáo chỉ dùng nến đã đóng.", nameof(candles));
-            if (i > 0 && c.OpenTimeUtc <= candles[i - 1].OpenTimeUtc)
+            if (candleIndex > 0 && candle.OpenTimeUtc <= candles[candleIndex - 1].OpenTimeUtc)
                 throw new ArgumentException("Nến phải tăng dần theo OpenTime.", nameof(candles));
-            if (c.OpenTimeUtc >= fromUtc && c.CloseTimeUtc <= toUtc)
-                window.Add(i);
+            if (candle.OpenTimeUtc >= fromUtc && candle.CloseTimeUtc <= toUtc)
+                window.Add(candleIndex);
         }
 
         if (window.Count == 0)
@@ -113,31 +113,31 @@ public sealed record DailyMoveReport(
         decimal? takerBuy = 0;
         List<ReportCandle> rows = new(window.Count);
 
-        foreach (int i in window)
+        foreach (int index in window)
         {
-            Candle c = candles[i];
-            if (c.High > high.High)
-                high = c;
-            if (c.Low < low.Low)
-                low = c;
+            Candle candle = candles[index];
+            if (candle.High > high.High)
+                high = candle;
+            if (candle.Low < low.Low)
+                low = candle;
 
             // Không biết trong một nến đỉnh hay đáy đến trước, nên so đáy của nến với đỉnh trước nó (gồm giá mở
             // của chính nến), và ngược lại. Cách này không bao giờ phóng đại cú giảm/hồi.
-            peak = Math.Max(peak, c.Open);
-            trough = Math.Min(trough, c.Open);
-            maxDrawdown = Math.Min(maxDrawdown, PercentChange.Between(peak, c.Low));
-            maxRally = Math.Max(maxRally, PercentChange.Between(trough, c.High));
-            peak = Math.Max(peak, c.High);
-            trough = Math.Min(trough, c.Low);
+            peak = Math.Max(peak, candle.Open);
+            trough = Math.Min(trough, candle.Open);
+            maxDrawdown = Math.Min(maxDrawdown, PercentChange.Between(peak, candle.Low));
+            maxRally = Math.Max(maxRally, PercentChange.Between(trough, candle.High));
+            peak = Math.Max(peak, candle.High);
+            trough = Math.Min(trough, candle.Low);
 
-            volume += c.Volume;
-            takerBuy = c.TakerBuyVolume is { } buy ? takerBuy + buy : null;
-            rows.Add(ToRow(candles, i, baselineCandles));
+            volume += candle.Volume;
+            takerBuy = candle.TakerBuyVolume is { } buy ? takerBuy + buy : null;
+            rows.Add(ToRow(candles, index, baselineCandles));
         }
 
-        ReportCandle biggestRise = rows.MaxBy(r => r.ChangePercent)!;
-        ReportCandle biggestDrop = rows.MinBy(r => r.ChangePercent)!;
-        List<ReportCandle> spikes = rows.Where(r => r.VolumeRatio >= volumeSpikeMultiplier).ToList();
+        ReportCandle biggestRise = rows.MaxBy(candle => candle.ChangePercent)!;
+        ReportCandle biggestDrop = rows.MinBy(candle => candle.ChangePercent)!;
+        List<ReportCandle> spikes = rows.Where(candle => candle.VolumeRatio >= volumeSpikeMultiplier).ToList();
 
         return new DailyMoveReport(
             fromUtc, toUtc, window.Count,
@@ -152,19 +152,20 @@ public sealed record DailyMoveReport(
     /// <summary>Nến thứ <paramref name="index"/>, so khối lượng với trung bình <paramref name="baseline"/> nến trước nó.</summary>
     private static ReportCandle ToRow(IReadOnlyList<Candle> candles, int index, int baseline)
     {
-        Candle c = candles[index];
+        Candle candle = candles[index];
         decimal? ratio = null;
         if (index >= baseline)
         {
             decimal average = 0;
-            for (int j = index - baseline; j < index; j++)
-                average += candles[j].Volume;
+            for (int baselineIndex = index - baseline; baselineIndex < index; baselineIndex++)
+                average += candles[baselineIndex].Volume;
             average /= baseline;
-            ratio = average > 0 ? c.Volume / average : null;
+            ratio = average > 0 ? candle.Volume / average : null;
         }
 
-        decimal? buyPercent = c.TakerBuyVolume is { } buy && c.Volume > 0 ? buy / c.Volume * 100 : null;
-        return new ReportCandle(c.OpenTimeUtc, c.Open, c.Close, PercentChange.Between(c.Open, c.Close), c.Volume,
+        decimal? buyPercent = candle.TakerBuyVolume is { } buy && candle.Volume > 0 ? buy / candle.Volume * 100 : null;
+        return new ReportCandle(candle.OpenTimeUtc, candle.Open, candle.Close, PercentChange.Between(candle.Open,
+            candle.Close), candle.Volume,
             ratio, buyPercent);
     }
 }

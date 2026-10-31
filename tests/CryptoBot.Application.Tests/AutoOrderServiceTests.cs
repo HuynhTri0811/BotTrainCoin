@@ -13,16 +13,17 @@ internal sealed class InMemoryAutoOrderStore : IAutoOrderStore
     private long _nextId = 1;
 
     public Task<IReadOnlyList<AutoOrderRule>> GetActiveAsync(CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<AutoOrderRule>>(Rules.Where(r => r.Status == AutoRuleStatus.Active).ToList());
+        Task.FromResult<IReadOnlyList<AutoOrderRule>>(Rules.Where(rule => rule.Status == AutoRuleStatus.Active)
+            .ToList());
 
     public Task<IReadOnlyList<AutoOrderRule>> GetWatchingCloseAsync(CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<AutoOrderRule>>(Rules.Where(r => r.IsWatchingClose).ToList());
+        Task.FromResult<IReadOnlyList<AutoOrderRule>>(Rules.Where(rule => rule.IsWatchingClose).ToList());
 
     public Task<IReadOnlyList<AutoOrderRule>> GetRecentAsync(int limit, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<AutoOrderRule>>(Rules.AsEnumerable().Reverse().Take(limit).ToList());
 
     public Task<AutoOrderRule?> GetAsync(long id, CancellationToken ct) =>
-        Task.FromResult(Rules.FirstOrDefault(r => r.Id == id));
+        Task.FromResult(Rules.FirstOrDefault(rule => rule.Id == id));
 
     public void Add(AutoOrderRule rule)
     {
@@ -107,13 +108,13 @@ public class AutoOrderServiceTests
 
         Assert.Equal(1, await _svc.EvaluateAsync(default));
 
-        var p = Assert.Single(_paperStore.Positions);
-        Assert.Equal(PositionSide.Long, p.Side);
-        Assert.Equal(2, p.Leverage);
-        Assert.Equal(96_921m, p.StopLoss);        // 97900 * 0.99
-        Assert.Equal(99_858m, p.TakeProfit);      // 97900 * 1.02
+        var position = Assert.Single(_paperStore.Positions);
+        Assert.Equal(PositionSide.Long, position.Side);
+        Assert.Equal(2, position.Leverage);
+        Assert.Equal(96_921m, position.StopLoss);        // 97900 * 0.99
+        Assert.Equal(99_858m, position.TakeProfit);      // 97900 * 1.02
         Assert.Equal(AutoRuleStatus.Triggered, rule.Status);
-        Assert.Equal(p.Id, rule.PositionId);
+        Assert.Equal(position.Id, rule.PositionId);
         Assert.Equal(97_900m, rule.TriggeredMarkPrice);
     }
 
@@ -125,10 +126,10 @@ public class AutoOrderServiceTests
 
         await _svc.EvaluateAsync(default);
 
-        var p = Assert.Single(_paperStore.Positions);
-        Assert.Equal(PositionSide.Short, p.Side);
-        Assert.Equal(103_525m, p.StopLoss);       // 102500 * 1.01
-        Assert.Equal(100_450m, p.TakeProfit);     // 102500 * 0.98
+        var position = Assert.Single(_paperStore.Positions);
+        Assert.Equal(PositionSide.Short, position.Side);
+        Assert.Equal(103_525m, position.StopLoss);       // 102500 * 1.01
+        Assert.Equal(100_450m, position.TakeProfit);     // 102500 * 0.98
     }
 
     [Fact]
@@ -256,25 +257,26 @@ public class AutoOrderServiceTests
         var result = await _svc.CreateAsync(BuyDip(trigger: trigger), default);
 
         Assert.Null(result.Rule);
-        Assert.Contains(result.Errors, e => e.Contains(expected));
+        Assert.Contains(result.Errors, error => error.Contains(expected));
     }
 
     [Fact]
     public async Task Create_validates_inputs()
     {
-        Assert.Contains((await _svc.CreateAsync(BuyDip(leverage: 20), default)).Errors, e => e.Contains("Đòn bẩy"));
+        Assert.Contains((await _svc.CreateAsync(BuyDip(leverage: 20), default)).Errors,
+            error => error.Contains("Đòn bẩy"));
         // Margin quá nhỏ: ở giá ~98000 không đủ mua một bước khối lượng (bước 0.001 BTC chặt hơn min notional 50).
         Assert.Contains((await _svc.CreateAsync(BuyDip(margin: 10m, leverage: 2), default)).Errors,
-            e => e.Contains("không đủ mua"));
-        Assert.Contains((await _svc.CreateAsync(BuyDip(sl: 0m), default)).Errors, e => e.Contains("Stop loss"));
+            error => error.Contains("không đủ mua"));
+        Assert.Contains((await _svc.CreateAsync(BuyDip(sl: 0m), default)).Errors, error => error.Contains("Stop loss"));
         // Ở 98000: 50 × 2 / 98000 = 0.00102 → đủ 0.001 BTC; ở 120000 thì làm tròn về 0.
         Assert.Contains((await _svc.CreateAsync(BuyDip(trigger: 120_000m, cond: TriggerCondition.AtOrAbove), default)).Errors,
-            e => e.Contains("không đủ mua"));
+            error => error.Contains("không đủ mua"));
         // 10x: giá thanh lý cách ~9.6%, stop 15% nằm sau giá thanh lý.
         Assert.Contains((await _svc.CreateAsync(BuyDip(leverage: 10, sl: 15m), default)).Errors,
-            e => e.Contains("thanh lý"));
+            error => error.Contains("thanh lý"));
         Assert.Contains((await _svc.CreateAsync(BuyDip() with { Symbol = "DOGEUSDT" }, default)).Errors,
-            e => e.Contains("chưa được cấu hình"));
+            error => error.Contains("chưa được cấu hình"));
     }
 
     [Fact]
@@ -287,7 +289,7 @@ public class AutoOrderServiceTests
         var third = await _svc.CreateAsync(BuyDip(), default);
 
         Assert.Null(third.Rule);
-        Assert.Contains(third.Errors, e => e.Contains("tối đa 2"));
+        Assert.Contains(third.Errors, error => error.Contains("tối đa 2"));
     }
 
     // ── Quy tắc theo chỉ báo ──────────────────────────────────────────────────
@@ -298,11 +300,11 @@ public class AutoOrderServiceTests
     /// <summary>Thêm các nến 1h đã đóng, nến cuối mở lúc <paramref name="lastOpen"/>.</summary>
     private void AddCandles(DateTime lastOpen, decimal[] closes)
     {
-        for (var i = 0; i < closes.Length; i++)
+        for (var index = 0; index < closes.Length; index++)
         {
-            var open = lastOpen - TimeSpan.FromHours(closes.Length - 1 - i);
+            var open = lastOpen - TimeSpan.FromHours(closes.Length - 1 - index);
             _candles.Candles[open] = new Candle("Binance", "BTCUSDT", CandleInterval.H1, open,
-                closes[i], closes[i], closes[i], closes[i], 1m, true, open);
+                closes[index], closes[index], closes[index], closes[index], 1m, true, open);
         }
     }
 
@@ -325,9 +327,9 @@ public class AutoOrderServiceTests
 
         Assert.Equal(1, await _svc.EvaluateAsync(default));
 
-        var p = Assert.Single(_paperStore.Positions);
-        Assert.Equal(PositionSide.Long, p.Side);
-        Assert.Equal(99_000m, p.StopLoss);           // SL/TP theo mark lúc kích hoạt, như quy tắc theo giá
+        var position = Assert.Single(_paperStore.Positions);
+        Assert.Equal(PositionSide.Long, position.Side);
+        Assert.Equal(99_000m, position.StopLoss);           // SL/TP theo mark lúc kích hoạt, như quy tắc theo giá
         Assert.Equal(AutoRuleStatus.Triggered, rule.Status);
         Assert.Contains("rsi-test", rule.TriggerDetail);
         Assert.Contains("RSI cắt lên", rule.TriggerDetail);
@@ -394,11 +396,11 @@ public class AutoOrderServiceTests
     public async Task Create_indicator_rule_validates_indicator_and_symbol()
     {
         Assert.Contains((await _svc.CreateAsync(OnIndicator(name: "nope"), default)).Errors,
-            e => e.Contains("Không có chỉ báo"));
+            error => error.Contains("Không có chỉ báo"));
         _paperOptions.Symbols.Add(new FuturesSymbolOptions { Symbol = "ETHUSDT", QuantityStep = 0.01m, TickSize = 0.01m, MinNotional = 20m, MaintenanceMarginRate = 0.005m });
         _marks.Set(new MarkPrice("ETHUSDT", 3000m, _clock.UtcNow));
         Assert.Contains((await _svc.CreateAsync(OnIndicator(symbol: "ETHUSDT"), default)).Errors,
-            e => e.Contains("chạy trên BTCUSDT"));
+            error => error.Contains("chạy trên BTCUSDT"));
 
         var ok = await _svc.CreateAsync(OnIndicator(), default);
         Assert.Empty(ok.Errors);
@@ -427,10 +429,10 @@ public class AutoOrderServiceTests
 
         Assert.Equal(1, await _svc.EvaluateAsync(default));
 
-        var p = Assert.Single(_paperStore.Positions);
-        Assert.Equal(PositionStatus.Closed, p.Status);
-        Assert.Equal(CloseReason.Signal, p.CloseReason);
-        Assert.Equal(rule.CloseCommandId, p.CloseCommandId);
+        var position = Assert.Single(_paperStore.Positions);
+        Assert.Equal(PositionStatus.Closed, position.Status);
+        Assert.Equal(CloseReason.Signal, position.CloseReason);
+        Assert.Equal(rule.CloseCommandId, position.CloseCommandId);
         Assert.False(rule.IsWatchingClose);
         Assert.Contains("RSI cắt xuống", rule.CloseDetail);
 
@@ -496,6 +498,6 @@ public class AutoOrderServiceTests
         var result = await _svc.CreateAsync(BuyDip() with { CloseOnReverse = true }, default);
 
         Assert.Null(result.Rule);
-        Assert.Contains(result.Errors, e => e.Contains("chỉ dùng với quy tắc theo chỉ báo"));
+        Assert.Contains(result.Errors, error => error.Contains("chỉ dùng với quy tắc theo chỉ báo"));
     }
 }

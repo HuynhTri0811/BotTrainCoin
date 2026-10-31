@@ -9,41 +9,41 @@ const count = new Intl.NumberFormat('en-US');
 const coin = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 });
 const compactUsdt = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 });
 
-const fmtCount = (v: number | null) => (v == null ? '—' : count.format(v));
-const fmtQuote = (v: number | null) => (v == null ? '—' : `${compactUsdt.format(v)} USDT`);
-const fmtExcess = (p: VolumePressure) => (p.excessPercent == null ? '100% một phía' : `+${p.excessPercent.toFixed(0)}%`);
+const fmtCount = (value: number | null) => (value == null ? '—' : count.format(value));
+const fmtQuote = (value: number | null) => (value == null ? '—' : `${compactUsdt.format(value)} USDT`);
+const fmtExcess = (percent: VolumePressure) => (percent.excessPercent == null ? '100% một phía' : `+${percent.excessPercent.toFixed(0)}%`);
 
 /** Thanh tỷ trọng mua (xanh) / bán (đỏ) kèm cảnh báo khi một phía áp đảo. */
-function PressureCell({ p }: { p: VolumePressure | null }) {
-  if (!p) return <>—</>;
+function PressureCell({ percent }: { percent: VolumePressure | null }) {
+  if (!percent) return <>—</>;
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
       <span style={{ display: 'inline-flex', width: 80, height: 8, borderRadius: 4, overflow: 'hidden', background: '#dc2626' }}>
-        <span style={{ width: `${p.buyPercent}%`, background: '#16a34a' }} />
+        <span style={{ width: `${percent.buyPercent}%`, background: '#16a34a' }} />
       </span>
       <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-        {p.buyPercent.toFixed(0)}/{(100 - p.buyPercent).toFixed(0)}
+        {percent.buyPercent.toFixed(0)}/{(100 - percent.buyPercent).toFixed(0)}
       </span>
-      {p.side === 'SellHeavy' && <Tag color="red">Bán áp đảo {fmtExcess(p)}</Tag>}
-      {p.side === 'BuyHeavy' && <Tag color="green">Mua áp đảo {fmtExcess(p)}</Tag>}
+      {percent.side === 'SellHeavy' && <Tag color="red">Bán áp đảo {fmtExcess(percent)}</Tag>}
+      {percent.side === 'BuyHeavy' && <Tag color="green">Mua áp đảo {fmtExcess(percent)}</Tag>}
     </span>
   );
 }
 
 /** Cảnh báo phiên vừa đóng và phiên đang chạy khi một phía vượt ngưỡng. */
 function PressureAlert({ candle, running }: { candle: ChartPoint | undefined; running: boolean }) {
-  const p = candle?.pressure;
-  if (!candle || !p || p.side === 'Balanced') return null;
-  const sell = p.side === 'SellHeavy';
+  const percent = candle?.pressure;
+  if (!candle || !percent || percent.side === 'Balanced') return null;
+  const sell = percent.side === 'SellHeavy';
   const which = running ? 'Phiên đang chạy' : 'Phiên vừa đóng';
   return (
     <Alert
       showIcon
       type={sell ? 'error' : 'success'}
       style={{ marginBottom: 12 }}
-      title={`${which} (${formatVnUnix(candle.time)}): ${sell ? 'bán' : 'mua'} chủ động lớn hơn ${sell ? 'mua' : 'bán'} ${fmtExcess(p)}`}
+      title={`${which} (${formatVnUnix(candle.time)}): ${sell ? 'bán' : 'mua'} chủ động lớn hơn ${sell ? 'mua' : 'bán'} ${fmtExcess(percent)}`}
       description={
-        `Mua ${coin.format(p.buyVolume)} · Bán ${coin.format(p.sellVolume)} (ngưỡng cảnh báo ${p.alertExcessPercent}%).` +
+        `Mua ${coin.format(percent.buyVolume)} · Bán ${coin.format(percent.sellVolume)} (ngưỡng cảnh báo ${percent.alertExcessPercent}%).` +
         (running ? ' Phiên chưa đóng nên số liệu còn thay đổi.' : '')
       }
     />
@@ -67,28 +67,28 @@ interface SessionRow {
  * khối lượng bao nhiêu (coin và USDT), và đông hơn hay vắng hơn mức trung bình gần đây.
  */
 export function SessionStatsCard({ candles, symbol, interval }: { candles: ChartPoint[]; symbol: string; interval: string }) {
-  const closed = candles.filter((c) => c.isClosed && c.tradeCount != null);
+  const closed = candles.filter((point) => point.isClosed && point.tradeCount != null);
   const recent = closed.slice(-AVERAGE_OVER);
-  const avgTrades = recent.length ? recent.reduce((s, c) => s + c.tradeCount!, 0) / recent.length : null;
-  const avgQuote = recent.length ? recent.reduce((s, c) => s + (c.quoteVolume ?? 0), 0) / recent.length : null;
+  const avgTrades = recent.length ? recent.reduce((sum, candle) => sum + candle.tradeCount!, 0) / recent.length : null;
+  const avgQuote = recent.length ? recent.reduce((sum, candle) => sum + (candle.quoteVolume ?? 0), 0) / recent.length : null;
   const last = closed.at(-1);
   const running = candles.at(-1)?.isClosed === false ? candles.at(-1) : undefined;
   const baseAsset = symbol.replace(/USDT$/, '');
 
   const rows: SessionRow[] = candles
     .slice(-50)
-    .map((c) => {
-      const before = closed.filter((p) => p.time < c.time).slice(-AVERAGE_OVER);
-      const avg = before.length ? before.reduce((s, p) => s + p.tradeCount!, 0) / before.length : null;
+    .map((point) => {
+      const before = closed.filter((previous) => previous.time < point.time).slice(-AVERAGE_OVER);
+      const avg = before.length ? before.reduce((sum, previous) => sum + previous.tradeCount!, 0) / before.length : null;
       return {
-        time: c.time,
-        tradeCount: c.tradeCount,
-        volume: c.volume,
-        quoteVolume: c.quoteVolume,
-        up: c.close >= c.open,
-        isClosed: c.isClosed,
-        pressure: c.pressure,
-        vsAverage: c.tradeCount != null && avg ? (c.tradeCount / avg - 1) * 100 : null,
+        time: point.time,
+        tradeCount: point.tradeCount,
+        volume: point.volume,
+        quoteVolume: point.quoteVolume,
+        up: point.close >= point.open,
+        isClosed: point.isClosed,
+        pressure: point.pressure,
+        vsAverage: point.tradeCount != null && avg ? (point.tradeCount / avg - 1) * 100 : null,
       };
     })
     .reverse();
@@ -127,9 +127,9 @@ export function SessionStatsCard({ candles, symbol, interval }: { candles: Chart
           {
             title: 'Phiên (mở lúc)',
             key: 'time',
-            render: (_, r) => (
+            render: (_, row) => (
               <span>
-                {formatVnUnix(r.time)} {!r.isClosed && <Tag>Đang chạy</Tag>}
+                {formatVnUnix(row.time)} {!row.isClosed && <Tag>Đang chạy</Tag>}
               </span>
             ),
           },
@@ -143,25 +143,25 @@ export function SessionStatsCard({ candles, symbol, interval }: { candles: Chart
             title: `Khối lượng (${baseAsset})`,
             dataIndex: 'volume',
             align: 'right',
-            render: (v: number, r) => <span style={{ color: r.up ? '#16a34a' : '#dc2626' }}>{coin.format(v)}</span>,
+            render: (value: number, row) => <span style={{ color: row.up ? '#16a34a' : '#dc2626' }}>{coin.format(value)}</span>,
           },
           { title: 'Khối lượng (USDT)', dataIndex: 'quoteVolume', align: 'right', render: fmtQuote },
           {
             title: 'Mua / Bán chủ động (%)',
             key: 'pressure',
-            render: (_, r) => <PressureCell p={r.pressure} />,
+            render: (_, row) => <PressureCell percent={row.pressure} />,
           },
           {
             title: `So với TB ${AVERAGE_OVER} phiên`,
             dataIndex: 'vsAverage',
             align: 'right',
-            render: (v: number | null, r) =>
-              v == null || !r.isClosed ? (
+            render: (value: number | null, row) =>
+              value == null || !row.isClosed ? (
                 '—'
               ) : (
-                <span style={{ color: v >= 0 ? '#16a34a' : '#64748b' }}>
-                  {v > 0 ? '+' : ''}
-                  {v.toFixed(0)}%
+                <span style={{ color: value >= 0 ? '#16a34a' : '#64748b' }}>
+                  {value > 0 ? '+' : ''}
+                  {value.toFixed(0)}%
                 </span>
               ),
           },

@@ -34,10 +34,10 @@ public static class Rsi
         // RSI đầu tiên nằm ở vị trí period (giá thứ period + 1).
         result[period] = ToRsi(avg);
 
-        for (int i = period + 1; i < span.Length; i++)
+        for (int index = period + 1; index < span.Length; index++)
         {
-            avg = Smooth(avg, span[i] - span[i - 1], period);
-            result[i] = ToRsi(avg);
+            avg = Smooth(avg, span[index] - span[index - 1], period);
+            result[index] = ToRsi(avg);
         }
 
         return result;
@@ -56,8 +56,8 @@ public static class Rsi
 
         Averages avg = Seed(values, period);
         // Làm mượt lần lượt đến nến áp chót (dừng trước nến cuối)...
-        for (int i = period + 1; i < values.Length - 1; i++)
-            avg = Smooth(avg, values[i] - values[i - 1], period);
+        for (int index = period + 1; index < values.Length - 1; index++)
+            avg = Smooth(avg, values[index] - values[index - 1], period);
 
         // ...để lấy RSI của nến trước, rồi làm mượt thêm một lần với thay đổi giá của nến cuối.
         decimal prev = ToRsi(avg);
@@ -72,9 +72,9 @@ public static class Rsi
     private static Averages Seed(ReadOnlySpan<decimal> values, int period)
     {
         decimal gain = 0, loss = 0;
-        for (int i = 1; i <= period; i++)
+        for (int index = 1; index <= period; index++)
         {
-            decimal change = values[i] - values[i - 1];
+            decimal change = values[index] - values[index - 1];
             if (change > 0) gain += change;   // nến tăng: cộng vào lãi
             else loss -= change;              // nến giảm: change âm, trừ đi để cộng phần dương vào lỗ
         }
