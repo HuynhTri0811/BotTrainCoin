@@ -8,7 +8,7 @@ internal static class DailyCloses
     {
         if (horizonDays <= 0)
             throw new ArgumentOutOfRangeException(nameof(horizonDays), "Số ngày phải lớn hơn 0.");
-        if (dailyCloses.Any(c => c <= 0))
+        if (dailyCloses.Any(close => close <= 0))
             throw new ArgumentException("Giá đóng cửa phải dương.", nameof(dailyCloses));
     }
 }
