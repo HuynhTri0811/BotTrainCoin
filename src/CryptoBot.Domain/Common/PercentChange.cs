@@ -8,5 +8,5 @@ internal static class PercentChange
 
     /// <summary>Tỷ lệ thay đổi dương (giá tăng thật, không tính đứng yên) trên tổng số, theo %.</summary>
     public static decimal UpShare(IReadOnlyCollection<decimal> changes) =>
-        (decimal)changes.Count(c => c > 0) / changes.Count * 100;
+        (decimal)changes.Count(change => change > 0) / changes.Count * 100;
 }
