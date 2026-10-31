@@ -23,57 +23,57 @@ public class DailyMoveReportTests
     [Fact]
     public void Summarizes_open_close_high_low_and_range()
     {
-        var r = DailyMoveReport.Build(Swing, T0, T0.AddHours(4))!;
+        var report = DailyMoveReport.Build(Swing, T0, T0.AddHours(4))!;
 
-        Assert.Equal(4, r.CandleCount);
-        Assert.Equal(100m, r.Open);
-        Assert.Equal(102m, r.Close);
-        Assert.Equal(2m, r.ChangePercent);
-        Assert.Equal(106m, r.High);
-        Assert.Equal(T0.AddHours(1), r.HighTimeUtc);
-        Assert.Equal(94m, r.Low);
-        Assert.Equal(T0.AddHours(2), r.LowTimeUtc);
-        Assert.Equal(12m, r.RangePercent);
+        Assert.Equal(4, report.CandleCount);
+        Assert.Equal(100m, report.Open);
+        Assert.Equal(102m, report.Close);
+        Assert.Equal(2m, report.ChangePercent);
+        Assert.Equal(106m, report.High);
+        Assert.Equal(T0.AddHours(1), report.HighTimeUtc);
+        Assert.Equal(94m, report.Low);
+        Assert.Equal(T0.AddHours(2), report.LowTimeUtc);
+        Assert.Equal(12m, report.RangePercent);
     }
 
     [Fact]
     public void Drawdown_is_measured_from_the_peak_before_the_low_and_rally_from_the_low_before_the_high()
     {
-        var r = DailyMoveReport.Build(Swing, T0, T0.AddHours(4))!;
+        var report = DailyMoveReport.Build(Swing, T0, T0.AddHours(4))!;
 
         // Đỉnh 106 (giờ 1) → đáy 94 (giờ 2); đáy 94 (giờ 2) → 103 (giờ 3).
-        Assert.Equal((94m / 106m - 1) * 100, r.MaxDrawdownPercent);
-        Assert.Equal((103m / 94m - 1) * 100, r.MaxRallyPercent);
+        Assert.Equal((94m / 106m - 1) * 100, report.MaxDrawdownPercent);
+        Assert.Equal((103m / 94m - 1) * 100, report.MaxRallyPercent);
     }
 
     [Fact]
     public void Low_inside_the_same_candle_as_the_high_is_not_counted_as_a_drop_from_that_high()
     {
         // Không biết đỉnh 110 hay đáy 90 đến trước, nên chỉ so đáy với giá mở 100.
-        var r = DailyMoveReport.Build([C(0, 100, 110, 90, 100)], T0, T0.AddHours(1))!;
+        var report = DailyMoveReport.Build([C(0, 100, 110, 90, 100)], T0, T0.AddHours(1))!;
 
-        Assert.Equal(-10m, r.MaxDrawdownPercent);
-        Assert.Equal(10m, r.MaxRallyPercent);
+        Assert.Equal(-10m, report.MaxDrawdownPercent);
+        Assert.Equal(10m, report.MaxRallyPercent);
     }
 
     [Fact]
     public void Finds_the_biggest_rising_and_falling_candles()
     {
-        var r = DailyMoveReport.Build(Swing, T0, T0.AddHours(4))!;
+        var report = DailyMoveReport.Build(Swing, T0, T0.AddHours(4))!;
 
-        Assert.Equal(T0.AddHours(3), r.BiggestRise.OpenTimeUtc);
-        Assert.Equal(T0.AddHours(1), r.BiggestDrop.OpenTimeUtc);
-        Assert.Equal((96m / 104m - 1) * 100, r.BiggestDrop.ChangePercent);
+        Assert.Equal(T0.AddHours(3), report.BiggestRise.OpenTimeUtc);
+        Assert.Equal(T0.AddHours(1), report.BiggestDrop.OpenTimeUtc);
+        Assert.Equal((96m / 104m - 1) * 100, report.BiggestDrop.ChangePercent);
     }
 
     [Fact]
     public void Only_candles_fully_inside_the_period_are_reported()
     {
-        var r = DailyMoveReport.Build(Swing, T0.AddHours(1), T0.AddHours(3).AddMinutes(30))!;
+        var report = DailyMoveReport.Build(Swing, T0.AddHours(1), T0.AddHours(3).AddMinutes(30))!;
 
-        Assert.Equal(2, r.CandleCount);
-        Assert.Equal(104m, r.Open);
-        Assert.Equal(97m, r.Close);
+        Assert.Equal(2, report.CandleCount);
+        Assert.Equal(104m, report.Open);
+        Assert.Equal(97m, report.Close);
     }
 
     [Fact]
@@ -88,23 +88,23 @@ public class DailyMoveReportTests
             C(4, 92, 93, 92, 93, volume: 10),
         ];
 
-        var r = DailyMoveReport.Build(candles, T0.AddHours(3), T0.AddHours(5), baselineCandles: 3)!;
+        var report = DailyMoveReport.Build(candles, T0.AddHours(3), T0.AddHours(5), baselineCandles: 3)!;
 
-        var spike = Assert.Single(r.VolumeSpikes);
+        var spike = Assert.Single(report.VolumeSpikes);
         Assert.Equal(T0.AddHours(3), spike.OpenTimeUtc);
         Assert.Equal(4m, spike.VolumeRatio);
-        Assert.Equal(50m, r.Volume);
+        Assert.Equal(50m, report.Volume);
     }
 
     [Fact]
     public void Candle_without_enough_earlier_candles_has_no_volume_ratio()
     {
-        var r = DailyMoveReport.Build(Swing, T0, T0.AddHours(4), baselineCandles: 2)!;
+        var report = DailyMoveReport.Build(Swing, T0, T0.AddHours(4), baselineCandles: 2)!;
 
         // Nến giờ 1 chỉ có 1 nến trước nó; nến giờ 3 có đủ 2 nến (khối lượng đều 1).
-        Assert.Null(r.BiggestDrop.VolumeRatio);
-        Assert.Equal(1m, r.BiggestRise.VolumeRatio);
-        Assert.Empty(r.VolumeSpikes);
+        Assert.Null(report.BiggestDrop.VolumeRatio);
+        Assert.Equal(1m, report.BiggestRise.VolumeRatio);
+        Assert.Empty(report.VolumeSpikes);
     }
 
     [Fact]
