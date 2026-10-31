@@ -20,12 +20,12 @@ public sealed class LivePriceWorker(
                 var sampler = scope.ServiceProvider.GetRequiredService<LivePriceSampler>();
                 foreach (var symbol in options.Symbols)
                 {
-                    var s = await sampler.SampleAsync(symbol, stoppingToken);
-                    if (s.Error is not null)
-                        logger.LogWarning("Live price {Symbol}: {Error}", symbol, s.Error);
+                    var sample = await sampler.SampleAsync(symbol, stoppingToken);
+                    if (sample.Error is not null)
+                        logger.LogWarning("Live price {Symbol}: {Error}", symbol, sample.Error);
                     else
                         logger.LogInformation("Live price {Symbol}: spot {Spot} mark {Mark} ({SpotMs}ms/{MarkMs}ms)",
-                            symbol, s.SpotPrice, s.MarkPrice, s.SpotLatencyMs, s.MarkLatencyMs);
+                            symbol, sample.SpotPrice, sample.MarkPrice, sample.SpotLatencyMs, sample.MarkLatencyMs);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

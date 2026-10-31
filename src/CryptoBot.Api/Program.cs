@@ -29,8 +29,8 @@ builder.Services.AddHostedService<DailyHistoryWorker>();
 builder.Services.AddHostedService<DailyReportWorker>();
 builder.Services.AddHostedService<NewsWorker>();
 // Cho phép client gửi số tiền dạng chuỗi ("50.5") để không mất chính xác qua JSON number.
-builder.Services.ConfigureHttpJsonOptions(o =>
-    o.SerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString);
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString);
 
 var app = builder.Build();
 

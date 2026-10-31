@@ -39,15 +39,17 @@ public static class PredictionEndpoints
 
             // Các lần đoán gần nhất: chỉ dùng nến trước nến được đoán, rồi so với giá đóng thực tế.
             var recent = new List<PredictionHistoryDto>();
-            for (var i = Math.Max(settings.RequiredCandles, closed.Count - RecentCount); i < closed.Count; i++)
+            for (var index = Math.Max(settings.RequiredCandles,
+                closed.Count - RecentCount); index < closed.Count; index++)
             {
-                var p = PriceDirectionPredictor.PredictAt(closed, i, settings);
-                var previousClose = closed[i - 1].Close;
-                var actual = closed[i].Close == previousClose ? null
-                    : closed[i].Close > previousClose ? "Up" : "Down";
-                recent.Add(new PredictionHistoryDto(ToUnixSeconds(closed[i].OpenTimeUtc), p.Direction.ToString(),
-                    p.Score, actual, previousClose, closed[i].Close, closed[i].Close - previousClose,
-                    (closed[i].Close / previousClose - 1) * 100));
+                var prediction = PriceDirectionPredictor.PredictAt(closed, index, settings);
+                var previousClose = closed[index - 1].Close;
+                var actual = closed[index].Close == previousClose ? null
+                    : closed[index].Close > previousClose ? "Up" : "Down";
+                recent.Add(new PredictionHistoryDto(ToUnixSeconds(closed[index].OpenTimeUtc),
+                    prediction.Direction.ToString(),
+                    prediction.Score, actual, previousClose, closed[index].Close, closed[index].Close - previousClose,
+                    (closed[index].Close / previousClose - 1) * 100));
             }
             recent.Reverse();
 
@@ -66,31 +68,34 @@ public static class PredictionEndpoints
                 return Results.BadRequest(new { error = $"Interval không hỗ trợ: {interval}" });
 
             var result = new List<IndicatorAccuracyDto>();
-            foreach (var c in registry.All.Where(c =>
-                         c.Key.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase) && c.Key.Interval == iv))
+            foreach (var indicator in registry.All.Where(candidate =>
+                         candidate.Key.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase)
+                             && candidate.Key.Interval == iv))
             {
-                var chart = await indicators.GetChartAsync(c.Name, history ?? IndicatorService.MaxLimit, ct);
+                var chart = await indicators.GetChartAsync(indicator.Name, history ?? IndicatorService.MaxLimit, ct);
                 if (chart is null)
                     continue;
 
-                var series = chart.Points.Select(p => p.Candle).ToList();
+                var series = chart.Points.Select(point => point.Candle).ToList();
                 var signals = chart.Points
-                    .Select((p, i) => (p.Result, Index: i))
-                    .Where(x => x.Result.Signal != IndicatorSignal.None)
-                    .Select(x => new DirectionSignal(x.Index,
-                        x.Result.Signal == IndicatorSignal.Long ? PriceDirection.Up : PriceDirection.Down))
+                    .Select((point, index) => (point.Result, Index: index))
+                    .Where(entry => entry.Result.Signal != IndicatorSignal.None)
+                    .Select(entry => new DirectionSignal(entry.Index,
+                        entry.Result.Signal == IndicatorSignal.Long ? PriceDirection.Up : PriceDirection.Down))
                     .ToList();
                 var horizons = SignalAccuracy.Evaluate(series, signals, SignalAccuracy.DefaultHorizons);
 
-                var recent = signals.TakeLast(RecentCount).Reverse().Select(s => new IndicatorSignalDto(
-                    ToUnixSeconds(series[s.Index].OpenTimeUtc), s.Direction.ToString(), series[s.Index].Close,
-                    SignalAccuracy.MovePercent(series, s, 1), SignalAccuracy.MovePercent(series, s, 3),
-                    chart.Points[s.Index].Result.Reason)).ToList();
+                var recent = signals.TakeLast(RecentCount).Reverse().Select(signal => new IndicatorSignalDto(
+                    ToUnixSeconds(series[signal.Index].OpenTimeUtc), signal.Direction.ToString(),
+                        series[signal.Index].Close,
+                    SignalAccuracy.MovePercent(series, signal, 1), SignalAccuracy.MovePercent(series, signal, 3),
+                    chart.Points[signal.Index].Result.Reason)).ToList();
 
-                result.Add(new IndicatorAccuracyDto(c.Name, c.Type, series.Count,
+                result.Add(new IndicatorAccuracyDto(indicator.Name, indicator.Type, series.Count,
                     series.Count > 0 ? ToUnixSeconds(series[0].OpenTimeUtc) : null,
-                    horizons.Select(h => new HorizonAccuracyDto(h.Candles, h.Signals, h.Correct, h.HitRatePercent,
-                        h.AverageMovePercent)).ToList(),
+                    horizons.Select(accuracy => new HorizonAccuracyDto(accuracy.Candles, accuracy.Signals,
+                        accuracy.Correct, accuracy.HitRatePercent,
+                        accuracy.AverageMovePercent)).ToList(),
                     recent));
             }
 

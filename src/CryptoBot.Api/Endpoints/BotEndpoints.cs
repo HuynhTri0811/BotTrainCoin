@@ -23,13 +23,16 @@ public static class BotEndpoints
         {
             var instances = await store.GetAllAsync(ct);
             var feeds = instances
-                .Select(i => new { Key = new CandleKey(i.Exchange, i.Symbol, CandleInterval.Parse(i.Interval)) })
-                .DistinctBy(x => x.Key)
-                .Select(x => registry.Get(x.Key.ToString(), x.Key.Interval) is { } s
-                    ? new FeedStatusDto(s.Key, s.IsStale, s.LastSuccessAtUtc, s.LastAttemptAtUtc, s.LastError,
-                        s.ConsecutiveFailures, s.LatestClosedOpenTimeUtc,
-                        s.RecentIssues.Select(i => $"{i.Kind} {i.OpenTimeUtc:O}: {i.Detail}").ToList())
-                    : new FeedStatusDto(x.Key.ToString(), true, null, null, "Chưa đồng bộ lần nào", 0, null, []))
+                .Select(instance => new { Key = new CandleKey(instance.Exchange, instance.Symbol,
+                    CandleInterval.Parse(instance.Interval)) })
+                .DistinctBy(item => item.Key)
+                .Select(item => registry.Get(item.Key.ToString(), item.Key.Interval) is { } status
+                    ? new FeedStatusDto(status.Key, status.IsStale, status.LastSuccessAtUtc, status.LastAttemptAtUtc,
+                        status.LastError,
+                        status.ConsecutiveFailures, status.LatestClosedOpenTimeUtc,
+                        status.RecentIssues.Select(issue => $"{issue.Kind} {issue.OpenTimeUtc:O}: {issue.Detail}")
+                            .ToList())
+                    : new FeedStatusDto(item.Key.ToString(), true, null, null, "Chưa đồng bộ lần nào", 0, null, []))
                 .ToList();
 
             return new StatusDto(DecisionMode, Environment, LiveLocked: true, clock.UtcNow, feeds,
@@ -48,7 +51,7 @@ public static class BotEndpoints
 
             return Results.Ok(new ChartDto(
                 ToDto(data.Instance),
-                data.Points.Select(p => ToDto(p.Candle, p.FastEma, p.SlowEma, options)).ToList(),
+                data.Points.Select(point => ToDto(point.Candle, point.FastEma, point.SlowEma, options)).ToList(),
                 data.Signals.Select(ToDto).ToList()));
         });
 
@@ -74,7 +77,7 @@ public static class BotEndpoints
 
             var list = await candles.GetLatestAsync(new CandleKey("Binance", symbol.ToUpperInvariant(), iv), null,
                 Math.Clamp(limit ?? 300, 1, 1000), closedOnly: false, ct);
-            return Results.Ok(list.Select(c => ToDto(c, null, null, options)));
+            return Results.Ok(list.Select(candle => ToDto(candle, null, null, options)));
         });
 
         app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
@@ -86,21 +89,27 @@ public static class BotEndpoints
 
     private static long ToUnixSeconds(DateTime utc) => new DateTimeOffset(utc).ToUnixTimeSeconds();
 
-    private static ChartPointDto ToDto(Candle c, decimal? fastEma, decimal? slowEma, MarketDataOptions options) =>
-        new(ToUnixSeconds(c.OpenTimeUtc), c.Open, c.High, c.Low, c.Close, c.Volume, c.QuoteVolume, c.TradeCount,
-            c.IsClosed, fastEma, slowEma,
-            VolumePressure.From(c, options.VolumeAlertExcessPercent) is { } v
-                ? new VolumePressureDto(v.BuyVolume, v.SellVolume, v.BuyPercent, v.ExcessPercent, v.Side.ToString(),
+    private static ChartPointDto ToDto(Candle candle, decimal? fastEma, decimal? slowEma, MarketDataOptions options) =>
+        new(ToUnixSeconds(candle.OpenTimeUtc), candle.Open, candle.High, candle.Low, candle.Close, candle.Volume,
+            candle.QuoteVolume, candle.TradeCount,
+            candle.IsClosed, fastEma, slowEma,
+            VolumePressure.From(candle, options.VolumeAlertExcessPercent) is { } pressure
+                ? new VolumePressureDto(pressure.BuyVolume, pressure.SellVolume, pressure.BuyPercent,
+                    pressure.ExcessPercent, pressure.Side.ToString(),
                     options.VolumeAlertExcessPercent)
                 : null);
 
-    private static StrategyDto ToDto(StrategyInstance i) => new(i.Id, i.Name, i.StrategyType, i.Version,
-        i.Exchange, i.Symbol, i.Interval, i.Enabled, i.LastEvaluatedCandleOpenTimeUtc,
-        StrategyFactory.ParseEmaCross(i.ParametersJson));
+    private static StrategyDto ToDto(StrategyInstance instance) => new(instance.Id, instance.Name,
+        instance.StrategyType, instance.Version,
+        instance.Exchange, instance.Symbol, instance.Interval, instance.Enabled,
+            instance.LastEvaluatedCandleOpenTimeUtc,
+        StrategyFactory.ParseEmaCross(instance.ParametersJson));
 
-    private static SignalDto ToDto(TradingSignal s) => new(s.Id, s.StrategyInstanceId, s.ConfigVersion, s.Symbol,
-        s.Interval, s.CandleOpenTimeUtc, ToUnixSeconds(s.CandleOpenTimeUtc), s.Action.ToString(), s.Reason,
-        s.CandleClose, s.FastEma, s.SlowEma, s.CreatedAtUtc, s.IsBackfill);
+    private static SignalDto ToDto(TradingSignal signal) => new(signal.Id, signal.StrategyInstanceId,
+        signal.ConfigVersion, signal.Symbol,
+        signal.Interval, signal.CandleOpenTimeUtc, ToUnixSeconds(signal.CandleOpenTimeUtc), signal.Action.ToString(),
+            signal.Reason,
+        signal.CandleClose, signal.FastEma, signal.SlowEma, signal.CreatedAtUtc, signal.IsBackfill);
 }
 
 public sealed record StatusDto(string DecisionMode, string Environment, bool LiveLocked, DateTime ServerTimeUtc,

@@ -27,121 +27,124 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
         builder.Properties<DateTime>().HaveConversion<UtcUnixMillisecondsConverter>();
     }
 
-    protected override void OnModelCreating(ModelBuilder b)
+    protected override void OnModelCreating(ModelBuilder builder)
     {
-        b.Entity<Candle>(e =>
+        builder.Entity<Candle>(entity =>
         {
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Exchange).HasMaxLength(32);
-            e.Property(x => x.Symbol).HasMaxLength(32);
-            e.Property(x => x.Interval).HasMaxLength(8);
-            e.HasIndex(x => new { x.Exchange, x.Symbol, x.Interval, x.OpenTimeUtc }).IsUnique();
+            entity.HasKey(candle => candle.Id);
+            entity.Property(candle => candle.Exchange).HasMaxLength(32);
+            entity.Property(candle => candle.Symbol).HasMaxLength(32);
+            entity.Property(candle => candle.Interval).HasMaxLength(8);
+            entity.HasIndex(candle => new { candle.Exchange, candle.Symbol, candle.Interval,
+                candle.OpenTimeUtc }).IsUnique();
         });
 
-        b.Entity<StrategyInstance>(e =>
+        builder.Entity<StrategyInstance>(entity =>
         {
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Name).HasMaxLength(100);
-            e.Property(x => x.StrategyType).HasMaxLength(50);
-            e.Property(x => x.Exchange).HasMaxLength(32);
-            e.Property(x => x.Symbol).HasMaxLength(32);
-            e.Property(x => x.Interval).HasMaxLength(8);
-            e.HasIndex(x => x.Name).IsUnique();
+            entity.HasKey(instance => instance.Id);
+            entity.Property(instance => instance.Name).HasMaxLength(100);
+            entity.Property(instance => instance.StrategyType).HasMaxLength(50);
+            entity.Property(instance => instance.Exchange).HasMaxLength(32);
+            entity.Property(instance => instance.Symbol).HasMaxLength(32);
+            entity.Property(instance => instance.Interval).HasMaxLength(8);
+            entity.HasIndex(instance => instance.Name).IsUnique();
         });
 
-        b.Entity<TradingSignal>(e =>
+        builder.Entity<TradingSignal>(entity =>
         {
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Symbol).HasMaxLength(32);
-            e.Property(x => x.Interval).HasMaxLength(8);
-            e.Property(x => x.Action).HasConversion<string>().HasMaxLength(8);
-            e.Property(x => x.Reason).HasMaxLength(500);
-            e.HasOne<StrategyInstance>().WithMany().HasForeignKey(x => x.StrategyInstanceId)
+            entity.HasKey(signal => signal.Id);
+            entity.Property(signal => signal.Symbol).HasMaxLength(32);
+            entity.Property(signal => signal.Interval).HasMaxLength(8);
+            entity.Property(signal => signal.Action).HasConversion<string>().HasMaxLength(8);
+            entity.Property(signal => signal.Reason).HasMaxLength(500);
+            entity.HasOne<StrategyInstance>().WithMany().HasForeignKey(signal => signal.StrategyInstanceId)
                 .OnDelete(DeleteBehavior.Restrict);
-            e.HasIndex(x => new { x.StrategyInstanceId, x.ConfigVersion, x.CandleOpenTimeUtc, x.Action }).IsUnique();
-            e.HasIndex(x => new { x.StrategyInstanceId, x.CandleOpenTimeUtc });
+            entity.HasIndex(signal => new { signal.StrategyInstanceId, signal.ConfigVersion, signal.CandleOpenTimeUtc,
+                signal.Action }).IsUnique();
+            entity.HasIndex(signal => new { signal.StrategyInstanceId, signal.CandleOpenTimeUtc });
         });
 
-        b.Entity<FuturesPosition>(e =>
+        builder.Entity<FuturesPosition>(entity =>
         {
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Environment).HasMaxLength(16);
-            e.Property(x => x.Symbol).HasMaxLength(32);
-            e.Property(x => x.Side).HasConversion<string>().HasMaxLength(8);
-            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
-            e.Property(x => x.CloseReason).HasConversion<string>().HasMaxLength(16);
-            e.Ignore(x => x.NetPnl);
+            entity.HasKey(position => position.Id);
+            entity.Property(position => position.Environment).HasMaxLength(16);
+            entity.Property(position => position.Symbol).HasMaxLength(32);
+            entity.Property(position => position.Side).HasConversion<string>().HasMaxLength(8);
+            entity.Property(position => position.Status).HasConversion<string>().HasMaxLength(16);
+            entity.Property(position => position.CloseReason).HasConversion<string>().HasMaxLength(16);
+            entity.Ignore(position => position.NetPnl);
             // Chống mở trùng khi cùng một lệnh được gửi lại.
-            e.HasIndex(x => new { x.Environment, x.OpenCommandId }).IsUnique();
-            e.HasIndex(x => new { x.Environment, x.Status, x.Symbol });
+            entity.HasIndex(position => new { position.Environment, position.OpenCommandId }).IsUnique();
+            entity.HasIndex(position => new { position.Environment, position.Status, position.Symbol });
         });
 
-        b.Entity<AutoOrderRule>(e =>
+        builder.Entity<AutoOrderRule>(entity =>
         {
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Environment).HasMaxLength(16);
-            e.Property(x => x.Symbol).HasMaxLength(32);
-            e.Property(x => x.Side).HasConversion<string>().HasMaxLength(8);
-            e.Property(x => x.TriggerType).HasConversion<string>().HasMaxLength(16);
-            e.Property(x => x.Condition).HasConversion<string>().HasMaxLength(16);
-            e.Property(x => x.IndicatorName).HasMaxLength(100);
-            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
-            e.Property(x => x.Note).HasMaxLength(500);
-            e.Property(x => x.TriggerDetail).HasMaxLength(500);
-            e.Property(x => x.CloseDetail).HasMaxLength(500);
-            e.Ignore(x => x.IsWatchingClose);
-            e.HasIndex(x => x.CommandId).IsUnique();
-            e.HasIndex(x => new { x.Environment, x.Status });
+            entity.HasKey(rule => rule.Id);
+            entity.Property(rule => rule.Environment).HasMaxLength(16);
+            entity.Property(rule => rule.Symbol).HasMaxLength(32);
+            entity.Property(rule => rule.Side).HasConversion<string>().HasMaxLength(8);
+            entity.Property(rule => rule.TriggerType).HasConversion<string>().HasMaxLength(16);
+            entity.Property(rule => rule.Condition).HasConversion<string>().HasMaxLength(16);
+            entity.Property(rule => rule.IndicatorName).HasMaxLength(100);
+            entity.Property(rule => rule.Status).HasConversion<string>().HasMaxLength(16);
+            entity.Property(rule => rule.Note).HasMaxLength(500);
+            entity.Property(rule => rule.TriggerDetail).HasMaxLength(500);
+            entity.Property(rule => rule.CloseDetail).HasMaxLength(500);
+            entity.Ignore(rule => rule.IsWatchingClose);
+            entity.HasIndex(rule => rule.CommandId).IsUnique();
+            entity.HasIndex(rule => new { rule.Environment, rule.Status });
         });
 
-        b.Entity<DailyReport>(e =>
+        builder.Entity<DailyReport>(entity =>
         {
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Symbol).HasMaxLength(32);
-            e.Property(x => x.Interval).HasMaxLength(8);
+            entity.HasKey(report => report.Id);
+            entity.Property(report => report.Symbol).HasMaxLength(32);
+            entity.Property(report => report.Interval).HasMaxLength(8);
             // Một báo cáo cho mỗi (symbol, giờ lập): chạy lại hoặc tạo bù không sinh bản trùng.
-            e.HasIndex(x => new { x.Symbol, x.PeriodEndUtc }).IsUnique();
+            entity.HasIndex(report => new { report.Symbol, report.PeriodEndUtc }).IsUnique();
         });
 
-        b.Entity<NewsArticle>(e =>
+        builder.Entity<NewsArticle>(entity =>
         {
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Source).HasMaxLength(64);
-            e.Property(x => x.ExternalId).HasMaxLength(500);
-            e.Property(x => x.Title).HasMaxLength(500);
-            e.Property(x => x.Url).HasMaxLength(1000);
-            e.Property(x => x.Summary).HasMaxLength(2000);
-            e.Property(x => x.Coins).HasMaxLength(32);
+            entity.HasKey(article => article.Id);
+            entity.Property(article => article.Source).HasMaxLength(64);
+            entity.Property(article => article.ExternalId).HasMaxLength(500);
+            entity.Property(article => article.Title).HasMaxLength(500);
+            entity.Property(article => article.Url).HasMaxLength(1000);
+            entity.Property(article => article.Summary).HasMaxLength(2000);
+            entity.Property(article => article.Coins).HasMaxLength(32);
             // Đồng bộ lại không lưu trùng một bài của cùng nguồn.
-            e.HasIndex(x => new { x.Source, x.ExternalId }).IsUnique();
-            e.HasIndex(x => x.PublishedAtUtc);
+            entity.HasIndex(article => new { article.Source, article.ExternalId }).IsUnique();
+            entity.HasIndex(article => article.PublishedAtUtc);
         });
 
-        b.Entity<PaperLedgerEntry>(e =>
+        builder.Entity<PaperLedgerEntry>(entity =>
         {
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Environment).HasMaxLength(16);
-            e.Property(x => x.Asset).HasMaxLength(16);
-            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(16);
-            e.Property(x => x.Note).HasMaxLength(200);
-            e.HasOne(x => x.Position).WithMany().HasForeignKey(x => x.PositionId).OnDelete(DeleteBehavior.Restrict);
-            e.HasIndex(x => new { x.Environment, x.TimeUtc });
+            entity.HasKey(entry => entry.Id);
+            entity.Property(entry => entry.Environment).HasMaxLength(16);
+            entity.Property(entry => entry.Asset).HasMaxLength(16);
+            entity.Property(entry => entry.Type).HasConversion<string>().HasMaxLength(16);
+            entity.Property(entry => entry.Note).HasMaxLength(200);
+            entity.HasOne(entry => entry.Position).WithMany().HasForeignKey(entry => entry.PositionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(entry => new { entry.Environment, entry.TimeUtc });
         });
     }
 }
 
 public sealed class DecimalInvariantStringConverter() : ValueConverter<decimal, string>(
-    v => v.ToString(CultureInfo.InvariantCulture),
-    v => decimal.Parse(v, NumberStyles.Number, CultureInfo.InvariantCulture));
+    value => value.ToString(CultureInfo.InvariantCulture),
+    value => decimal.Parse(value, NumberStyles.Number, CultureInfo.InvariantCulture));
 
 public sealed class UtcUnixMillisecondsConverter() : ValueConverter<DateTime, long>(
-    v => ToUnixMs(v),
-    v => DateTime.UnixEpoch.AddMilliseconds(v))
+    value => ToUnixMs(value),
+    value => DateTime.UnixEpoch.AddMilliseconds(value))
 {
-    private static long ToUnixMs(DateTime v)
+    private static long ToUnixMs(DateTime value)
     {
-        if (v.Kind != DateTimeKind.Utc)
+        if (value.Kind != DateTimeKind.Utc)
             throw new InvalidOperationException("Chỉ lưu DateTime UTC.");
-        return (v.Ticks - DateTime.UnixEpoch.Ticks) / TimeSpan.TicksPerMillisecond;
+        return (value.Ticks - DateTime.UnixEpoch.Ticks) / TimeSpan.TicksPerMillisecond;
     }
 }

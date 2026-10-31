@@ -46,19 +46,19 @@ public sealed class BinanceMarketDataClient(HttpClient http, ILogger<BinanceMark
 
         using var doc = await GetJsonAsync(url, ct);
         var result = new List<KlineDto>(doc.RootElement.GetArrayLength());
-        foreach (var k in doc.RootElement.EnumerateArray())
+        foreach (var element in doc.RootElement.EnumerateArray())
         {
             // [openTime, open, high, low, close, volume, closeTime, quoteVolume, numberOfTrades, ...]
             result.Add(new KlineDto(
-                FromUnixMs(k[0].GetInt64()),
-                ParseDecimal(k[1]),
-                ParseDecimal(k[2]),
-                ParseDecimal(k[3]),
-                ParseDecimal(k[4]),
-                ParseDecimal(k[5]),
-                ParseDecimal(k[7]),
-                k[8].GetInt64(),
-                ParseDecimal(k[9])));
+                FromUnixMs(element[0].GetInt64()),
+                ParseDecimal(element[1]),
+                ParseDecimal(element[2]),
+                ParseDecimal(element[3]),
+                ParseDecimal(element[4]),
+                ParseDecimal(element[5]),
+                ParseDecimal(element[7]),
+                element[8].GetInt64(),
+                ParseDecimal(element[9])));
         }
 
         return result;
@@ -102,8 +102,8 @@ public sealed class BinanceMarketDataClient(HttpClient http, ILogger<BinanceMark
         }
     }
 
-    private static decimal ParseDecimal(JsonElement e) =>
-        decimal.Parse(e.GetString()!, NumberStyles.Number, CultureInfo.InvariantCulture);
+    private static decimal ParseDecimal(JsonElement element) =>
+        decimal.Parse(element.GetString()!, NumberStyles.Number, CultureInfo.InvariantCulture);
 
     private static DateTime FromUnixMs(long ms) => DateTime.UnixEpoch.AddMilliseconds(ms);
 }
