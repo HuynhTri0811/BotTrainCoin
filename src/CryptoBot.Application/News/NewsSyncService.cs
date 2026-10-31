@@ -40,6 +40,14 @@ public interface INewsFeedClient
 /// <summary>Feed tạm thời không đọc được (lỗi mạng, 4xx/5xx, XML hỏng).</summary>
 public sealed class NewsFeedUnavailableException(string message, Exception? inner = null) : Exception(message, inner);
 
+/// <summary>Điều kiện lọc tin; trường null là không lọc. <see cref="Search"/> tìm trong tiêu đề và tóm tắt.</summary>
+public sealed record NewsFilter(
+    string? Coin = null,
+    string? Source = null,
+    string? Search = null,
+    DateTime? FromUtc = null,
+    DateTime? ToUtc = null);
+
 public interface INewsStore
 {
     /// <summary>Những mã trong <paramref name="externalIds"/> đã được lưu cho <paramref name="source"/>.</summary>
@@ -47,11 +55,10 @@ public interface INewsStore
         CancellationToken ct);
 
     /// <summary>
-    /// Tối đa <paramref name="limit"/> bài mới nhất (theo giờ đăng), mới → cũ, lọc theo coin và khoảng
-    /// [<paramref name="fromUtc"/>, <paramref name="toUtc"/>) nếu có.
+    /// Tối đa <paramref name="limit"/> bài mới nhất (theo giờ đăng), mới → cũ, khớp <paramref name="filter"/>.
+    /// Khoảng thời gian là [FromUtc, ToUtc).
     /// </summary>
-    Task<IReadOnlyList<NewsArticle>> QueryAsync(string? coin, DateTime? fromUtc, DateTime? toUtc, int limit,
-        CancellationToken ct);
+    Task<IReadOnlyList<NewsArticle>> QueryAsync(NewsFilter filter, int limit, CancellationToken ct);
 
     void AddRange(IEnumerable<NewsArticle> articles);
     Task SaveAsync(CancellationToken ct);

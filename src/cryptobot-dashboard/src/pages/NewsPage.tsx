@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useDeferredValue, useState } from 'react';
 import { Alert, Button, Card, Input, Segmented, Select, Space, Spin, Typography, message } from 'antd';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { newsApi } from '../api/client';
 import { NewsList } from '../features/news/NewsList';
 
@@ -11,10 +11,12 @@ export function NewsPage() {
   const [coin, setCoin] = useState(ALL);
   const [source, setSource] = useState<string | undefined>();
   const [search, setSearch] = useState('');
+  const keyword = useDeferredValue(search.trim());
   const queryClient = useQueryClient();
   const q = useQuery({
-    queryKey: ['news', coin],
-    queryFn: () => newsApi.list({ coin: coin === ALL ? undefined : coin, limit: 100 }),
+    queryKey: ['news', coin, source, keyword],
+    queryFn: () => newsApi.list({ coin: coin === ALL ? undefined : coin, source, search: keyword, limit: 100 }),
+    placeholderData: keepPreviousData,
     refetchInterval: 5 * 60_000,
   });
   const sync = useMutation({
@@ -27,14 +29,6 @@ export function NewsPage() {
     onError: (e) => message.error(e.message),
   });
   const d = q.data;
-
-  // Nguồn và từ khóa lọc trên 100 tin đã tải về, coin thì lọc từ backend.
-  const keyword = search.trim().toLowerCase();
-  const articles = (d?.articles ?? []).filter(
-    (a) =>
-      (source === undefined || a.source === source) &&
-      (keyword === '' || a.title.toLowerCase().includes(keyword) || a.summary.toLowerCase().includes(keyword)),
-  );
 
   return (
     <Card
@@ -80,7 +74,7 @@ export function NewsPage() {
         />
         {d && (
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {articles.length}/{d.articles.length} tin
+            {d.articles.length} tin
           </Typography.Text>
         )}
       </Space>
@@ -89,7 +83,7 @@ export function NewsPage() {
       ) : q.isError ? (
         <Alert type="error" showIcon title={`Không tải được tin: ${q.error.message}`} />
       ) : (
-        <NewsList articles={articles} />
+        <NewsList articles={d?.articles ?? []} />
       )}
       <Typography.Paragraph type="secondary" style={{ margin: '12px 0 0', fontSize: 12 }}>
         Chỉ lưu tiêu đề, tóm tắt ngắn và link tới bài gốc. Coin được gắn theo từ khóa trong tiêu đề/tóm tắt (bitcoin,

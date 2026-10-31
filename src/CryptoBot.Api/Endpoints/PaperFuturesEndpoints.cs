@@ -53,9 +53,21 @@ public static class PaperFuturesEndpoints
                 : Results.UnprocessableEntity(new { error = result.Error });
         });
 
-        api.MapGet("/positions/history", async (int? limit, IPaperFuturesStore store, CancellationToken ct) =>
-            (await store.GetClosedAsync(Math.Clamp(limit ?? 50, 1, 500), ct))
-            .Select(p => ToDto(p, null, null, null)));
+        // Mới → cũ; lọc theo symbol, hướng, lý do đóng và khoảng giờ đóng [fromUtc, toUtc).
+        api.MapGet("/positions/history", async (string? symbol, string? side, string? closeReason,
+            DateTimeOffset? fromUtc, DateTimeOffset? toUtc, int? limit, IPaperFuturesStore store, CancellationToken ct) =>
+        {
+            if (!QueryEnum.TryParse<PositionSide>(side, out var pickedSide))
+                return Results.BadRequest(new { error = QueryEnum.Error<PositionSide>(side!) });
+            if (!QueryEnum.TryParse<CloseReason>(closeReason, out var pickedReason))
+                return Results.BadRequest(new { error = QueryEnum.Error<CloseReason>(closeReason!) });
+
+            var filter = new ClosedPositionFilter(
+                string.IsNullOrWhiteSpace(symbol) ? null : symbol.Trim().ToUpperInvariant(), pickedSide, pickedReason,
+                fromUtc?.UtcDateTime, toUtc?.UtcDateTime);
+            var closed = await store.GetClosedAsync(filter, Math.Clamp(limit ?? 50, 1, 500), ct);
+            return Results.Ok(closed.Select(p => ToDto(p, null, null, null)));
+        });
     }
 
     private static PositionDto ToDto(FuturesPosition p, decimal? mark, decimal? upnl, decimal? roe) => new(
