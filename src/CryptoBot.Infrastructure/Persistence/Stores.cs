@@ -10,32 +10,45 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CryptoBot.Infrastructure.Persistence;
 
+/// <summary>
+/// Lưu và đọc nến trong SQLite. Mỗi nến được xác định bởi (Exchange, Symbol, Interval, OpenTimeUtc), có index duy nhất.
+/// </summary>
 public sealed class CandleStore(BotDbContext db) : ICandleStore
 {
+    /// <summary>OpenTime của nến mới nhất đã lưu (kể cả nến đang chạy); null nếu chưa có nến nào.</summary>
     public async Task<DateTime?> GetLatestOpenTimeAsync(CandleKey key, CancellationToken ct) =>
         await ForKey(key)
-            .OrderByDescending(c => c.OpenTimeUtc)
-            .Select(c => (DateTime?)c.OpenTimeUtc)
+            .OrderByDescending(candle => candle.OpenTimeUtc)
+            .Select(candle => (DateTime?)candle.OpenTimeUtc)
             .FirstOrDefaultAsync(ct);
 
+    /// <summary>
+    /// OpenTime sớm nhất từ <paramref name="fromUtc"/> của nến thiếu số giao dịch hoặc khối lượng mua chủ động.
+    /// </summary>
     public async Task<DateTime?> GetFirstMissingStatsOpenTimeAsync(CandleKey key, DateTime fromUtc,
         CancellationToken ct) =>
         await ForKey(key)
-            .Where(c => c.OpenTimeUtc >= fromUtc && (c.TradeCount == null || c.TakerBuyVolume == null))
-            .OrderBy(c => c.OpenTimeUtc)
-            .Select(c => (DateTime?)c.OpenTimeUtc)
+            .Where(candle => candle.OpenTimeUtc >= fromUtc &&
+                             (candle.TradeCount == null || candle.TakerBuyVolume == null))
+            .OrderBy(candle => candle.OpenTimeUtc)
+            .Select(candle => (DateTime?)candle.OpenTimeUtc)
             .FirstOrDefaultAsync(ct);
 
+    /// <summary>
+    /// Thêm nến mới và cập nhật nến đã có trong một lần lưu. Nến đã đóng không bị ghi đè: bản khác giá trị được báo
+    /// trong <see cref="UpsertResult.Conflicts"/>, bản khớp chỉ được bổ sung các số còn thiếu và tính là Unchanged.
+    /// </summary>
     public async Task<UpsertResult> UpsertAsync(CandleKey key, IReadOnlyList<Candle> candles, CancellationToken ct)
     {
         if (candles.Count == 0)
             return new UpsertResult(0, 0, 0, []);
 
-        var from = candles.Min(c => c.OpenTimeUtc);
-        var to = candles.Max(c => c.OpenTimeUtc);
+        // Đọc một lần cả khoảng thời gian của lô, có tracking để SaveChanges ghi lại các nến được sửa.
+        var from = candles.Min(candle => candle.OpenTimeUtc);
+        var to = candles.Max(candle => candle.OpenTimeUtc);
         var existing = await ForKey(key, tracking: true)
-            .Where(c => c.OpenTimeUtc >= from && c.OpenTimeUtc <= to)
-            .ToDictionaryAsync(c => c.OpenTimeUtc, ct);
+            .Where(candle => candle.OpenTimeUtc >= from && candle.OpenTimeUtc <= to)
+            .ToDictionaryAsync(candle => candle.OpenTimeUtc, ct);
 
         int inserted = 0, updated = 0, unchanged = 0;
         var conflicts = new List<CandleIssue>();
@@ -45,6 +58,7 @@ public sealed class CandleStore(BotDbContext db) : ICandleStore
             if (!existing.TryGetValue(candle.OpenTimeUtc, out var stored))
             {
                 db.Candles.Add(candle);
+                // Ghi vào từ điển để nến trùng OpenTime trong cùng lô thành cập nhật, không thêm hai lần.
                 existing[candle.OpenTimeUtc] = candle;
                 inserted++;
                 continue;
@@ -68,56 +82,67 @@ public sealed class CandleStore(BotDbContext db) : ICandleStore
         return new UpsertResult(inserted, updated, unchanged, conflicts);
     }
 
+    /// <summary>
+    /// Tối đa <paramref name="limit"/> nến mới nhất có OpenTime trước <paramref name="beforeExclusiveUtc"/> (nếu có),
+    /// trả về cũ → mới. <paramref name="closedOnly"/> bỏ nến đang chạy.
+    /// </summary>
     public async Task<IReadOnlyList<Candle>> GetLatestAsync(CandleKey key, DateTime? beforeExclusiveUtc, int limit,
         bool closedOnly, CancellationToken ct)
     {
         if (limit <= 0)
             return [];
 
-        var q = ForKey(key);
+        var query = ForKey(key);
         if (beforeExclusiveUtc is { } before)
-            q = q.Where(c => c.OpenTimeUtc < before);
+            query = query.Where(candle => candle.OpenTimeUtc < before);
         if (closedOnly)
-            q = q.Where(c => c.IsClosed);
+            query = query.Where(candle => candle.IsClosed);
 
-        var list = await q.OrderByDescending(c => c.OpenTimeUtc).Take(limit).ToListAsync(ct);
+        // Sắp giảm dần để Take lấy nến mới nhất, rồi đảo lại cho đúng thứ tự thời gian.
+        var list = await query.OrderByDescending(candle => candle.OpenTimeUtc).Take(limit).ToListAsync(ct);
         list.Reverse();
         return list;
     }
 
+    /// <summary>
+    /// Tối đa <paramref name="limit"/> nến đầu tiên có OpenTime sau <paramref name="afterExclusiveUtc"/> (nếu có),
+    /// cũ → mới. <paramref name="closedOnly"/> bỏ nến đang chạy.
+    /// </summary>
     public async Task<IReadOnlyList<Candle>> GetAfterAsync(CandleKey key, DateTime? afterExclusiveUtc, int limit,
         bool closedOnly, CancellationToken ct)
     {
         if (limit <= 0)
             return [];
 
-        var q = ForKey(key);
+        var query = ForKey(key);
         if (afterExclusiveUtc is { } after)
-            q = q.Where(c => c.OpenTimeUtc > after);
+            query = query.Where(candle => candle.OpenTimeUtc > after);
         if (closedOnly)
-            q = q.Where(c => c.IsClosed);
+            query = query.Where(candle => candle.IsClosed);
 
-        return await q.OrderBy(c => c.OpenTimeUtc).Take(limit).ToListAsync(ct);
+        return await query.OrderBy(candle => candle.OpenTimeUtc).Take(limit).ToListAsync(ct);
     }
 
+    /// <summary>Nến của một sàn/cặp/khung. Mặc định không tracking; chỉ bật khi cần sửa nến rồi lưu lại.</summary>
     private IQueryable<Candle> ForKey(CandleKey key, bool tracking = false)
     {
         var interval = key.Interval.Code;
-        var q = db.Candles.Where(c => c.Exchange == key.Exchange && c.Symbol == key.Symbol && c.Interval == interval);
-        return tracking ? q : q.AsNoTracking();
+        var query = db.Candles.Where(candle => candle.Exchange == key.Exchange && candle.Symbol == key.Symbol &&
+                                               candle.Interval == interval);
+        return tracking ? query : query.AsNoTracking();
     }
 }
 
 public sealed class StrategyInstanceStore(BotDbContext db) : IStrategyInstanceStore
 {
     public async Task<IReadOnlyList<StrategyInstance>> GetAllAsync(CancellationToken ct) =>
-        await db.StrategyInstances.OrderBy(s => s.Id).ToListAsync(ct);
+        await db.StrategyInstances.OrderBy(instance => instance.Id).ToListAsync(ct);
 
     public Task<StrategyInstance?> GetAsync(int id, CancellationToken ct) =>
-        db.StrategyInstances.FirstOrDefaultAsync(s => s.Id == id, ct);
+        db.StrategyInstances.FirstOrDefaultAsync(instance => instance.Id == id, ct);
 
     public Task<StrategyInstance?> FindByNameAsync(string name, CancellationToken ct) =>
-        db.StrategyInstances.FirstOrDefaultAsync(s => s.Name == name, ct);
+        db.StrategyInstances.FirstOrDefaultAsync(instance => instance.Name == name, ct);
 
     public async Task AddAsync(StrategyInstance instance, CancellationToken ct) =>
         await db.StrategyInstances.AddAsync(instance, ct);
@@ -129,8 +154,8 @@ public sealed class SignalStore(BotDbContext db) : ISignalStore
 {
     public Task<TradingSignal?> GetLastAsync(int strategyInstanceId, int configVersion, CancellationToken ct) =>
         db.Signals.AsNoTracking()
-            .Where(s => s.StrategyInstanceId == strategyInstanceId && s.ConfigVersion == configVersion)
-            .OrderByDescending(s => s.CandleOpenTimeUtc)
+            .Where(signal => signal.StrategyInstanceId == strategyInstanceId && signal.ConfigVersion == configVersion)
+            .OrderByDescending(signal => signal.CandleOpenTimeUtc)
             .FirstOrDefaultAsync(ct);
 
     public async Task SaveEvaluationAsync(StrategyInstance instance, IReadOnlyList<TradingSignal> newSignals,
@@ -146,22 +171,22 @@ public sealed class SignalStore(BotDbContext db) : ISignalStore
 
     public async Task<IReadOnlyList<TradingSignal>> QueryAsync(SignalFilter filter, int limit, CancellationToken ct)
     {
-        var q = db.Signals.AsNoTracking();
+        var query = db.Signals.AsNoTracking();
         if (filter.StrategyInstanceId is { } id)
-            q = q.Where(s => s.StrategyInstanceId == id);
-        if (filter.ConfigVersion is { } v)
-            q = q.Where(s => s.ConfigVersion == v);
+            query = query.Where(signal => signal.StrategyInstanceId == id);
+        if (filter.ConfigVersion is { } version)
+            query = query.Where(signal => signal.ConfigVersion == version);
         if (filter.Action is { } action)
-            q = q.Where(s => s.Action == action);
+            query = query.Where(signal => signal.Action == action);
         if (filter.IsBackfill is { } backfill)
-            q = q.Where(s => s.IsBackfill == backfill);
+            query = query.Where(signal => signal.IsBackfill == backfill);
         if (filter.FromUtc is { } from)
-            q = q.Where(s => s.CandleOpenTimeUtc >= from);
+            query = query.Where(signal => signal.CandleOpenTimeUtc >= from);
         if (filter.ToUtc is { } to)
-            q = q.Where(s => s.CandleOpenTimeUtc <= to);
+            query = query.Where(signal => signal.CandleOpenTimeUtc <= to);
 
-        var list = await q.OrderByDescending(s => s.CandleOpenTimeUtc).ThenByDescending(s => s.Id)
-            .Take(limit).ToListAsync(ct);
+        var list = await query.OrderByDescending(signal => signal.CandleOpenTimeUtc)
+            .ThenByDescending(signal => signal.Id).Take(limit).ToListAsync(ct);
         list.Reverse();
         return list;
     }
@@ -173,39 +198,40 @@ public sealed class PaperFuturesStore(BotDbContext db) : IPaperFuturesStore
 
     public async Task<IReadOnlyList<FuturesPosition>> GetOpenPositionsAsync(CancellationToken ct) =>
         await db.FuturesPositions
-            .Where(p => p.Environment == Env && p.Status == PositionStatus.Open)
-            .OrderBy(p => p.Id).ToListAsync(ct);
+            .Where(position => position.Environment == Env && position.Status == PositionStatus.Open)
+            .OrderBy(position => position.Id).ToListAsync(ct);
 
     public Task<FuturesPosition?> GetAsync(long id, CancellationToken ct) =>
-        db.FuturesPositions.FirstOrDefaultAsync(p => p.Environment == Env && p.Id == id, ct);
+        db.FuturesPositions.FirstOrDefaultAsync(position => position.Environment == Env && position.Id == id, ct);
 
     public Task<FuturesPosition?> FindByOpenCommandAsync(Guid commandId, CancellationToken ct) =>
-        db.FuturesPositions.FirstOrDefaultAsync(p => p.Environment == Env && p.OpenCommandId == commandId, ct);
+        db.FuturesPositions.FirstOrDefaultAsync(
+            position => position.Environment == Env && position.OpenCommandId == commandId, ct);
 
     public async Task<IReadOnlyList<FuturesPosition>> GetClosedAsync(ClosedPositionFilter filter, int limit,
         CancellationToken ct)
     {
-        var q = db.FuturesPositions.AsNoTracking()
-            .Where(p => p.Environment == Env && p.Status != PositionStatus.Open);
+        var query = db.FuturesPositions.AsNoTracking()
+            .Where(position => position.Environment == Env && position.Status != PositionStatus.Open);
         if (filter.Symbol is { } symbol)
-            q = q.Where(p => p.Symbol == symbol);
+            query = query.Where(position => position.Symbol == symbol);
         if (filter.Side is { } side)
-            q = q.Where(p => p.Side == side);
+            query = query.Where(position => position.Side == side);
         if (filter.CloseReason is { } reason)
-            q = q.Where(p => p.CloseReason == reason);
+            query = query.Where(position => position.CloseReason == reason);
         if (filter.FromUtc is { } from)
-            q = q.Where(p => p.ClosedAtUtc >= from);
+            query = query.Where(position => position.ClosedAtUtc >= from);
         if (filter.ToUtc is { } to)
-            q = q.Where(p => p.ClosedAtUtc < to);
-        return await q.OrderByDescending(p => p.Id).Take(limit).ToListAsync(ct);
+            query = query.Where(position => position.ClosedAtUtc < to);
+        return await query.OrderByDescending(position => position.Id).Take(limit).ToListAsync(ct);
     }
 
     public async Task<IReadOnlyList<PaperLedgerEntry>> GetLedgerAsync(CancellationToken ct)
     {
         // Bút toán chưa lưu (cùng transaction) cũng phải được tính vào số dư.
-        var stored = await db.PaperLedger.Where(e => e.Environment == Env).ToListAsync(ct);
+        var stored = await db.PaperLedger.Where(entry => entry.Environment == Env).ToListAsync(ct);
         var pending = db.ChangeTracker.Entries<PaperLedgerEntry>()
-            .Where(e => e.State == EntityState.Added).Select(e => e.Entity);
+            .Where(tracked => tracked.State == EntityState.Added).Select(tracked => tracked.Entity);
         return stored.Concat(pending).Distinct().ToList();
     }
 
@@ -222,22 +248,22 @@ public sealed class AutoOrderStore(BotDbContext db) : IAutoOrderStore
 
     public async Task<IReadOnlyList<AutoOrderRule>> GetActiveAsync(CancellationToken ct) =>
         await db.AutoOrderRules
-            .Where(r => r.Environment == Env && r.Status == AutoRuleStatus.Active)
-            .OrderBy(r => r.Id).ToListAsync(ct);
+            .Where(rule => rule.Environment == Env && rule.Status == AutoRuleStatus.Active)
+            .OrderBy(rule => rule.Id).ToListAsync(ct);
 
     public async Task<IReadOnlyList<AutoOrderRule>> GetWatchingCloseAsync(CancellationToken ct) =>
         await db.AutoOrderRules
-            .Where(r => r.Environment == Env && r.CloseOnReverse && r.Status == AutoRuleStatus.Triggered &&
-                        r.CloseWatchEndedAtUtc == null)
-            .OrderBy(r => r.Id).ToListAsync(ct);
+            .Where(rule => rule.Environment == Env && rule.CloseOnReverse && rule.Status == AutoRuleStatus.Triggered &&
+                        rule.CloseWatchEndedAtUtc == null)
+            .OrderBy(rule => rule.Id).ToListAsync(ct);
 
     public async Task<IReadOnlyList<AutoOrderRule>> GetRecentAsync(int limit, CancellationToken ct) =>
         await db.AutoOrderRules.AsNoTracking()
-            .Where(r => r.Environment == Env)
-            .OrderByDescending(r => r.Id).Take(limit).ToListAsync(ct);
+            .Where(rule => rule.Environment == Env)
+            .OrderByDescending(rule => rule.Id).Take(limit).ToListAsync(ct);
 
     public Task<AutoOrderRule?> GetAsync(long id, CancellationToken ct) =>
-        db.AutoOrderRules.FirstOrDefaultAsync(r => r.Environment == Env && r.Id == id, ct);
+        db.AutoOrderRules.FirstOrDefaultAsync(rule => rule.Environment == Env && rule.Id == id, ct);
 
     public void Add(AutoOrderRule rule) => db.AutoOrderRules.Add(rule);
 
@@ -247,12 +273,12 @@ public sealed class AutoOrderStore(BotDbContext db) : IAutoOrderStore
 public sealed class DailyReportStore(BotDbContext db) : IDailyReportStore
 {
     public Task<bool> ExistsAsync(string symbol, DateTime periodEndUtc, CancellationToken ct) =>
-        db.DailyReports.AnyAsync(r => r.Symbol == symbol && r.PeriodEndUtc == periodEndUtc, ct);
+        db.DailyReports.AnyAsync(report => report.Symbol == symbol && report.PeriodEndUtc == periodEndUtc, ct);
 
     public async Task<IReadOnlyList<DailyReport>> GetRecentAsync(string? symbol, int limit, CancellationToken ct) =>
         await db.DailyReports.AsNoTracking()
-            .Where(r => symbol == null || r.Symbol == symbol)
-            .OrderByDescending(r => r.PeriodEndUtc).ThenBy(r => r.Symbol)
+            .Where(report => symbol == null || report.Symbol == symbol)
+            .OrderByDescending(report => report.PeriodEndUtc).ThenBy(report => report.Symbol)
             .Take(limit).ToListAsync(ct);
 
     public void Add(DailyReport report) => db.DailyReports.Add(report);
@@ -265,29 +291,29 @@ public sealed class NewsStore(BotDbContext db) : INewsStore
     public async Task<IReadOnlySet<string>> GetExistingIdsAsync(string source, IReadOnlyCollection<string> externalIds,
         CancellationToken ct) =>
         (await db.NewsArticles
-            .Where(a => a.Source == source && externalIds.Contains(a.ExternalId))
-            .Select(a => a.ExternalId).ToListAsync(ct)).ToHashSet();
+            .Where(article => article.Source == source && externalIds.Contains(article.ExternalId))
+            .Select(article => article.ExternalId).ToListAsync(ct)).ToHashSet();
 
     public async Task<IReadOnlyList<NewsArticle>> QueryAsync(NewsFilter filter, int limit, CancellationToken ct)
     {
         var query = db.NewsArticles.AsNoTracking();
         // Coins là "BTC,ETH": mã coin không trùng một phần với nhau nên tìm chuỗi con là đủ.
         if (filter.Coin is { } coin)
-            query = query.Where(a => a.Coins.Contains(coin));
+            query = query.Where(article => article.Coins.Contains(coin));
         if (filter.Source is { } source)
-            query = query.Where(a => a.Source == source);
+            query = query.Where(article => article.Source == source);
         if (filter.Search is { } search)
         {
             // Giữ nguyên %, _ người dùng gõ. LIKE của SQLite chỉ không phân biệt hoa thường với ký tự ASCII.
             var pattern = $"%{search.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_")}%";
-            query = query.Where(a => EF.Functions.Like(a.Title, pattern, @"\") ||
-                                     EF.Functions.Like(a.Summary, pattern, @"\"));
+            query = query.Where(article => EF.Functions.Like(article.Title, pattern, @"\") ||
+                                     EF.Functions.Like(article.Summary, pattern, @"\"));
         }
         if (filter.FromUtc is { } from)
-            query = query.Where(a => a.PublishedAtUtc >= from);
+            query = query.Where(article => article.PublishedAtUtc >= from);
         if (filter.ToUtc is { } to)
-            query = query.Where(a => a.PublishedAtUtc < to);
-        return await query.OrderByDescending(a => a.PublishedAtUtc).ThenByDescending(a => a.Id)
+            query = query.Where(article => article.PublishedAtUtc < to);
+        return await query.OrderByDescending(article => article.PublishedAtUtc).ThenByDescending(article => article.Id)
             .Take(limit).ToListAsync(ct);
     }
 
