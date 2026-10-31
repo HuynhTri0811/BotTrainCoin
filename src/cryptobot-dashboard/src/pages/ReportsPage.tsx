@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, Button, Card, Empty, Segmented, Space, Spin, Table, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { reportApi, type SavedDailyReport } from '../api/client';
+import { columnFilter } from '../components/tableFilters';
 import { DailyReportCard, fmtPct2, pctColor } from '../features/reports/DailyReportCard';
 import { formatVn } from '../time';
 
@@ -70,7 +71,14 @@ export function ReportsPage() {
                 dataSource={older}
                 columns={[
                   { title: 'Đến', render: (_, r) => formatVn(r.report.toUtc) },
-                  { title: 'Thay đổi', render: (_, r) => colored(r.report.changePercent) },
+                  {
+                    title: 'Thay đổi',
+                    ...columnFilter<SavedDailyReport>((r) => (r.report.changePercent >= 0 ? 'Up' : 'Down'), [
+                      { text: 'Tăng', value: 'Up' },
+                      { text: 'Giảm', value: 'Down' },
+                    ]),
+                    render: (_, r) => colored(r.report.changePercent),
+                  },
                   { title: 'Biên độ', render: (_, r) => `${r.report.rangePercent.toFixed(2)}%` },
                   { title: 'Giảm sâu nhất', render: (_, r) => colored(r.report.maxDrawdownPercent) },
                   { title: 'Hồi mạnh nhất', render: (_, r) => colored(r.report.maxRallyPercent) },
@@ -78,7 +86,14 @@ export function ReportsPage() {
                     title: 'Mua chủ động',
                     render: (_, r) => (r.report.buyPercent == null ? '—' : `${r.report.buyPercent.toFixed(1)}%`),
                   },
-                  { title: 'Giờ khối lượng bất thường', render: (_, r) => r.report.volumeSpikes.length },
+                  {
+                    title: 'Giờ khối lượng bất thường',
+                    ...columnFilter<SavedDailyReport>((r) => (r.report.volumeSpikes.length > 0 ? 'Yes' : 'No'), [
+                      { text: 'Có', value: 'Yes' },
+                      { text: 'Không', value: 'No' },
+                    ]),
+                    render: (_, r) => r.report.volumeSpikes.length,
+                  },
                 ]}
               />
             </Card>

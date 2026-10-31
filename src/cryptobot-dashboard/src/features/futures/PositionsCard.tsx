@@ -1,6 +1,7 @@
 import { Button, Card, Popconfirm, Table, Tabs, Tag, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, futuresApi, type FuturesAccount, type FuturesPosition } from '../../api/client';
+import { columnFilter, optionsFrom } from '../../components/tableFilters';
 import { formatVn } from '../../time';
 import { fmtPrice, fmtSigned, fmtUsdt, pnlColor } from './format';
 
@@ -17,6 +18,11 @@ const reasonLabel: Record<string, { text: string; color: string }> = {
   Liquidation: { text: 'Thanh lý', color: 'red' },
   Signal: { text: 'Chỉ báo đảo chiều', color: 'purple' },
 };
+
+const SIDES = [
+  { text: 'Long', value: 'Long' },
+  { text: 'Short', value: 'Short' },
+];
 
 export function PositionsCard({ account }: { account: FuturesAccount | undefined }) {
   const queryClient = useQueryClient();
@@ -37,6 +43,7 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
   });
 
   const open = account?.openPositions ?? [];
+  const closed = history.data ?? [];
 
   return (
     <Card size="small">
@@ -113,16 +120,29 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
                 rowKey="id"
                 size="small"
                 loading={history.isPending}
-                dataSource={history.data ?? []}
+                dataSource={closed}
                 pagination={{ pageSize: 10, hideOnSinglePage: true }}
                 scroll={{ x: true }}
                 columns={[
                   { title: 'Đóng lúc', dataIndex: 'closedAtUtc', render: formatVn },
-                  { title: 'Symbol', dataIndex: 'symbol' },
-                  { title: 'Hướng', key: 'side', render: (_, p) => sideTag(p) },
+                  {
+                    title: 'Symbol',
+                    dataIndex: 'symbol',
+                    ...columnFilter<FuturesPosition>((p) => p.symbol, optionsFrom(closed, (p) => p.symbol)),
+                  },
+                  {
+                    title: 'Hướng',
+                    key: 'side',
+                    ...columnFilter<FuturesPosition>((p) => p.side, SIDES),
+                    render: (_, p) => sideTag(p),
+                  },
                   {
                     title: 'Lý do',
                     dataIndex: 'closeReason',
+                    ...columnFilter<FuturesPosition>(
+                      (p) => p.closeReason ?? '',
+                      Object.entries(reasonLabel).map(([value, { text }]) => ({ text, value })),
+                    ),
                     render: (r: string) => <Tag color={reasonLabel[r]?.color}>{reasonLabel[r]?.text ?? r}</Tag>,
                   },
                   { title: 'Giá vào', dataIndex: 'entryPrice', align: 'right', render: fmtPrice },
@@ -142,6 +162,10 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
                   {
                     title: 'PnL ròng',
                     dataIndex: 'netPnl',
+                    ...columnFilter<FuturesPosition>((p) => ((p.netPnl ?? 0) >= 0 ? 'Win' : 'Loss'), [
+                      { text: 'Lời', value: 'Win' },
+                      { text: 'Lỗ', value: 'Loss' },
+                    ]),
                     align: 'right',
                     render: (v: number) => (
                       <Typography.Text strong style={{ color: pnlColor(v) }}>

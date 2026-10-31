@@ -273,6 +273,9 @@ UI: trang **Lịch sử theo tháng** ([`HistoryPage.tsx`](../src/cryptobot-dash
   hiện tại nằm trong `#hash` (tải lại hoặc gửi link vẫn mở đúng trang).
 - Nút chọn chiến lược (`BTCUSDT 1h`, `BTCUSDT 15m`, …) ở góc phải; các trang (trừ Lịch sử, Báo cáo ngày, Tin tức)
   dùng symbol/khung của chiến lược đang chọn.
+- Lọc trên tiêu đề cột (`components/tableFilters.ts`) ở các bảng Tín hiệu, Lịch sử vị thế, Quy tắc tự động, Dự đoán,
+  Tín hiệu chỉ báo và Các ngày trước. Trang Tin tức có thêm ô tìm kiếm và chọn nguồn. Các bộ lọc này chạy trên dữ
+  liệu đã tải về (ví dụ 50 tín hiệu, 50 vị thế, 100 tin), không gọi lại API.
 - Thanh trạng thái: chế độ, môi trường, feed nào stale, lỗi đồng bộ.
 - Thời gian hiển thị theo giờ Việt Nam (`Asia/Ho_Chi_Minh`); backend luôn trả UTC.
 - Giao diện tiếng Việt (`antd/locale/vi_VN`).
