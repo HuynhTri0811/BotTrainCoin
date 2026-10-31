@@ -105,10 +105,10 @@ export const api = {
   chart: (strategyId: number, limit = 300) =>
     getJson<ChartData>(`/api/strategies/${strategyId}/chart?limit=${limit}`),
   signals: (strategyId: number, filter: { action?: string; isBackfill?: string } = {}, limit = 50) => {
-    const q = new URLSearchParams({ strategyId: String(strategyId), limit: String(limit) });
-    if (filter.action) q.set('action', filter.action);
-    if (filter.isBackfill) q.set('isBackfill', filter.isBackfill);
-    return getJson<Signal[]>(`/api/signals?${q}`);
+    const params = new URLSearchParams({ strategyId: String(strategyId), limit: String(limit) });
+    if (filter.action) params.set('action', filter.action);
+    if (filter.isBackfill) params.set('isBackfill', filter.isBackfill);
+    return getJson<Signal[]>(`/api/signals?${params}`);
   },
 };
 
@@ -210,11 +210,11 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 export const futuresApi = {
   account: () => getJson<FuturesAccount>('/api/paper/futures/account'),
   history: (filter: { symbol?: string; side?: string; closeReason?: string } = {}, limit = 50) => {
-    const q = new URLSearchParams({ limit: String(limit) });
-    if (filter.symbol) q.set('symbol', filter.symbol);
-    if (filter.side) q.set('side', filter.side);
-    if (filter.closeReason) q.set('closeReason', filter.closeReason);
-    return getJson<FuturesPosition[]>(`/api/paper/futures/positions/history?${q}`);
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (filter.symbol) params.set('symbol', filter.symbol);
+    if (filter.side) params.set('side', filter.side);
+    if (filter.closeReason) params.set('closeReason', filter.closeReason);
+    return getJson<FuturesPosition[]>(`/api/paper/futures/positions/history?${params}`);
   },
   quote: (req: OpenRequest) => postJson<FuturesQuote>('/api/paper/futures/quote', req),
   open: (req: OpenRequest) =>
@@ -645,14 +645,14 @@ export const newsApi = {
   list: (
     opts: { coin?: string; source?: string; search?: string; fromUtc?: string; toUtc?: string; limit?: number } = {},
   ) => {
-    const q = new URLSearchParams();
-    if (opts.coin) q.set('coin', opts.coin);
-    if (opts.source) q.set('source', opts.source);
-    if (opts.search) q.set('search', opts.search);
-    if (opts.fromUtc) q.set('fromUtc', opts.fromUtc);
-    if (opts.toUtc) q.set('toUtc', opts.toUtc);
-    q.set('limit', String(opts.limit ?? 50));
-    return getJson<NewsList>(`/api/news?${q}`);
+    const params = new URLSearchParams();
+    if (opts.coin) params.set('coin', opts.coin);
+    if (opts.source) params.set('source', opts.source);
+    if (opts.search) params.set('search', opts.search);
+    if (opts.fromUtc) params.set('fromUtc', opts.fromUtc);
+    if (opts.toUtc) params.set('toUtc', opts.toUtc);
+    params.set('limit', String(opts.limit ?? 50));
+    return getJson<NewsList>(`/api/news?${params}`);
   },
   sync: () => postJson<{ added: number; errors: string[] }>('/api/news/sync', {}),
 };

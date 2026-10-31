@@ -65,19 +65,19 @@ public sealed record SimilarDaysForecast(
 
         Features features = Features.Build(dailyCloses);
         int days = 0, correct = 0, strongDays = 0, strongCorrect = 0;
-        for (int i = FirstFeatureIndex + warmupDays; i + horizonDays < dailyCloses.Count; i++)
+        for (int index = FirstFeatureIndex + warmupDays; index + horizonDays < dailyCloses.Count; index++)
         {
-            List<decimal>? outcomes = NeighborOutcomes(dailyCloses, features, i, i - horizonDays, horizonDays,
+            List<decimal>? outcomes = NeighborOutcomes(dailyCloses, features, index, index - horizonDays, horizonDays,
                 neighbors);
             if (outcomes is null)
                 continue;
 
             // Hòa (đúng 50% ngày tương tự tăng) là không đoán; giá đứng yên thì không có hướng để chấm.
             decimal up = PercentChange.UpShare(outcomes);
-            if (up == 50m || dailyCloses[i + horizonDays] == dailyCloses[i])
+            if (up == 50m || dailyCloses[index + horizonDays] == dailyCloses[index])
                 continue;
 
-            bool hit = up > 50m == dailyCloses[i + horizonDays] > dailyCloses[i];
+            bool hit = up > 50m == dailyCloses[index + horizonDays] > dailyCloses[index];
             days++;
             if (hit) correct++;
             if (up >= StrongLeanPercent || up <= 100m - StrongLeanPercent)
@@ -107,16 +107,16 @@ public sealed record SimilarDaysForecast(
 
         double[] distances = new double[count];
         int[] days = new int[count];
-        for (int k = 0; k < count; k++)
+        for (int neighborIndex = 0; neighborIndex < count; neighborIndex++)
         {
-            days[k] = FirstFeatureIndex + k;
-            distances[k] = features.Distance(days[k], target);
+            days[neighborIndex] = FirstFeatureIndex + neighborIndex;
+            distances[neighborIndex] = features.Distance(days[neighborIndex], target);
         }
 
         Array.Sort(distances, days);
         List<decimal> outcomes = new(neighbors);
-        for (int k = 0; k < neighbors; k++)
-            outcomes.Add(PercentChange.Between(closes[days[k]], closes[days[k] + horizonDays]));
+        for (int neighborIndex = 0; neighborIndex < neighbors; neighborIndex++)
+            outcomes.Add(PercentChange.Between(closes[days[neighborIndex]], closes[days[neighborIndex] + horizonDays]));
         return outcomes;
     }
 
@@ -132,7 +132,8 @@ public sealed record SimilarDaysForecast(
     }
 
     /// <summary>Phân vị đơn giản (không nội suy) trên danh sách đã sắp xếp.</summary>
-    private static decimal Percentile(List<decimal> sorted, double p) => sorted[(int)(p * (sorted.Count - 1))];
+    private static decimal Percentile(List<decimal> sorted,
+        double percentile) => sorted[(int)(percentile * (sorted.Count - 1))];
 
     /// <summary>5 đặc trưng của mỗi ngày, đã chia cho độ lệch chuẩn để các đặc trưng nặng ngang nhau.</summary>
     private sealed class Features
@@ -149,39 +150,39 @@ public sealed record SimilarDaysForecast(
             decimal?[] rsi = Rsi.Calculate(closes, 14);
 
             double[][] rows = new double[closes.Count][];
-            for (int i = FirstFeatureIndex; i < closes.Count; i++)
+            for (int index = FirstFeatureIndex; index < closes.Count; index++)
             {
-                rows[i] =
+                rows[index] =
                 [
-                    Pct(closes[i], ema200[i]!.Value),
-                    Pct(closes[i], ema50[i]!.Value),
-                    (double)rsi[i]!.Value,
-                    Pct(closes[i], closes[i - 7]),
-                    Pct(closes[i], closes[i - 1]),
+                    Pct(closes[index], ema200[index]!.Value),
+                    Pct(closes[index], ema50[index]!.Value),
+                    (double)rsi[index]!.Value,
+                    Pct(closes[index], closes[index - 7]),
+                    Pct(closes[index], closes[index - 1]),
                 ];
             }
 
-            for (int f = 0; f < Count; f++)
+            for (int featureIndex = 0; featureIndex < Count; featureIndex++)
             {
-                double[] column = rows.Skip(FirstFeatureIndex).Select(r => r[f]).ToArray();
+                double[] column = rows.Skip(FirstFeatureIndex).Select(row => row[featureIndex]).ToArray();
                 double mean = column.Average();
-                double sd = Math.Sqrt(column.Sum(v => (v - mean) * (v - mean)) / column.Length);
+                double sd = Math.Sqrt(column.Sum(value => (value - mean) * (value - mean)) / column.Length);
                 if (sd == 0)
                     sd = 1;
-                for (int i = FirstFeatureIndex; i < rows.Length; i++)
-                    rows[i][f] /= sd;
+                for (int index = FirstFeatureIndex; index < rows.Length; index++)
+                    rows[index][featureIndex] /= sd;
             }
 
             return new Features(rows);
         }
 
-        public double Distance(int a, int b)
+        public double Distance(int first, int second)
         {
             double sum = 0;
-            for (int f = 0; f < Count; f++)
+            for (int featureIndex = 0; featureIndex < Count; featureIndex++)
             {
-                double d = _rows[a][f] - _rows[b][f];
-                sum += d * d;
+                double difference = _rows[first][featureIndex] - _rows[second][featureIndex];
+                sum += difference * difference;
             }
 
             return sum;

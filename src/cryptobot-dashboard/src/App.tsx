@@ -26,7 +26,7 @@ type Page = (typeof PAGES)[number]['key'];
 /** Trang hiện tại nằm trong #hash để tải lại hoặc gửi link vẫn mở đúng trang. */
 function pageFromHash(): Page {
   const hash = window.location.hash.slice(1);
-  return PAGES.find((p) => p.key === hash)?.key ?? 'market';
+  return PAGES.find((page) => page.key === hash)?.key ?? 'market';
 }
 
 export function App() {
@@ -40,8 +40,8 @@ export function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  const strategies = status.data?.strategies.filter((s) => s.enabled) ?? [];
-  const current = strategies.find((s) => s.id === selected) ?? strategies[0];
+  const strategies = status.data?.strategies.filter((strategy) => strategy.enabled) ?? [];
+  const current = strategies.find((strategy) => strategy.id === selected) ?? strategies[0];
   // Lịch sử theo tháng, báo cáo ngày và tin tức có danh sách riêng, không theo cặp/khung nến của chiến lược.
   const usesStrategy = page !== 'history' && page !== 'reports' && page !== 'news';
 
@@ -58,7 +58,7 @@ export function App() {
           onClick={({ key }) => {
             window.location.hash = key;
           }}
-          items={PAGES.map((p) => ({ key: p.key, label: p.label }))}
+          items={PAGES.map((page) => ({ key: page.key, label: page.label }))}
         />
       </Layout.Sider>
       <Layout style={{ background: '#f8fafc' }}>
@@ -66,13 +66,13 @@ export function App() {
           <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
             <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
               <Typography.Title level={3} style={{ margin: 0 }}>
-                {PAGES.find((p) => p.key === page)?.label}
+                {PAGES.find((entry) => entry.key === page)?.label}
               </Typography.Title>
               {usesStrategy && strategies.length > 1 && (
                 <Segmented
                   value={current?.id}
-                  onChange={(v) => setSelected(v as number)}
-                  options={strategies.map((s) => ({ label: `${s.symbol} ${s.interval}`, value: s.id }))}
+                  onChange={(value) => setSelected(value as number)}
+                  options={strategies.map((strategy) => ({ label: `${strategy.symbol} ${strategy.interval}`, value: strategy.id }))}
                 />
               )}
             </Space>

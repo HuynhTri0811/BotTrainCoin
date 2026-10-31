@@ -54,11 +54,11 @@ public sealed class SignalEvaluationService(
         var now = clock.UtcNow;
         var created = new List<TradingSignal>();
 
-        for (var i = history.Count; i < series.Count; i++)
+        for (var index = history.Count; index < series.Count; index++)
         {
-            var candle = series[i];
-            var start = Math.Max(0, i - strategy.RequiredCandles + 1);
-            var window = new ListSlice<Candle>(series, start, i - start + 1);
+            var candle = series[index];
+            var start = Math.Max(0, index - strategy.RequiredCandles + 1);
+            var window = new ListSlice<Candle>(series, start, index - start + 1);
 
             var decision = HasGap(window, interval)
                 ? StrategyDecision.Hold("Cửa sổ nến có khoảng thiếu; bỏ qua đánh giá.")
@@ -78,11 +78,12 @@ public sealed class SignalEvaluationService(
 
         await signals.SaveEvaluationAsync(instance, created, ct);
 
-        foreach (var s in created)
+        foreach (var signal in created)
             logger.LogInformation(
                 "Signal {Action} {Symbol} {Interval} nến {OpenTime:O} close {Close} ({Reason}) backfill={Backfill} instance={InstanceId} v{Version}",
-                s.Action, s.Symbol, s.Interval, s.CandleOpenTimeUtc, s.CandleClose, s.Reason, s.IsBackfill,
-                s.StrategyInstanceId, s.ConfigVersion);
+                signal.Action, signal.Symbol, signal.Interval, signal.CandleOpenTimeUtc, signal.CandleClose,
+                    signal.Reason, signal.IsBackfill,
+                signal.StrategyInstanceId, signal.ConfigVersion);
 
         return new EvaluationResult(pending.Count, created);
     }

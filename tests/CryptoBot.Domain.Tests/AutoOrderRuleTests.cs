@@ -35,13 +35,13 @@ public class AutoOrderRuleTests
     [Fact]
     public void New_rules_are_active_with_their_own_command_id()
     {
-        var a = PriceRule(TriggerCondition.AtOrBelow);
-        var b = PriceRule(TriggerCondition.AtOrBelow);
+        var rule = PriceRule(TriggerCondition.AtOrBelow);
+        var secondRule = PriceRule(TriggerCondition.AtOrBelow);
 
-        Assert.Equal(AutoRuleStatus.Active, a.Status);
-        Assert.Equal("Paper", a.Environment);
-        Assert.NotEqual(Guid.Empty, a.CommandId);
-        Assert.NotEqual(a.CommandId, b.CommandId);
+        Assert.Equal(AutoRuleStatus.Active, rule.Status);
+        Assert.Equal("Paper", rule.Environment);
+        Assert.NotEqual(Guid.Empty, rule.CommandId);
+        Assert.NotEqual(rule.CommandId, secondRule.CommandId);
     }
 
     [Fact]

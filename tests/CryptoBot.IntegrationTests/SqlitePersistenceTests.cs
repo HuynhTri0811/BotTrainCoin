@@ -29,8 +29,8 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
 
     public Task DisposeAsync()
     {
-        foreach (var f in new[] { _path, _path + "-wal", _path + "-shm" })
-            File.Delete(f);
+        foreach (var path in new[] { _path, _path + "-wal", _path + "-shm" })
+            File.Delete(path);
         return Task.CompletedTask;
     }
 
@@ -51,13 +51,13 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
 
         await using (var db = NewContext())
         {
-            var c = await db.Candles.SingleAsync();
-            Assert.Equal(123456789.12345678m, c.Open);
-            Assert.Equal(0.00000001m, c.Low);
-            Assert.Equal(79228162514264.337593543950335m, c.Close);
-            Assert.Equal(DateTimeKind.Utc, c.OpenTimeUtc.Kind);
-            Assert.Equal(T0, c.OpenTimeUtc);
-            Assert.Equal(T0.AddMilliseconds(123), c.ReceivedAtUtc);
+            var candle = await db.Candles.SingleAsync();
+            Assert.Equal(123456789.12345678m, candle.Open);
+            Assert.Equal(0.00000001m, candle.Low);
+            Assert.Equal(79228162514264.337593543950335m, candle.Close);
+            Assert.Equal(DateTimeKind.Utc, candle.OpenTimeUtc.Kind);
+            Assert.Equal(T0, candle.OpenTimeUtc);
+            Assert.Equal(T0.AddMilliseconds(123), candle.ReceivedAtUtc);
         }
     }
 
@@ -89,8 +89,8 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
         await using (var db = NewContext())
         {
             var all = await new CandleStore(db).GetLatestAsync(Key, null, 10, closedOnly: false, default);
-            Assert.Equal([10m, 21m, 30m], all.Select(c => c.Close));
-            Assert.Equal([true, true, false], all.Select(c => c.IsClosed));
+            Assert.Equal([10m, 21m, 30m], all.Select(candle => candle.Close));
+            Assert.Equal([true, true, false], all.Select(candle => candle.IsClosed));
 
             var closed = await new CandleStore(db).GetAfterAsync(Key, T0, 10, closedOnly: true, default);
             Assert.Equal(T0 + TimeSpan.FromHours(1), Assert.Single(closed).OpenTimeUtc);
@@ -101,14 +101,15 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
     public async Task Time_ordering_works_in_sql()
     {
         await using (var db = NewContext())
-            await new CandleStore(db).UpsertAsync(Key, Enumerable.Range(0, 30).Select(h => MakeCandle(h, h + 1)).ToList(), default);
+            await new CandleStore(db).UpsertAsync(Key, Enumerable.Range(0, 30).Select(hour => MakeCandle(hour,
+                hour + 1)).ToList(), default);
 
         await using (var db = NewContext())
         {
             var store = new CandleStore(db);
             Assert.Equal(T0 + TimeSpan.FromHours(29), await store.GetLatestOpenTimeAsync(Key, default));
             var before = await store.GetLatestAsync(Key, T0 + TimeSpan.FromHours(10), 3, closedOnly: true, default);
-            Assert.Equal([8m, 9m, 10m], before.Select(c => c.Close));
+            Assert.Equal([8m, 9m, 10m], before.Select(candle => candle.Close));
         }
     }
 
@@ -160,7 +161,7 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
 
         await using (var db = NewContext())
         {
-            var rules = await db.AutoOrderRules.OrderBy(r => r.Id).ToListAsync();
+            var rules = await db.AutoOrderRules.OrderBy(rule => rule.Id).ToListAsync();
             Assert.Equal(RuleTriggerType.Indicator, rules[0].TriggerType);
             Assert.Equal("btc-15m-myrsi", rules[0].IndicatorName);
             Assert.Null(rules[0].TriggerPrice);
@@ -217,7 +218,7 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
             Assert.True(await store.ExistsAsync("BTCUSDT", T0.AddDays(2), default));
             Assert.False(await store.ExistsAsync("BTCUSDT", T0.AddDays(3), default));
             Assert.Equal([T0.AddDays(2), T0.AddDays(1)],
-                (await store.GetRecentAsync("BTCUSDT", 10, default)).Select(r => r.PeriodEndUtc));
+                (await store.GetRecentAsync("BTCUSDT", 10, default)).Select(report => report.PeriodEndUtc));
             Assert.Equal(3, (await store.GetRecentAsync(null, 10, default)).Count);
 
             db.DailyReports.Add(Report("BTCUSDT", 2));
@@ -245,11 +246,15 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
         {
             var store = new NewsStore(db);
             Assert.Equal(["a"], await store.GetExistingIdsAsync("CoinDesk", ["a", "z"], default));
-            Assert.Equal(["b", "a"], (await store.QueryAsync(new NewsFilter("ETH"), 10, default)).Select(a => a.ExternalId));
-            Assert.Equal(["Decrypt"], (await store.QueryAsync(new NewsFilter("ETC"), 10, default)).Select(a => a.Source));
+            Assert.Equal(["b", "a"], (await store.QueryAsync(new NewsFilter("ETH"), 10,
+                default)).Select(article => article.ExternalId));
+            Assert.Equal(["Decrypt"], (await store.QueryAsync(new NewsFilter("ETC"), 10,
+                default)).Select(article => article.Source));
             Assert.Equal(["b", "a"], (await store.QueryAsync(
-                new NewsFilter(FromUtc: T0.AddHours(1), ToUtc: T0.AddHours(3)), 10, default)).Select(a => a.ExternalId));
-            Assert.Equal(["c"], (await store.QueryAsync(new NewsFilter(), 1, default)).Select(a => a.ExternalId));
+                new NewsFilter(FromUtc: T0.AddHours(1), ToUtc: T0.AddHours(3)), 10, default)).Select(article =>
+                    article.ExternalId));
+            Assert.Equal(["c"], (await store.QueryAsync(new NewsFilter(), 1, default)).Select(article =>
+                article.ExternalId));
 
             db.NewsArticles.Add(Article("CoinDesk", "a", [], 5));
             await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
@@ -276,7 +281,7 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
         {
             var store = new NewsStore(db);
             async Task<IEnumerable<string>> Ids(NewsFilter filter) =>
-                (await store.QueryAsync(filter, 10, default)).Select(a => a.ExternalId).Order();
+                (await store.QueryAsync(filter, 10, default)).Select(article => article.ExternalId).Order();
 
             Assert.Equal(["b", "c", "d"], await Ids(new NewsFilter(Source: "Decrypt")));
             Assert.Equal(["a", "b"], await Ids(new NewsFilter(Search: "binance")));
@@ -307,7 +312,7 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
         {
             var store = new SignalStore(db);
             async Task<IEnumerable<int>> Hours(SignalFilter filter) =>
-                (await store.QueryAsync(filter, 10, default)).Select(s => s.CandleOpenTimeUtc.Hour);
+                (await store.QueryAsync(filter, 10, default)).Select(signal => signal.CandleOpenTimeUtc.Hour);
 
             Assert.Equal([1, 3], await Hours(new SignalFilter(Action: SignalAction.Buy)));
             Assert.Equal([3], await Hours(new SignalFilter(IsBackfill: false)));
@@ -321,9 +326,10 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
     {
         FuturesPosition Closed(string symbol, PositionSide side, CloseReason reason, int hour)
         {
-            var p = new FuturesPosition(Guid.NewGuid(), symbol, side, 10, 1m, 100m, 10m, 90m, 95m, null, 0.1m, T0);
-            p.Close(reason, 101m, 0.1m, Guid.NewGuid(), T0.AddHours(hour));
-            return p;
+            var position = new FuturesPosition(Guid.NewGuid(), symbol, side, 10, 1m, 100m, 10m, 90m, 95m, null, 0.1m,
+                T0);
+            position.Close(reason, 101m, 0.1m, Guid.NewGuid(), T0.AddHours(hour));
+            return position;
         }
 
         await using (var db = NewContext())
@@ -340,7 +346,7 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
         {
             var store = new PaperFuturesStore(db);
             async Task<IEnumerable<int>> Hours(ClosedPositionFilter filter) =>
-                (await store.GetClosedAsync(filter, 10, default)).Select(p => p.ClosedAtUtc!.Value.Hour);
+                (await store.GetClosedAsync(filter, 10, default)).Select(position => position.ClosedAtUtc!.Value.Hour);
 
             Assert.Equal([3, 2, 1], await Hours(new ClosedPositionFilter()));
             Assert.Equal([2, 1], await Hours(new ClosedPositionFilter("BTCUSDT")));

@@ -5,7 +5,7 @@ import { ago, formatVn } from '../time';
 const envColor = { Paper: 'blue', Testnet: 'gold', Live: 'red' } as const;
 
 export function StatusBar({ status }: { status: Status }) {
-  const staleFeeds = status.feeds.filter((f) => f.isStale);
+  const staleFeeds = status.feeds.filter((feed) => feed.isStale);
 
   return (
     <Space orientation="vertical" style={{ width: '100%' }} size="small">
@@ -15,25 +15,25 @@ export function StatusBar({ status }: { status: Status }) {
         </Tag>
         <Tag color={status.decisionMode === 'SignalOnly' ? 'default' : 'purple'}>{status.decisionMode}</Tag>
         {status.liveLocked && <Tag>Live bị khóa</Tag>}
-        {status.feeds.map((f) => (
+        {status.feeds.map((feed) => (
           <Tooltip
-            key={f.key}
+            key={feed.key}
             title={
               <>
-                Sync thành công: {formatVn(f.lastSuccessAtUtc)}
+                Sync thành công: {formatVn(feed.lastSuccessAtUtc)}
                 <br />
-                Nến đóng mới nhất: {formatVn(f.latestClosedOpenTimeUtc)}
-                {f.lastError && (
+                Nến đóng mới nhất: {formatVn(feed.latestClosedOpenTimeUtc)}
+                {feed.lastError && (
                   <>
                     <br />
-                    Lỗi: {f.lastError}
+                    Lỗi: {feed.lastError}
                   </>
                 )}
               </>
             }
           >
-            <Tag color={f.isStale ? 'error' : 'success'}>
-              {f.key.replace('Binance:', '')} · {f.isStale ? 'STALE' : ago(f.lastSuccessAtUtc, status.serverTimeUtc)}
+            <Tag color={feed.isStale ? 'error' : 'success'}>
+              {feed.key.replace('Binance:', '')} · {feed.isStale ? 'STALE' : ago(feed.lastSuccessAtUtc, status.serverTimeUtc)}
             </Tag>
           </Tooltip>
         ))}
@@ -43,8 +43,8 @@ export function StatusBar({ status }: { status: Status }) {
         <Alert
           type="warning"
           showIcon
-          title={`Dữ liệu stale: ${staleFeeds.map((f) => f.key).join(', ')}`}
-          description={staleFeeds.map((f) => f.lastError).filter(Boolean).join(' · ') || undefined}
+          title={`Dữ liệu stale: ${staleFeeds.map((feed) => feed.key).join(', ')}`}
+          description={staleFeeds.map((feed) => feed.lastError).filter(Boolean).join(' · ') || undefined}
         />
       )}
     </Space>

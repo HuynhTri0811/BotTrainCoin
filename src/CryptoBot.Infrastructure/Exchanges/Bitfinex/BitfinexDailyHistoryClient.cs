@@ -29,16 +29,16 @@ public sealed class BitfinexDailyHistoryClient(HttpClient http) : IDailyHistoryC
 
         using var doc = await GetJsonAsync(url, ct);
         var result = new List<KlineDto>(doc.RootElement.GetArrayLength());
-        foreach (var k in doc.RootElement.EnumerateArray())
+        foreach (var element in doc.RootElement.EnumerateArray())
         {
             // [MTS, OPEN, CLOSE, HIGH, LOW, VOLUME] — khác thứ tự OHLC của Binance.
             result.Add(new KlineDto(
-                DateTime.UnixEpoch.AddMilliseconds(k[0].GetInt64()),
-                Open: k[1].GetDecimal(),
-                High: k[3].GetDecimal(),
-                Low: k[4].GetDecimal(),
-                Close: k[2].GetDecimal(),
-                Volume: k[5].GetDecimal()));
+                DateTime.UnixEpoch.AddMilliseconds(element[0].GetInt64()),
+                Open: element[1].GetDecimal(),
+                High: element[3].GetDecimal(),
+                Low: element[4].GetDecimal(),
+                Close: element[2].GetDecimal(),
+                Volume: element[5].GetDecimal()));
         }
 
         return result;

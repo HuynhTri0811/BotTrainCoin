@@ -13,7 +13,7 @@ export function NewsPage() {
   const [search, setSearch] = useState('');
   const keyword = useDeferredValue(search.trim());
   const queryClient = useQueryClient();
-  const q = useQuery({
+  const query = useQuery({
     queryKey: ['news', coin, source, keyword],
     queryFn: () => newsApi.list({ coin: coin === ALL ? undefined : coin, source, search: keyword, limit: 100 }),
     placeholderData: keepPreviousData,
@@ -21,14 +21,14 @@ export function NewsPage() {
   });
   const sync = useMutation({
     mutationFn: newsApi.sync,
-    onSuccess: (r) => {
-      if (r.errors.length > 0) message.warning(r.errors.join(' · '));
-      else message.success(r.added > 0 ? `Thêm ${r.added} tin mới.` : 'Không có tin mới.');
+    onSuccess: (result) => {
+      if (result.errors.length > 0) message.warning(result.errors.join(' · '));
+      else message.success(result.added > 0 ? `Thêm ${result.added} tin mới.` : 'Không có tin mới.');
       queryClient.invalidateQueries({ queryKey: ['news'] });
     },
-    onError: (e) => message.error(e.message),
+    onError: (error) => message.error(error.message),
   });
-  const d = q.data;
+  const data = query.data;
 
   return (
     <Card
@@ -37,15 +37,15 @@ export function NewsPage() {
         <Segmented
           size="small"
           value={coin}
-          onChange={(v) => setCoin(v as string)}
-          options={[ALL, ...(d?.coins ?? ['BTC', 'ETH', 'ETC'])]}
+          onChange={(value) => setCoin(value as string)}
+          options={[ALL, ...(data?.coins ?? ['BTC', 'ETH', 'ETC'])]}
         />
       }
       extra={
         <Space wrap>
-          {d && (
+          {data && (
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {d.sources.join(', ')} · đồng bộ mỗi {d.pollIntervalHours} giờ
+              {data.sources.join(', ')} · đồng bộ mỗi {data.pollIntervalHours} giờ
             </Typography.Text>
           )}
           <Button size="small" loading={sync.isPending} onClick={() => sync.mutate()}>
@@ -61,7 +61,7 @@ export function NewsPage() {
           placeholder="Tìm trong tiêu đề, tóm tắt"
           style={{ width: 260 }}
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(error) => setSearch(error.target.value)}
         />
         <Select<string>
           size="small"
@@ -70,20 +70,20 @@ export function NewsPage() {
           style={{ minWidth: 140 }}
           value={source}
           onChange={setSource}
-          options={(d?.sources ?? []).map((s) => ({ value: s, label: s }))}
+          options={(data?.sources ?? []).map((symbol) => ({ value: symbol, label: symbol }))}
         />
-        {d && (
+        {data && (
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {d.articles.length} tin
+            {data.articles.length} tin
           </Typography.Text>
         )}
       </Space>
-      {q.isPending ? (
+      {query.isPending ? (
         <Spin />
-      ) : q.isError ? (
-        <Alert type="error" showIcon title={`Không tải được tin: ${q.error.message}`} />
+      ) : query.isError ? (
+        <Alert type="error" showIcon title={`Không tải được tin: ${query.error.message}`} />
       ) : (
-        <NewsList articles={d?.articles ?? []} />
+        <NewsList articles={data?.articles ?? []} />
       )}
       <Typography.Paragraph type="secondary" style={{ margin: '12px 0 0', fontSize: 12 }}>
         Chỉ lưu tiêu đề, tóm tắt ngắn và link tới bài gốc. Coin được gắn theo từ khóa trong tiêu đề/tóm tắt (bitcoin,

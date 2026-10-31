@@ -25,33 +25,33 @@ const statusTag: Record<AutoRule['status'], { text: string; color: string }> = {
 
 const STATUSES = Object.entries(statusTag).map(([value, { text }]) => ({ text, value }));
 
-const condText = (c: TriggerCondition | null) => (c === 'AtOrBelow' ? '≤' : '≥');
+const condText = (coin: TriggerCondition | null) => (coin === 'AtOrBelow' ? '≤' : '≥');
 
-function describe(r: CreateAutoRule) {
-  const tp = r.takeProfitPercent ? `, TP +${r.takeProfitPercent}%` : '';
+function describe(result: CreateAutoRule) {
+  const tp = result.takeProfitPercent ? `, TP +${result.takeProfitPercent}%` : '';
   const when =
-    r.triggerType === 'Indicator'
-      ? `Khi chỉ báo ${r.indicatorName} báo ${r.side} trên một nến đóng sau lúc này`
-      : `Khi mark price ${condText(r.condition)} ${r.triggerPrice}`;
-  const close = r.closeOnReverse
-    ? ` Tự đóng khi ${r.indicatorName} báo ${r.side === 'Long' ? 'Short' : 'Long'} trên nến đóng sau lúc mở lệnh.`
+    result.triggerType === 'Indicator'
+      ? `Khi chỉ báo ${result.indicatorName} báo ${result.side} trên một nến đóng sau lúc này`
+      : `Khi mark price ${condText(result.condition)} ${result.triggerPrice}`;
+  const close = result.closeOnReverse
+    ? ` Tự đóng khi ${result.indicatorName} báo ${result.side === 'Long' ? 'Short' : 'Long'} trên nến đóng sau lúc mở lệnh.`
     : '';
-  return `${when}, tự mở ${r.side} ${r.symbol} ${r.leverage}x, ` +
-    `margin ${r.margin} USDT, SL ${r.stopLossPercent}%${tp}.${close} Chỉ chạy một lần, chỉ tiền giả lập (Paper).`;
+  return `${when}, tự mở ${result.side} ${result.symbol} ${result.leverage}x, ` +
+    `margin ${result.margin} USDT, SL ${result.stopLossPercent}%${tp}.${close} Chỉ chạy một lần, chỉ tiền giả lập (Paper).`;
 }
 
 export function AutoOrdersCard({ symbol, account }: { symbol: string; account: FuturesAccount | undefined }) {
   const queryClient = useQueryClient();
   const summary = useQuery({ queryKey: ['auto-rules'], queryFn: autoApi.summary, refetchInterval: 3_000 });
-  const d = summary.data?.defaults;
+  const data = summary.data?.defaults;
 
   const indicators = useQuery({ queryKey: ['indicators'], queryFn: indicatorApi.list, staleTime: 60_000 });
-  const symbolIndicators = (indicators.data?.indicators ?? []).filter((i) => i.symbol === symbol);
+  const symbolIndicators = (indicators.data?.indicators ?? []).filter((indicator) => indicator.symbol === symbol);
 
   const [triggerType, setTriggerType] = useState<RuleTriggerType>('Price');
   const [pickedIndicator, setPickedIndicator] = useState<string | null>(null);
   const indicatorName =
-    pickedIndicator && symbolIndicators.some((i) => i.name === pickedIndicator)
+    pickedIndicator && symbolIndicators.some((indicator) => indicator.name === pickedIndicator)
       ? pickedIndicator
       : (symbolIndicators[0]?.name ?? null);
   const [closeOnReverse, setCloseOnReverse] = useState(false);
@@ -63,7 +63,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
   const [sl, setSl] = useState<string | null>(null);
   const [tp, setTp] = useState<string | null>(null);
 
-  const mark = account?.markPrices.find((m) => m.symbol === symbol)?.price;
+  const mark = account?.markPrices.find((markPrice) => markPrice.symbol === symbol)?.price;
   const supported = account?.rules.symbols.includes(symbol) ?? false;
 
   const create = useMutation({
@@ -77,8 +77,8 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
       setTrigger(null);
       queryClient.invalidateQueries({ queryKey: ['auto-rules'] });
     },
-    onError: (e) => {
-      const details = e instanceof ApiError ? e.details : [e.message];
+    onError: (error) => {
+      const details = error instanceof ApiError ? error.details : [error.message];
       Modal.error({ title: 'Không thể tạo quy tắc', content: details.join('\n') });
     },
   });
@@ -86,7 +86,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
   const cancel = useMutation({
     mutationFn: autoApi.cancel,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['auto-rules'] }),
-    onError: (e) => message.error(e.message),
+    onError: (error) => message.error(error.message),
   });
 
   const submit = () => {
@@ -107,10 +107,10 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
       triggerPrice: byIndicator ? null : trigger,
       indicatorName: byIndicator ? indicatorName : null,
       closeOnReverse: byIndicator && closeOnReverse,
-      margin: margin ?? String(d?.margin ?? 50),
-      leverage: leverage ?? d?.leverage ?? 2,
-      stopLossPercent: sl ?? String(d?.stopLossPercent ?? 1),
-      takeProfitPercent: tp === '' ? null : (tp ?? String(d?.takeProfitPercent ?? 2)),
+      margin: margin ?? String(data?.margin ?? 50),
+      leverage: leverage ?? data?.leverage ?? 2,
+      stopLossPercent: sl ?? String(data?.stopLossPercent ?? 1),
+      takeProfitPercent: tp === '' ? null : (tp ?? String(data?.takeProfitPercent ?? 2)),
     };
     Modal.confirm({
       title: 'Bật quy tắc tự mở lệnh?',
@@ -141,7 +141,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
           style={{ marginBottom: 8 }}
           title="Đã chạm giới hạn lỗ trong ngày"
           description={`Lỗ hôm nay ${fmtUsdt(risk.todayRealizedPnl)}, giới hạn −${fmtUsdt(risk.lossLimit)} (${
-            d?.dailyLossLimitPercent
+            data?.dailyLossLimitPercent
           }% vốn đầu ngày). Quy tắc mới sẽ không kích hoạt cho đến 00:00 UTC.`}
         />
       )}
@@ -169,12 +169,12 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
               placeholder={`Chưa có chỉ báo cho ${symbol}`}
               disabled={symbolIndicators.length === 0}
               style={{ width: '100%' }}
-              options={symbolIndicators.map((i) => ({
-                value: i.name,
-                label: `${i.name} · ${i.type} · ${i.interval}`,
+              options={symbolIndicators.map((indicator) => ({
+                value: indicator.name,
+                label: `${indicator.name} · ${indicator.type} · ${indicator.interval}`,
               }))}
             />
-            <Checkbox checked={closeOnReverse} onChange={(e) => setCloseOnReverse(e.target.checked)}>
+            <Checkbox checked={closeOnReverse} onChange={(error) => setCloseOnReverse(error.target.checked)}>
               Tự đóng khi chỉ báo đảo chiều
             </Checkbox>
           </>
@@ -203,7 +203,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
         <Segmented
           block
           value={side}
-          onChange={(v) => setSide(v as PositionSide)}
+          onChange={(value) => setSide(value as PositionSide)}
           options={[
             { label: <span style={{ color: '#16a34a', fontWeight: 600 }}>Long</span>, value: 'Long' },
             { label: <span style={{ color: '#dc2626', fontWeight: 600 }}>Short</span>, value: 'Short' },
@@ -214,7 +214,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
           <InputNumber<string>
             stringMode
             min="0"
-            value={margin ?? String(d?.margin ?? '')}
+            value={margin ?? String(data?.margin ?? '')}
             onChange={setMargin}
             prefix="Margin"
             suffix="USDT"
@@ -223,7 +223,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
           <InputNumber
             min={1}
             max={account?.rules.maxLeverage ?? 10}
-            value={leverage ?? d?.leverage}
+            value={leverage ?? data?.leverage}
             onChange={setLeverage}
             suffix="x"
             style={{ width: 90 }}
@@ -231,7 +231,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
           <InputNumber<string>
             stringMode
             min="0"
-            value={sl ?? String(d?.stopLossPercent ?? '')}
+            value={sl ?? String(data?.stopLossPercent ?? '')}
             onChange={setSl}
             prefix="SL"
             suffix="%"
@@ -240,7 +240,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
           <InputNumber<string>
             stringMode
             min="0"
-            value={tp ?? String(d?.takeProfitPercent ?? '')}
+            value={tp ?? String(data?.takeProfitPercent ?? '')}
             onChange={setTp}
             prefix="TP"
             suffix="%"
@@ -257,7 +257,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
         Chạy một lần khi mark price chạm mức, hoặc khi chỉ báo phát tín hiệu cùng hướng (Long/Short) trên nến
         đóng sau lúc tạo quy tắc. Quy tắc theo chỉ báo có thể tự đóng vị thế khi chỉ báo báo ngược hướng.
         SL/TP tính theo % so với mark lúc kích hoạt. Mặc định thận trọng: tối đa{' '}
-        {d?.maxActiveRules ?? 10} quy tắc, một vị thế mỗi symbol, dừng khi lỗ trong ngày quá {d?.dailyLossLimitPercent ?? 5}%.
+        {data?.maxActiveRules ?? 10} quy tắc, một vị thế mỗi symbol, dừng khi lỗ trong ngày quá {data?.dailyLossLimitPercent ?? 5}%.
       </Typography.Paragraph>
 
       <Table<AutoRule>
@@ -272,25 +272,25 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
           {
             title: 'Quy tắc',
             key: 'rule',
-            ...columnFilter<AutoRule>((r) => r.side, [
+            ...columnFilter<AutoRule>((rule) => rule.side, [
               { text: 'Long', value: 'Long' },
               { text: 'Short', value: 'Short' },
             ]),
-            render: (_, r) => (
+            render: (_, rule) => (
               <span>
-                {r.triggerType === 'Indicator' ? (
+                {rule.triggerType === 'Indicator' ? (
                   <>
-                    {r.symbol} <Tag color="purple">{r.indicatorName}</Tag>
-                    {r.closeOnReverse && <Tag color="geekblue">Tự đóng khi đảo chiều</Tag>}
+                    {rule.symbol} <Tag color="purple">{rule.indicatorName}</Tag>
+                    {rule.closeOnReverse && <Tag color="geekblue">Tự đóng khi đảo chiều</Tag>}
                   </>
                 ) : (
                   <>
-                    {r.symbol} {condText(r.condition)} {fmtPrice(r.triggerPrice)}
+                    {rule.symbol} {condText(rule.condition)} {fmtPrice(rule.triggerPrice)}
                   </>
                 )}{' '}
                 →{' '}
-                <Tag color={r.side === 'Long' ? 'green' : 'red'}>
-                  {r.side} {r.leverage}x
+                <Tag color={rule.side === 'Long' ? 'green' : 'red'}>
+                  {rule.side} {rule.leverage}x
                 </Tag>
               </span>
             ),
@@ -298,29 +298,29 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
           {
             title: 'Trạng thái',
             key: 'status',
-            ...columnFilter<AutoRule>((r) => r.status, STATUSES),
-            render: (_, r) => (
+            ...columnFilter<AutoRule>((rule) => rule.status, STATUSES),
+            render: (_, rule) => (
               <Space orientation="vertical" size={0}>
-                <Tag color={statusTag[r.status].color}>{statusTag[r.status].text}</Tag>
-                {r.note && (
-                  <Typography.Text type={r.status === 'Rejected' ? 'danger' : 'warning'} style={{ fontSize: 12 }}>
-                    {r.note}
+                <Tag color={statusTag[rule.status].color}>{statusTag[rule.status].text}</Tag>
+                {rule.note && (
+                  <Typography.Text type={rule.status === 'Rejected' ? 'danger' : 'warning'} style={{ fontSize: 12 }}>
+                    {rule.note}
                   </Typography.Text>
                 )}
-                {r.triggerDetail && (
+                {rule.triggerDetail && (
                   <Typography.Text type="secondary" style={{ fontSize: 12, maxWidth: 260 }}>
-                    {r.triggerDetail}
+                    {rule.triggerDetail}
                   </Typography.Text>
                 )}
-                {r.triggeredAtUtc && (
+                {rule.triggeredAtUtc && (
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    {formatVn(r.triggeredAtUtc)} @ {fmtPrice(r.triggeredMarkPrice)}
+                    {formatVn(rule.triggeredAtUtc)} @ {fmtPrice(rule.triggeredMarkPrice)}
                   </Typography.Text>
                 )}
-                {r.status === 'Triggered' && r.closeOnReverse && (
+                {rule.status === 'Triggered' && rule.closeOnReverse && (
                   <Typography.Text type="secondary" style={{ fontSize: 12, maxWidth: 260 }}>
-                    {r.closeWatchEndedAtUtc
-                      ? `Đóng: ${r.closeDetail} (${formatVn(r.closeWatchEndedAtUtc)})`
+                    {rule.closeWatchEndedAtUtc
+                      ? `Đóng: ${rule.closeDetail} (${formatVn(rule.closeWatchEndedAtUtc)})`
                       : 'Đang chờ chỉ báo đảo chiều để tự đóng…'}
                   </Typography.Text>
                 )}
@@ -330,9 +330,9 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
           {
             title: '',
             key: 'cancel',
-            render: (_, r) =>
-              r.status === 'Active' ? (
-                <Popconfirm title="Hủy quy tắc này?" okText="Hủy quy tắc" cancelText="Giữ" onConfirm={() => cancel.mutate(r.id)}>
+            render: (_, rule) =>
+              rule.status === 'Active' ? (
+                <Popconfirm title="Hủy quy tắc này?" okText="Hủy quy tắc" cancelText="Giữ" onConfirm={() => cancel.mutate(rule.id)}>
                   <Button size="small" danger>
                     Hủy
                   </Button>

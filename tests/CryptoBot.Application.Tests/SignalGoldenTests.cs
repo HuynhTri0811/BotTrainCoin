@@ -25,7 +25,7 @@ public class SignalGoldenTests
         public Task<IReadOnlyList<StrategyInstance>> GetAllAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<StrategyInstance>>([instance]);
         public Task<StrategyInstance?> GetAsync(int id, CancellationToken ct) => Task.FromResult<StrategyInstance?>(instance);
         public Task<StrategyInstance?> FindByNameAsync(string name, CancellationToken ct) => Task.FromResult<StrategyInstance?>(instance);
-        public Task AddAsync(StrategyInstance i, CancellationToken ct) => Task.CompletedTask;
+        public Task AddAsync(StrategyInstance strategyInstance, CancellationToken ct) => Task.CompletedTask;
         public Task SaveAsync(CancellationToken ct) => Task.CompletedTask;
     }
 
@@ -38,25 +38,26 @@ public class SignalGoldenTests
         var store = new InMemoryCandleStore();
         var rnd = new Random(42);
         var price = 30_000m;
-        for (var i = 0; i < 1500; i++)
+        for (var index = 0; index < 1500; index++)
         {
-            var drift = (i / 120) % 2 == 0 ? 0.0015 : -0.0015;
+            var drift = (index / 120) % 2 == 0 ? 0.0015 : -0.0015;
             var change = (decimal)(drift + (rnd.NextDouble() - 0.5) * 0.02);
             var open = price;
             var close = Math.Round(open * (1 + change), 2);
             var high = Math.Max(open, close) + Math.Round((decimal)rnd.NextDouble() * 20m, 2);
             var low = Math.Min(open, close) - Math.Round((decimal)rnd.NextDouble() * 20m, 2);
             price = close;
-            if (i == 900)
+            if (index == 900)
                 continue;
-            var t = T0 + TimeSpan.FromHours(i);
-            store.Candles[t] = new Candle("Binance", "BTCUSDT", CandleInterval.H1, t, open, high, low, close, 1m, true, T0);
+            var openTime = T0 + TimeSpan.FromHours(index);
+            store.Candles[openTime] = new Candle("Binance", "BTCUSDT", CandleInterval.H1, openTime, open, high, low,
+                close, 1m, true, T0);
         }
 
         return store;
     }
 
-    private static string D(decimal? v) => v?.ToString(CultureInfo.InvariantCulture) ?? "null";
+    private static string D(decimal? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "null";
 
     private static async Task<string> RenderAsync()
     {
@@ -72,15 +73,15 @@ public class SignalGoldenTests
         await new SignalEvaluationService(candles, signals, clock, new SignalOptions(),
             NullLogger<SignalEvaluationService>.Instance).EvaluatePendingAsync(instance, default);
         sb.AppendLine("# EMA signals");
-        foreach (var s in signals.Signals)
-            sb.AppendLine($"{s.CandleOpenTimeUtc:O} {s.Action} {D(s.CandleClose)} {D(s.FastEma)} {D(s.SlowEma)} {s.IsBackfill} {s.Reason}");
+        foreach (var signal in signals.Signals)
+            sb.AppendLine($"{signal.CandleOpenTimeUtc:O} {signal.Action} {D(signal.CandleClose)} {D(signal.FastEma)} {D(signal.SlowEma)} {signal.IsBackfill} {signal.Reason}");
 
         // B. Giá trị EMA trên chart.
         var chart = await new ChartQueryService(new SingleInstanceStore(instance), candles, signals)
             .GetAsync(1, 1000, default);
         sb.AppendLine("# EMA chart");
-        foreach (var p in chart!.Points)
-            sb.AppendLine($"{p.Candle.OpenTimeUtc:O} {D(p.FastEma)} {D(p.SlowEma)}");
+        foreach (var point in chart!.Points)
+            sb.AppendLine($"{point.Candle.OpenTimeUtc:O} {D(point.FastEma)} {D(point.SlowEma)}");
 
         // C. Chỉ báo MyRsi, có và không có bộ lọc xu hướng.
         var registry = new IndicatorRegistry(
@@ -97,10 +98,11 @@ public class SignalGoldenTests
         {
             sb.AppendLine($"# Indicator {name}");
             var ic = await indicators.GetChartAsync(name, 1000, default);
-            foreach (var p in ic!.Points)
+            foreach (var goldenPoint in ic!.Points)
             {
-                var values = string.Join(",", p.Result.Values.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={D(kv.Value)}"));
-                sb.AppendLine($"{p.Candle.OpenTimeUtc:O} {p.Result.Signal} {values} {p.Result.Reason}");
+                var values = string.Join(",", goldenPoint.Result.Values.OrderBy(kv => kv.Key).Select(kv =>
+                    $"{kv.Key}={D(kv.Value)}"));
+                sb.AppendLine($"{goldenPoint.Candle.OpenTimeUtc:O} {goldenPoint.Result.Signal} {values} {goldenPoint.Result.Reason}");
             }
 
             var latest = await indicators.GetLatestAsync(name, default);

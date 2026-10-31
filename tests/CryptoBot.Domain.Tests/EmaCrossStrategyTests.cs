@@ -14,26 +14,26 @@ public class EmaCrossStrategyTests
     public void Buy_on_upward_cross()
     {
         // fast: prev 10, cur 2/3*13 + 1/3*10 = 12; slow: prev 10, cur 0.5*13 + 0.5*10 = 11.5
-        var d = Evaluate([10, 10, 10, 13]);
+        var decision = Evaluate([10, 10, 10, 13]);
 
-        Assert.Equal(SignalAction.Buy, d.Action);
-        Assert.Equal(new IndicatorValues(10m, 10m, 12m, 11.5m), d.Indicators);
+        Assert.Equal(SignalAction.Buy, decision.Action);
+        Assert.Equal(new IndicatorValues(10m, 10m, 12m, 11.5m), decision.Indicators);
     }
 
     [Fact]
     public void Sell_on_downward_cross_when_holding()
     {
-        var d = Evaluate([10, 10, 10, 7], hasPosition: true);
+        var decision = Evaluate([10, 10, 10, 7], hasPosition: true);
 
-        Assert.Equal(SignalAction.Sell, d.Action);
+        Assert.Equal(SignalAction.Sell, decision.Action);
     }
 
     [Fact]
     public void Downward_cross_without_position_is_hold()
     {
-        var d = Evaluate([10, 10, 10, 7], hasPosition: false);
+        var decision = Evaluate([10, 10, 10, 7], hasPosition: false);
 
-        Assert.Equal(SignalAction.Hold, d.Action);
+        Assert.Equal(SignalAction.Hold, decision.Action);
     }
 
     [Theory]
@@ -41,37 +41,37 @@ public class EmaCrossStrategyTests
     [InlineData(false, true)]
     public void Upward_cross_with_position_or_pending_entry_is_hold(bool hasPosition, bool pendingEntry)
     {
-        var d = Evaluate([10, 10, 10, 13], hasPosition, pendingEntry);
+        var decision = Evaluate([10, 10, 10, 13], hasPosition, pendingEntry);
 
-        Assert.Equal(SignalAction.Hold, d.Action);
+        Assert.Equal(SignalAction.Hold, decision.Action);
     }
 
     [Fact]
     public void No_cross_is_hold()
     {
         // Fast đã ở trên slow từ nến trước: không phải giao cắt mới.
-        var d = Evaluate([10, 11, 12, 13]);
+        var decision = Evaluate([10, 11, 12, 13]);
 
-        Assert.Equal(SignalAction.Hold, d.Action);
+        Assert.Equal(SignalAction.Hold, decision.Action);
     }
 
     [Fact]
     public void Insufficient_history_is_hold_without_indicators()
     {
-        var d = Evaluate([10, 10, 13]);
+        var decision = Evaluate([10, 10, 13]);
 
-        Assert.Equal(SignalAction.Hold, d.Action);
-        Assert.Null(d.Indicators);
-        Assert.Contains("Warm-up", d.Reason);
+        Assert.Equal(SignalAction.Hold, decision.Action);
+        Assert.Null(decision.Indicators);
+        Assert.Contains("Warm-up", decision.Reason);
     }
 
     [Fact]
     public void Uses_only_last_lookback_candles()
     {
         // Thêm nến cũ phía trước không được làm đổi kết quả.
-        var d = Evaluate([500, 1, 10, 10, 10, 13]);
+        var decision = Evaluate([500, 1, 10, 10, 10, 13]);
 
-        Assert.Equal(new IndicatorValues(10m, 10m, 12m, 11.5m), d.Indicators);
+        Assert.Equal(new IndicatorValues(10m, 10m, 12m, 11.5m), decision.Indicators);
     }
 
     [Fact]

@@ -20,7 +20,7 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
   // Chỉ báo tự viết cùng symbol và khung nến với chart đang xem.
   const indicators = useQuery({ queryKey: ['indicators'], queryFn: indicatorApi.list, staleTime: 60_000 });
   const matching = (indicators.data?.indicators ?? []).filter(
-    (i) => i.symbol === strategy.symbol && i.interval === strategy.interval,
+    (indicator) => indicator.symbol === strategy.symbol && indicator.interval === strategy.interval,
   );
   const [picked, setPicked] = useState<string | null | undefined>(undefined);
   // undefined = chưa chọn: mặc định chỉ báo đầu tiên; null = người dùng tắt.
@@ -37,7 +37,7 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
     queryFn: futuresApi.account,
     refetchInterval: 2_000,
   });
-  const openPosition = account.data?.openPositions.find((p) => p.symbol === strategy.symbol);
+  const openPosition = account.data?.openPositions.find((position) => position.symbol === strategy.symbol);
 
   const { fastPeriod, slowPeriod, lookbackCandles } = strategy.parameters;
   const fastLabel = `EMA${fastPeriod}`;
@@ -67,12 +67,12 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
                 <Select<string | null>
                   size="small"
                   value={indicatorName}
-                  onChange={(v) => setPicked(v ?? null)}
+                  onChange={(value) => setPicked(value ?? null)}
                   allowClear
                   placeholder={matching.length ? 'Chỉ báo của tôi' : `Chưa có chỉ báo ${strategy.interval}`}
                   disabled={matching.length === 0}
                   style={{ minWidth: 170 }}
-                  options={matching.map((i) => ({ value: i.name, label: `${i.name} (${i.type})` }))}
+                  options={matching.map((indicator) => ({ value: indicator.name, label: `${indicator.name} (${indicator.type})` }))}
                 />
               </Space>
             }
@@ -107,13 +107,13 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
             {indicatorChart.isError && (
               <Alert type="error" showIcon style={{ marginTop: 8 }} title={`Không tải được chỉ báo: ${indicatorChart.error.message}`} />
             )}
-            {(indicators.data?.errors ?? []).map((e) => (
+            {(indicators.data?.errors ?? []).map((error) => (
               <Alert
-                key={e.name}
+                key={error.name}
                 type="warning"
                 showIcon
                 style={{ marginTop: 8 }}
-                title={`Chỉ báo "${e.name}" bị bỏ qua: ${e.error}`}
+                title={`Chỉ báo "${error.name}" bị bỏ qua: ${error.error}`}
               />
             ))}
             <Typography.Paragraph type="secondary" style={{ margin: '8px 0 0', fontSize: 12 }}>

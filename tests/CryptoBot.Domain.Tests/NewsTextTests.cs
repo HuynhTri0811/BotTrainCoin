@@ -36,8 +36,8 @@ public class NewsTextTests
     {
         var utc = new DateTime(2026, 10, 30, 0, 0, 0, DateTimeKind.Utc);
 
-        var a = new NewsArticle("CoinDesk", "id-1", "Title", "https://x", "", ["BTC", "ETH"], utc, utc);
-        Assert.Equal("BTC,ETH", a.Coins);
+        var article = new NewsArticle("CoinDesk", "id-1", "Title", "https://x", "", ["BTC", "ETH"], utc, utc);
+        Assert.Equal("BTC,ETH", article.Coins);
         Assert.Throws<ArgumentException>(() => new NewsArticle("CoinDesk", "", "Title", "u", "", [], utc, utc));
         Assert.Throws<ArgumentException>(() =>
             new NewsArticle("CoinDesk", "id", "Title", "u", "", [], DateTime.SpecifyKind(utc, DateTimeKind.Local), utc));

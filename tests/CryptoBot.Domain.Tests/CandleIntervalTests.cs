@@ -45,9 +45,9 @@ public class CandleIntervalTests
     public void OpenTimeAt_rounds_down_to_the_candle_containing_the_time(string code, string time, string expected)
     {
         var interval = CandleInterval.Parse(code);
-        var t = DateTime.SpecifyKind(DateTime.Parse(time, CultureInfo.InvariantCulture), DateTimeKind.Utc);
+        var openTime = DateTime.SpecifyKind(DateTime.Parse(time, CultureInfo.InvariantCulture), DateTimeKind.Utc);
 
-        var open = interval.OpenTimeAt(t);
+        var open = interval.OpenTimeAt(openTime);
 
         Assert.Equal(DateTime.Parse(expected, CultureInfo.InvariantCulture), open);
         Assert.Equal(DateTimeKind.Utc, open.Kind);

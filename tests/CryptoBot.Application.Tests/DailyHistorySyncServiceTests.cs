@@ -18,8 +18,8 @@ public class DailyHistorySyncServiceTests
 
     private void AddDays(params int[] days)
     {
-        foreach (var d in days)
-            _client.Klines.Add(new KlineDto(D0.AddDays(d), 100 + d, 110 + d, 90 + d, 105 + d, 1));
+        foreach (var day in days)
+            _client.Klines.Add(new KlineDto(D0.AddDays(day), 100 + day, 110 + day, 90 + day, 105 + day, 1));
     }
 
     [Fact]
@@ -80,6 +80,7 @@ internal sealed class FakeDailyHistoryClient : IDailyHistoryClient
     {
         Requests.Add(startTimeUtc);
         return Task.FromResult<IReadOnlyList<KlineDto>>(
-            Klines.Where(k => k.OpenTimeUtc >= startTimeUtc).OrderBy(k => k.OpenTimeUtc).Take(limit).ToList());
+            Klines.Where(kline => kline.OpenTimeUtc >= startTimeUtc).OrderBy(kline => kline.OpenTimeUtc).Take(limit)
+                .ToList());
     }
 }

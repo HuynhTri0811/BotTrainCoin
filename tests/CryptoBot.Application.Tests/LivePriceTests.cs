@@ -45,13 +45,13 @@ public class LivePriceTests
     {
         var history = new LivePriceHistory(new LivePriceOptions());
 
-        var s = await Sampler(new StubSpot(() => 100.5m), new StubMark(() => 100.7m), history)
+        var sample = await Sampler(new StubSpot(() => 100.5m), new StubMark(() => 100.7m), history)
             .SampleAsync("BTCUSDT", default);
 
-        Assert.Equal(100.5m, s.SpotPrice);
-        Assert.Equal(100.7m, s.MarkPrice);
-        Assert.Null(s.Error);
-        Assert.Equal(T0, s.TimeUtc);
+        Assert.Equal(100.5m, sample.SpotPrice);
+        Assert.Equal(100.7m, sample.MarkPrice);
+        Assert.Null(sample.Error);
+        Assert.Equal(T0, sample.TimeUtc);
         Assert.Single(history.Get("BTCUSDT", 10));
     }
 
@@ -61,11 +61,11 @@ public class LivePriceTests
         var history = new LivePriceHistory(new LivePriceOptions());
         var failingMark = new StubMark(() => throw new MarketDataUnavailableException("rate limit"));
 
-        var s = await Sampler(new StubSpot(() => 100m), failingMark, history).SampleAsync("BTCUSDT", default);
+        var sample = await Sampler(new StubSpot(() => 100m), failingMark, history).SampleAsync("BTCUSDT", default);
 
-        Assert.Equal(100m, s.SpotPrice);
-        Assert.Null(s.MarkPrice);
-        Assert.Contains("Mark: rate limit", s.Error);
+        Assert.Equal(100m, sample.SpotPrice);
+        Assert.Null(sample.MarkPrice);
+        Assert.Contains("Mark: rate limit", sample.Error);
     }
 
     [Fact]
@@ -75,11 +75,11 @@ public class LivePriceTests
         var price = 0m;
         var sampler = Sampler(new StubSpot(() => ++price), new StubMark(() => price), history);
 
-        for (var i = 0; i < 5; i++)
+        for (var index = 0; index < 5; index++)
             await sampler.SampleAsync("BTCUSDT", default);
 
-        Assert.Equal([3m, 4m, 5m], history.Get("BTCUSDT", 10).Select(s => s.SpotPrice!.Value));
-        Assert.Equal([5m], history.Get("BTCUSDT", 1).Select(s => s.SpotPrice!.Value));
+        Assert.Equal([3m, 4m, 5m], history.Get("BTCUSDT", 10).Select(sample => sample.SpotPrice!.Value));
+        Assert.Equal([5m], history.Get("BTCUSDT", 1).Select(sample => sample.SpotPrice!.Value));
         Assert.Empty(history.Get("ETHUSDT", 10));
     }
 }

@@ -37,31 +37,31 @@ export function TradePanel({ symbol, account }: Props) {
   const [takeProfit, setTakeProfit] = useState<string | null>(null);
   const [pending, setPending] = useState<{ request: OpenRequest; quote: FuturesQuote } | null>(null);
 
-  const mark = account?.markPrices.find((m) => m.symbol === symbol)?.price;
+  const mark = account?.markPrices.find((markPrice) => markPrice.symbol === symbol)?.price;
   const maxLeverage = account?.rules.maxLeverage ?? 10;
   const supported = account?.rules.symbols.includes(symbol) ?? false;
-  const hasOpen = account?.openPositions.some((p) => p.symbol === symbol) ?? false;
+  const hasOpen = account?.openPositions.some((position) => position.symbol === symbol) ?? false;
   const color = side === 'Long' ? LONG : SHORT;
 
   const quote = useMutation({
     mutationFn: futuresApi.quote,
-    onSuccess: (q, request) => setPending({ request, quote: q }),
-    onError: (e) => message.error(e.message),
+    onSuccess: (query, request) => setPending({ request, quote: query }),
+    onError: (error) => message.error(error.message),
   });
 
   const open = useMutation({
     mutationFn: futuresApi.open,
-    onSuccess: (r) => {
+    onSuccess: (result) => {
       message.success(
-        r.duplicate
+        result.duplicate
           ? 'Lệnh này đã được xử lý trước đó.'
-          : `Đã mở ${r.position.side} ${r.position.quantity} ${symbol} @ ${fmtPrice(r.position.entryPrice)}`,
+          : `Đã mở ${result.position.side} ${result.position.quantity} ${symbol} @ ${fmtPrice(result.position.entryPrice)}`,
       );
       setPending(null);
       queryClient.invalidateQueries({ queryKey: ['futures-account'] });
     },
-    onError: (e) => {
-      const details = e instanceof ApiError ? e.details : [e.message];
+    onError: (error) => {
+      const details = error instanceof ApiError ? error.details : [error.message];
       Modal.error({ title: 'Lệnh bị từ chối', content: details.join('\n') });
     },
   });
@@ -133,7 +133,7 @@ export function TradePanel({ symbol, account }: Props) {
       <Segmented
         block
         value={side}
-        onChange={(v) => setSide(v as PositionSide)}
+        onChange={(value) => setSide(value as PositionSide)}
         options={[
           { label: <span style={{ color: LONG, fontWeight: 600 }}>Long</span>, value: 'Long' },
           { label: <span style={{ color: SHORT, fontWeight: 600 }}>Short</span>, value: 'Short' },
@@ -165,9 +165,9 @@ export function TradePanel({ symbol, account }: Props) {
           style={{ width: '100%' }}
         />
         <Space size={4}>
-          {[0.1, 0.25, 0.5].map((p) => (
-            <Button key={p} size="small" onClick={() => fillMarginPct(p)}>
-              {p * 100}%
+          {[0.1, 0.25, 0.5].map((fraction) => (
+            <Button key={fraction} size="small" onClick={() => fillMarginPct(fraction)}>
+              {fraction * 100}%
             </Button>
           ))}
         </Space>
@@ -239,11 +239,11 @@ function ConfirmModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const q = pending?.quote;
-  const r = pending?.request;
-  const color = q?.side === 'Long' ? LONG : SHORT;
+  const query = pending?.quote;
+  const result = pending?.request;
+  const color = query?.side === 'Long' ? LONG : SHORT;
   const liqDistance =
-    q?.fillPrice && q.liquidationPrice ? Math.abs(q.liquidationPrice - q.fillPrice) / q.fillPrice : null;
+    query?.fillPrice && query.liquidationPrice ? Math.abs(query.liquidationPrice - query.fillPrice) / query.fillPrice : null;
 
   return (
     <Modal
@@ -252,60 +252,60 @@ function ConfirmModal({
         <Space>
           <Tag color="blue">PAPER</Tag>
           <span style={{ color }}>
-            {q?.side} {q?.symbol} {q?.leverage}x
+            {query?.side} {query?.symbol} {query?.leverage}x
           </span>
         </Space>
       }
-      okText={`Xác nhận mở ${q?.side ?? ''}`}
-      okButtonProps={{ disabled: !q?.accepted, style: q?.accepted ? { background: color } : undefined }}
+      okText={`Xác nhận mở ${query?.side ?? ''}`}
+      okButtonProps={{ disabled: !query?.accepted, style: query?.accepted ? { background: color } : undefined }}
       cancelText="Hủy"
       confirmLoading={loading}
       onCancel={onCancel}
       onOk={onConfirm}
       destroyOnHidden
     >
-      {q && !q.accepted && (
+      {query && !query.accepted && (
         <Alert
           type="error"
           showIcon
           title="Không thể mở vị thế"
           description={
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {q.errors.map((e) => (
-                <li key={e}>{e}</li>
+              {query.errors.map((value) => (
+                <li key={value}>{value}</li>
               ))}
             </ul>
           }
           style={{ marginBottom: 12 }}
         />
       )}
-      {q && (
+      {query && (
         <Descriptions size="small" column={1} bordered>
-          <Descriptions.Item label="Mark price">{fmtPrice(q.markPrice)}</Descriptions.Item>
-          <Descriptions.Item label="Giá vào ước tính">{fmtPrice(q.fillPrice)}</Descriptions.Item>
-          <Descriptions.Item label="Khối lượng">{q.quantity ?? '—'}</Descriptions.Item>
-          <Descriptions.Item label="Giá trị vị thế">{fmtUsdt(q.notional)}</Descriptions.Item>
-          <Descriptions.Item label="Margin">{fmtUsdt(q.margin)}</Descriptions.Item>
-          <Descriptions.Item label="Phí mở">{fmtUsdt(q.openFee)}</Descriptions.Item>
+          <Descriptions.Item label="Mark price">{fmtPrice(query.markPrice)}</Descriptions.Item>
+          <Descriptions.Item label="Giá vào ước tính">{fmtPrice(query.fillPrice)}</Descriptions.Item>
+          <Descriptions.Item label="Khối lượng">{query.quantity ?? '—'}</Descriptions.Item>
+          <Descriptions.Item label="Giá trị vị thế">{fmtUsdt(query.notional)}</Descriptions.Item>
+          <Descriptions.Item label="Margin">{fmtUsdt(query.margin)}</Descriptions.Item>
+          <Descriptions.Item label="Phí mở">{fmtUsdt(query.openFee)}</Descriptions.Item>
           <Descriptions.Item label="Giá thanh lý">
             <Typography.Text strong style={{ color: SHORT }}>
-              {fmtPrice(q.liquidationPrice)}
+              {fmtPrice(query.liquidationPrice)}
             </Typography.Text>
             {liqDistance != null && (
               <Typography.Text type="secondary"> (cách {(liqDistance * 100).toFixed(2)}%)</Typography.Text>
             )}
           </Descriptions.Item>
-          <Descriptions.Item label="Stop loss">{fmtPrice(r ? Number(r.stopLoss) : null)}</Descriptions.Item>
-          <Descriptions.Item label="Take profit">{r?.takeProfit ? fmtPrice(Number(r.takeProfit)) : '—'}</Descriptions.Item>
+          <Descriptions.Item label="Stop loss">{fmtPrice(result ? Number(result.stopLoss) : null)}</Descriptions.Item>
+          <Descriptions.Item label="Take profit">{result?.takeProfit ? fmtPrice(Number(result.takeProfit)) : '—'}</Descriptions.Item>
           <Descriptions.Item label="Lỗ ước tính nếu chạm SL">
-            <span style={{ color: SHORT }}>{q.lossAtStop != null ? `−${fmtUsdt(q.lossAtStop)}` : '—'}</span>
+            <span style={{ color: SHORT }}>{query.lossAtStop != null ? `−${fmtUsdt(query.lossAtStop)}` : '—'}</span>
           </Descriptions.Item>
           <Descriptions.Item label="Lãi ước tính nếu chạm TP">
-            <span style={{ color: LONG }}>{fmtUsdt(q.profitAtTakeProfit)}</span>
+            <span style={{ color: LONG }}>{fmtUsdt(query.profitAtTakeProfit)}</span>
           </Descriptions.Item>
         </Descriptions>
       )}
-      {q?.accepted && (
+      {query?.accepted && (
         <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '12px 0 0' }}>
           Ước tính theo mark price hiện tại; giá khớp thực tế lấy tại thời điểm xác nhận. Nếu giá gap qua stop, lỗ có thể
           lớn hơn ước tính (tối đa bằng margin).

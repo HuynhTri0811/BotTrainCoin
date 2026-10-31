@@ -32,8 +32,8 @@ public sealed class ListSlice<T> : IReadOnlyList<T>
 
     public IEnumerator<T> GetEnumerator()
     {
-        for (int i = 0; i < Count; i++)
-            yield return _source[_start + i];
+        for (int offset = 0; offset < Count; offset++)
+            yield return _source[_start + offset];
     }
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();

@@ -65,7 +65,7 @@ public sealed class CandleSyncService(
             if (klines.Count == 0)
                 break;
 
-            var candles = klines.Select(k => k.ToCandle(key, serverTime)).ToList();
+            var candles = klines.Select(kline => kline.ToCandle(key, serverTime)).ToList();
 
             var batchIssues = CandleSeriesValidator.Validate(candles, key.Interval);
             issues.AddRange(batchIssues);
@@ -77,7 +77,7 @@ public sealed class CandleSyncService(
             updated += result.Updated;
             issues.AddRange(result.Conflicts);
 
-            var lastClosed = valid.LastOrDefault(c => c.IsClosed);
+            var lastClosed = valid.LastOrDefault(candle => candle.IsClosed);
             if (lastClosed is not null)
                 latestClosed = lastClosed.OpenTimeUtc;
 

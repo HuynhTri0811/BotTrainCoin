@@ -29,5 +29,5 @@ public class RsiTests
 
     [Fact]
     public void Not_enough_values_returns_all_null() =>
-        Assert.All(Rsi.Calculate([1m, 2m], 2), v => Assert.Null(v));
+        Assert.All(Rsi.Calculate([1m, 2m], 2), value => Assert.Null(value));
 }

@@ -27,23 +27,24 @@ public sealed class MarketEventCatalog
 
     public MarketEventCatalog(IEnumerable<MarketEvent> events)
     {
-        _events = events.Select(e =>
+        _events = events.Select(marketEvent =>
         {
-            if (!DateTime.TryParseExact(e.Month, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None,
+            if (!DateTime.TryParseExact(marketEvent.Month, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None,
                     out var month))
-                throw new InvalidOperationException($"MarketEvents: Month '{e.Month}' phải có dạng yyyy-MM ({e.Title}).");
-            if (string.IsNullOrWhiteSpace(e.Title))
-                throw new InvalidOperationException($"MarketEvents: sự kiện tháng {e.Month} thiếu Title.");
-            return (month.Year, month.Month, e);
+                throw new InvalidOperationException($"MarketEvents: Month '{marketEvent.Month}' phải có dạng yyyy-MM ({marketEvent.Title}).");
+            if (string.IsNullOrWhiteSpace(marketEvent.Title))
+                throw new InvalidOperationException($"MarketEvents: sự kiện tháng {marketEvent.Month} thiếu Title.");
+            return (month.Year, month.Month, marketEvent);
         }).ToList();
     }
 
     /// <summary>Sự kiện chung và sự kiện riêng của <paramref name="symbol"/>, tăng dần theo tháng.</summary>
     public IReadOnlyList<MonthEvent> For(string symbol) =>
         _events
-            .Where(x => x.Event.Symbols.Count == 0 ||
-                        x.Event.Symbols.Contains(symbol, StringComparer.OrdinalIgnoreCase))
-            .OrderBy(x => x.Year).ThenBy(x => x.Month)
-            .Select(x => new MonthEvent(x.Year, x.Month, x.Event.Title, x.Event.Detail, x.Event.Symbols.Count == 0))
+            .Where(entry => entry.Event.Symbols.Count == 0 ||
+                        entry.Event.Symbols.Contains(symbol, StringComparer.OrdinalIgnoreCase))
+            .OrderBy(entry => entry.Year).ThenBy(entry => entry.Month)
+            .Select(entry => new MonthEvent(entry.Year, entry.Month, entry.Event.Title, entry.Event.Detail,
+                entry.Event.Symbols.Count == 0))
             .ToList();
 }

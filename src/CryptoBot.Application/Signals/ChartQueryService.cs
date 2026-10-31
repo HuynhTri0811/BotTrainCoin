@@ -51,19 +51,19 @@ public sealed class ChartQueryService(IStrategyInstanceStore instances, ICandleS
         var closes = ClosedCloses(history, visible);
         var points = new List<ChartPoint>(visible.Count);
         var closedIndex = history.Count - 1;
-        foreach (var c in visible)
+        foreach (var candle in visible)
         {
-            if (!c.IsClosed)
+            if (!candle.IsClosed)
             {
                 // Nến đang chạy không có EMA: chiến lược chỉ dùng nến đã đóng.
-                points.Add(new ChartPoint(c, null, null));
+                points.Add(new ChartPoint(candle, null, null));
                 continue;
             }
 
             closedIndex++;
             var start = Math.Max(0, closedIndex - strategy.RequiredCandles + 1);
             var ema = strategy.ComputeAt(closes.AsSpan(start, closedIndex - start + 1));
-            points.Add(new ChartPoint(c, ema?.Fast, ema?.Slow));
+            points.Add(new ChartPoint(candle, ema?.Fast, ema?.Slow));
         }
 
         return points;
@@ -73,11 +73,11 @@ public sealed class ChartQueryService(IStrategyInstanceStore instances, ICandleS
     private static decimal[] ClosedCloses(IReadOnlyList<Candle> history, IReadOnlyList<Candle> visible)
     {
         var closes = new List<decimal>(history.Count + visible.Count);
-        foreach (var c in history)
-            closes.Add(c.Close);
-        foreach (var c in visible)
-            if (c.IsClosed)
-                closes.Add(c.Close);
+        foreach (var candle in history)
+            closes.Add(candle.Close);
+        foreach (var visibleCandle in visible)
+            if (visibleCandle.IsClosed)
+                closes.Add(visibleCandle.Close);
         return closes.ToArray();
     }
 }

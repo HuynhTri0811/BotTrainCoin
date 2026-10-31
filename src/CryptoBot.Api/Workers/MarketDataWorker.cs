@@ -59,10 +59,12 @@ public sealed class MarketDataWorker(
         var evaluator = sp.GetRequiredService<SignalEvaluationService>();
 
         var delay = options.PollInterval;
-        var enabled = instances.Where(i => i.Enabled).ToList();
+        var enabled = instances.Where(instance => instance.Enabled).ToList();
 
-        var byKey = enabled.ToLookup(i => new CandleKey(i.Exchange, i.Symbol, CandleInterval.Parse(i.Interval)));
-        var keys = byKey.Select(g => g.Key).Concat(indicators.All.Select(i => i.Key)).Distinct();
+        var byKey = enabled.ToLookup(instance => new CandleKey(instance.Exchange, instance.Symbol,
+            CandleInterval.Parse(instance.Interval)));
+        var keys = byKey.Select(group => group.Key).Concat(indicators.All.Select(indicator => indicator.Key))
+            .Distinct();
 
         foreach (var key in keys)
         {
