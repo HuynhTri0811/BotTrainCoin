@@ -22,59 +22,62 @@ public sealed class IndicatorService(IndicatorRegistry registry, ICandleStore ca
 
     public async Task<IndicatorChart?> GetChartAsync(string name, int limit, CancellationToken ct)
     {
-        if (registry.Find(name) is not { } c)
+        if (registry.Find(name) is not { } indicator)
             return null;
 
         limit = Math.Clamp(limit, 1, MaxLimit);
-        var visible = await candles.GetLatestAsync(c.Key, null, limit, closedOnly: true, ct);
+        var visible = await candles.GetLatestAsync(indicator.Key, null, limit, closedOnly: true, ct);
         if (visible.Count == 0)
-            return new IndicatorChart(c, []);
+            return new IndicatorChart(indicator, []);
 
-        var required = Math.Max(c.Indicator.RequiredCandles, 1);
-        var history = await candles.GetLatestAsync(c.Key, visible[0].OpenTimeUtc, required - 1, closedOnly: true, ct);
+        var required = Math.Max(indicator.Indicator.RequiredCandles, 1);
+        var history = await candles.GetLatestAsync(indicator.Key, visible[0].OpenTimeUtc, required - 1,
+            closedOnly: true, ct);
         var series = history.Concat(visible).ToList();
-        var gaps = GapIndex.Build(series, c.Key.Interval.Duration);
+        var gaps = GapIndex.Build(series, indicator.Key.Interval.Duration);
 
         var points = new List<IndicatorPoint>(visible.Count);
-        for (var i = history.Count; i < series.Count; i++)
+        for (var index = history.Count; index < series.Count; index++)
         {
-            var start = Math.Max(0, i - required + 1);
-            var window = new ListSlice<Candle>(series, start, i - start + 1);
-            points.Add(new IndicatorPoint(series[i], Evaluate(c, window, gaps.FirstIn(series, start, i, c.Indicator.RequiredCandles))));
+            var start = Math.Max(0, index - required + 1);
+            var window = new ListSlice<Candle>(series, start, index - start + 1);
+            points.Add(new IndicatorPoint(series[index], Evaluate(indicator, window, gaps.FirstIn(series, start, index,
+                indicator.Indicator.RequiredCandles))));
         }
 
-        return new IndicatorChart(c, points);
+        return new IndicatorChart(indicator, points);
     }
 
     public async Task<IndicatorReading?> GetLatestAsync(string name, CancellationToken ct)
     {
-        if (registry.Find(name) is not { } c)
+        if (registry.Find(name) is not { } indicator)
             return null;
 
-        var window = await candles.GetLatestAsync(c.Key, null, Math.Max(c.Indicator.RequiredCandles, 1),
+        var window = await candles.GetLatestAsync(indicator.Key, null, Math.Max(indicator.Indicator.RequiredCandles, 1),
             closedOnly: true, ct);
         if (window.Count == 0)
             return null;
 
-        var gap = GapIndex.Build(window, c.Key.Interval.Duration)
-            .FirstIn(window, 0, window.Count - 1, c.Indicator.RequiredCandles);
-        return new IndicatorReading(c, window[^1], Evaluate(c, window, gap));
+        var gap = GapIndex.Build(window, indicator.Key.Interval.Duration)
+            .FirstIn(window, 0, window.Count - 1, indicator.Indicator.RequiredCandles);
+        return new IndicatorReading(indicator, window[^1], Evaluate(indicator, window, gap));
     }
 
     /// <summary>
     /// Cửa sổ thiếu nến → không phát tín hiệu (giống chiến lược EMA). Lỗi trong code chỉ báo được bắt lại
     /// và trả về None kèm lý do, để một chỉ báo viết sai không làm dừng worker.
     /// </summary>
-    private static IndicatorResult Evaluate(ConfiguredIndicator c, IReadOnlyList<Candle> window, Candle? gapAt) =>
+    private static IndicatorResult Evaluate(ConfiguredIndicator indicator, IReadOnlyList<Candle> window,
+        Candle? gapAt) =>
         gapAt is not null
             ? IndicatorResult.None($"Thiếu nến trước {gapAt.OpenTimeUtc:yyyy-MM-dd HH:mm} UTC.")
-            : SafeCompute(c, window);
+            : SafeCompute(indicator, window);
 
-    private static IndicatorResult SafeCompute(ConfiguredIndicator c, IReadOnlyList<Candle> window)
+    private static IndicatorResult SafeCompute(ConfiguredIndicator indicator, IReadOnlyList<Candle> window)
     {
         try
         {
-            return c.Indicator.Compute(window);
+            return indicator.Indicator.Compute(window);
         }
         catch (Exception ex)
         {
@@ -97,8 +100,10 @@ public sealed class IndicatorService(IndicatorRegistry registry, ICandleStore ca
         {
             var next = new int[series.Count + 1];
             next[series.Count] = int.MaxValue;
-            for (var j = series.Count - 1; j >= 0; j--)
-                next[j] = j > 0 && series[j].OpenTimeUtc - series[j - 1].OpenTimeUtc != step ? j : next[j + 1];
+            for (var candleIndex = series.Count - 1; candleIndex >= 0; candleIndex--)
+                next[candleIndex] = candleIndex > 0
+                    && series[candleIndex].OpenTimeUtc - series[candleIndex - 1].OpenTimeUtc != step ? candleIndex
+                        : next[candleIndex + 1];
             return new GapIndex(next);
         }
 
@@ -113,8 +118,8 @@ public sealed class IndicatorService(IndicatorRegistry registry, ICandleStore ca
             var from = Math.Max(end - required + 2, start + 1);
             if (from > end)
                 return null;
-            var g = _next[from];
-            return g <= end ? series[g] : null;
+            var value = _next[from];
+            return value <= end ? series[value] : null;
         }
     }
 }
