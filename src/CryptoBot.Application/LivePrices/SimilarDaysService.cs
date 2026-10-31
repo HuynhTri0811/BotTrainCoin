@@ -125,19 +125,20 @@ public sealed class SimilarDaysService(
         var computed = await cache.GetOrComputeAsync(historySymbol, horizonDays, lastStored.OpenTimeUtc, async () =>
         {
             var history = await candles.GetLatestAsync(key, null, MaxDailyCandles, closedOnly: true, ct);
-            var closes = history.Select(c => c.Close).ToList();
+            var closes = history.Select(candle => candle.Close).ToList();
             // Chạy thử nặng (vài trăm ms đến hơn 1 giây): đưa khỏi luồng xử lý request.
             return await Task.Run(() => new SimilarDaysCache.Computed(
                 SimilarDaysForecast.Compute(closes, horizonDays),
                 SimilarDaysForecast.Backtest(closes, horizonDays)), ct);
         });
-        if (computed.Forecast is not { } f)
+        if (computed.Forecast is not { } forecast)
             return null;
 
         var price = anchor.Close;
         return new SimilarDaysResult(historySymbol, historyClient.Exchange, yesterday, price,
-            yesterday + day * (horizonDays + 1), price * (1 + f.Low68Percent / 100), price * (1 + f.High68Percent / 100),
-            f, computed.Backtest);
+            yesterday + day * (horizonDays + 1), price * (1 + forecast.Low68Percent / 100),
+                price * (1 + forecast.High68Percent / 100),
+            forecast, computed.Backtest);
     }
 
     /// <summary>BTCUSDT → BTCUSD nếu BTCUSD có trong DailyHistory:Symbols.</summary>
@@ -146,6 +147,7 @@ public sealed class SimilarDaysService(
         var candidate = liveSymbol.EndsWith("USDT", StringComparison.OrdinalIgnoreCase)
             ? liveSymbol[..^1]
             : liveSymbol;
-        return options.Symbols.FirstOrDefault(s => s.Equals(candidate, StringComparison.OrdinalIgnoreCase));
+        return options.Symbols.FirstOrDefault(configured => configured.Equals(candidate,
+            StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -132,7 +132,7 @@ public sealed class DailyReportService(
 
             var now = clock.UtcNow;
             var key = new CandleKey(client.Exchange, symbol, interval);
-            var candles = klines.Select(k => k.ToCandle(key, now)).Where(c => c.IsClosed).ToList();
+            var candles = klines.Select(kline => kline.ToCandle(key, now)).Where(candle => candle.IsClosed).ToList();
             candles = CandleSeriesValidator.WithoutRejected(candles, CandleSeriesValidator.Validate(candles, interval));
 
             var report = DailyMoveReport.Build(candles, periodStart, periodEndUtc, options.BaselineCandles,
@@ -156,8 +156,8 @@ public sealed class DailyReportService(
     {
         var saved = await store.GetRecentAsync(symbol, limit, ct);
         return saved
-            .Select(r => new SavedDailyReport(r.Symbol, r.Interval, r.CreatedAtUtc,
-                JsonSerializer.Deserialize<DailyMoveReport>(r.ContentJson, Json)!))
+            .Select(report => new SavedDailyReport(report.Symbol, report.Interval, report.CreatedAtUtc,
+                JsonSerializer.Deserialize<DailyMoveReport>(report.ContentJson, Json)!))
             .ToList();
     }
 }
