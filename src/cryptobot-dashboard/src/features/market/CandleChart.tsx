@@ -55,7 +55,7 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
 
   // Chỉ tạo lại series khi danh sách đường thay đổi, không phải mỗi lần dữ liệu được làm mới.
   const linesKey = JSON.stringify(indicator?.indicator.lines ?? []);
-  const hasPane = (indicator?.indicator.lines ?? []).some((l) => !l.overlay);
+  const hasPane = (indicator?.indicator.lines ?? []).some((line) => !line.overlay);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -106,32 +106,32 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
   }, [fastLabel, slowLabel]);
 
   useEffect(() => {
-    const h = handles.current;
-    if (!h) return;
+    const chart = handles.current;
+    if (!chart) return;
 
-    h.candles.setData(
-      candles.map((c) => ({
-        time: c.time as UTCTimestamp,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
+    chart.candles.setData(
+      candles.map((point) => ({
+        time: point.time as UTCTimestamp,
+        open: point.open,
+        high: point.high,
+        low: point.low,
+        close: point.close,
         // Nến đang chạy hiển thị nhạt hơn: chiến lược chưa dùng nến này.
-        ...(c.isClosed ? {} : { color: '#94a3b8', wickColor: '#94a3b8' }),
+        ...(point.isClosed ? {} : { color: '#94a3b8', wickColor: '#94a3b8' }),
       })),
     );
-    h.volume.setData(
-      candles.map((c) => ({
-        time: c.time as UTCTimestamp,
-        value: c.volume,
-        color: !c.isClosed ? '#cbd5e1' : c.close >= c.open ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.35)',
+    chart.volume.setData(
+      candles.map((point) => ({
+        time: point.time as UTCTimestamp,
+        value: point.volume,
+        color: !point.isClosed ? '#cbd5e1' : point.close >= point.open ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.35)',
       })),
     );
-    h.fast.setData(
-      candles.filter((c) => c.fastEma !== null).map((c) => ({ time: c.time as UTCTimestamp, value: c.fastEma! })),
+    chart.fast.setData(
+      candles.filter((point) => point.fastEma !== null).map((point) => ({ time: point.time as UTCTimestamp, value: point.fastEma! })),
     );
-    h.slow.setData(
-      candles.filter((c) => c.slowEma !== null).map((c) => ({ time: c.time as UTCTimestamp, value: c.slowEma! })),
+    chart.slow.setData(
+      candles.filter((point) => point.slowEma !== null).map((point) => ({ time: point.time as UTCTimestamp, value: point.slowEma! })),
     );
     if (!fitted.current && candles.length > 0) {
       fitted.current = true;
@@ -141,21 +141,21 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
   }, [candles]);
 
   useEffect(() => {
-    const h = handles.current;
-    if (!h) return;
+    const chartHandles = handles.current;
+    if (!chartHandles) return;
     const lines = JSON.parse(linesKey) as IndicatorChart['indicator']['lines'];
-    const created = lines.map((l) => {
-      const series = h.chart.addSeries(
+    const created = lines.map((line) => {
+      const series = chartHandles.chart.addSeries(
         LineSeries,
-        { color: l.color, lineWidth: 2, title: l.title, priceLineVisible: false },
-        l.overlay ? 0 : 1,
+        { color: line.color, lineWidth: 2, title: line.title, priceLineVisible: false },
+        line.overlay ? 0 : 1,
       );
-      for (const level of l.levels)
+      for (const level of line.levels)
         series.createPriceLine({ price: level, color: '#94a3b8', lineStyle: LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: '' });
-      return [l.key, series] as const;
+      return [line.key, series] as const;
     });
     indicatorSeries.current = new Map(created);
-    if (lines.some((l) => !l.overlay)) h.chart.panes()[1]?.setHeight(INDICATOR_PANE_HEIGHT);
+    if (lines.some((line) => !line.overlay)) chartHandles.chart.panes()[1]?.setHeight(INDICATOR_PANE_HEIGHT);
 
     return () => {
       // Khi chart bị tạo lại, chart cũ đã bị remove cùng các series.
@@ -169,41 +169,41 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
     for (const [key, series] of indicatorSeries.current) {
       series.setData(
         (indicator?.points ?? [])
-          .filter((p) => p.values[key] != null)
-          .map((p) => ({ time: p.time as UTCTimestamp, value: p.values[key]! })),
+          .filter((point) => point.values[key] != null)
+          .map((point) => ({ time: point.time as UTCTimestamp, value: point.values[key]! })),
       );
     }
   }, [indicator, linesKey, fastLabel, slowLabel]);
 
   useEffect(() => {
-    const h = handles.current;
-    if (!h) return;
-    const markers: SeriesMarker<Time>[] = signals.map((s) =>
-      s.action === 'Buy'
-        ? { time: s.time as UTCTimestamp, position: 'belowBar', color: '#16a34a', shape: 'arrowUp', text: 'BUY' }
-        : { time: s.time as UTCTimestamp, position: 'aboveBar', color: '#dc2626', shape: 'arrowDown', text: 'SELL' },
+    const chart = handles.current;
+    if (!chart) return;
+    const markers: SeriesMarker<Time>[] = signals.map((signal) =>
+      signal.action === 'Buy'
+        ? { time: signal.time as UTCTimestamp, position: 'belowBar', color: '#16a34a', shape: 'arrowUp', text: 'BUY' }
+        : { time: signal.time as UTCTimestamp, position: 'aboveBar', color: '#dc2626', shape: 'arrowDown', text: 'SELL' },
     );
     // Tín hiệu của chỉ báo tự viết: chấm tím, khác mũi tên BUY/SELL của chiến lược EMA.
-    for (const m of indicator?.markers ?? [])
+    for (const month of indicator?.markers ?? [])
       markers.push(
-        m.signal === 'Long'
-          ? { time: m.time as UTCTimestamp, position: 'belowBar', color: INDICATOR_MARKER_COLOR, shape: 'circle', text: 'L' }
-          : { time: m.time as UTCTimestamp, position: 'aboveBar', color: INDICATOR_MARKER_COLOR, shape: 'circle', text: 'S' },
+        month.signal === 'Long'
+          ? { time: month.time as UTCTimestamp, position: 'belowBar', color: INDICATOR_MARKER_COLOR, shape: 'circle', text: 'L' }
+          : { time: month.time as UTCTimestamp, position: 'aboveBar', color: INDICATOR_MARKER_COLOR, shape: 'circle', text: 'S' },
       );
-    markers.sort((a, b) => (a.time as number) - (b.time as number));
-    h.markers.setMarkers(markers);
+    markers.sort((first, second) => (first.time as number) - (second.time as number));
+    chart.markers.setMarkers(markers);
   }, [signals, indicator, fastLabel, slowLabel]);
 
   useEffect(() => {
-    const h = handles.current;
-    if (!h) return;
-    for (const line of priceLines.current) h.candles.removePriceLine(line);
+    const chart = handles.current;
+    if (!chart) return;
+    for (const line of priceLines.current) chart.candles.removePriceLine(line);
     priceLines.current = [];
     if (!position) return;
 
     const add = (price: number, title: string, color: string, style: LineStyle) =>
       priceLines.current.push(
-        h.candles.createPriceLine({ price, title, color, lineStyle: style, lineWidth: 1, axisLabelVisible: true }),
+        chart.candles.createPriceLine({ price, title, color, lineStyle: style, lineWidth: 1, axisLabelVisible: true }),
       );
     add(position.entryPrice, `${position.side} ${position.leverage}x`, '#475569', LineStyle.Solid);
     add(position.stopLoss, 'SL', '#dc2626', LineStyle.Dashed);
