@@ -107,12 +107,12 @@ public class FuturesMathTests
     [Fact]
     public void Isolated_close_loss_is_capped_at_margin()
     {
-        var p = new FuturesPosition(Guid.NewGuid(), "BTCUSDT", PositionSide.Long, 10, 1m, 100m, 10m, 90.36m,
+        var position = new FuturesPosition(Guid.NewGuid(), "BTCUSDT", PositionSide.Long, 10, 1m, 100m, 10m, 90.36m,
             95m, null, 0.05m, TestCandles.T0);
 
-        p.Close(CloseReason.StopLoss, 80m, 0.04m, null, TestCandles.T0);
+        position.Close(CloseReason.StopLoss, 80m, 0.04m, null, TestCandles.T0);
 
-        Assert.Equal(-10m, p.RealizedPnl);
-        Assert.Throws<InvalidOperationException>(() => p.Liquidate(80m, TestCandles.T0));
+        Assert.Equal(-10m, position.RealizedPnl);
+        Assert.Throws<InvalidOperationException>(() => position.Liquidate(80m, TestCandles.T0));
     }
 }
