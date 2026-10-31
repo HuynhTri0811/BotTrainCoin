@@ -20,27 +20,28 @@ internal sealed class InMemoryCandleStore : ICandleStore
         Task.FromResult(Candles.Count == 0 ? (DateTime?)null : Candles.Keys.Max());
 
     public Task<DateTime?> GetFirstMissingStatsOpenTimeAsync(CandleKey key, DateTime fromUtc, CancellationToken ct) =>
-        Task.FromResult(Candles.Values.FirstOrDefault(c => c.OpenTimeUtc >= fromUtc && (c.TradeCount is null || c.TakerBuyVolume is null))?.OpenTimeUtc);
+        Task.FromResult(Candles.Values.FirstOrDefault(candle => candle.OpenTimeUtc >= fromUtc
+            && (candle.TradeCount is null || candle.TakerBuyVolume is null))?.OpenTimeUtc);
 
     public Task<UpsertResult> UpsertAsync(CandleKey key, IReadOnlyList<Candle> candles, CancellationToken ct)
     {
         int inserted = 0, updated = 0, unchanged = 0;
         var conflicts = new List<CandleIssue>();
-        foreach (var c in candles)
+        foreach (var candle in candles)
         {
-            if (!Candles.TryGetValue(c.OpenTimeUtc, out var stored))
+            if (!Candles.TryGetValue(candle.OpenTimeUtc, out var stored))
             {
-                Candles[c.OpenTimeUtc] = c;
+                Candles[candle.OpenTimeUtc] = candle;
                 inserted++;
             }
             else if (stored.IsClosed)
             {
-                if (stored.ApplyUpdate(c)) unchanged++;
-                else conflicts.Add(new CandleIssue(CandleIssueKind.InvalidValues, c.OpenTimeUtc, "conflict"));
+                if (stored.ApplyUpdate(candle)) unchanged++;
+                else conflicts.Add(new CandleIssue(CandleIssueKind.InvalidValues, candle.OpenTimeUtc, "conflict"));
             }
             else
             {
-                stored.ApplyUpdate(c);
+                stored.ApplyUpdate(candle);
                 updated++;
             }
         }
@@ -50,13 +51,15 @@ internal sealed class InMemoryCandleStore : ICandleStore
     public Task<IReadOnlyList<Candle>> GetLatestAsync(CandleKey key, DateTime? beforeExclusiveUtc, int limit,
         bool closedOnly, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<Candle>>(Candles.Values
-            .Where(c => (beforeExclusiveUtc is null || c.OpenTimeUtc < beforeExclusiveUtc) && (!closedOnly || c.IsClosed))
+            .Where(candle => (beforeExclusiveUtc is null || candle.OpenTimeUtc < beforeExclusiveUtc) && (!closedOnly
+                || candle.IsClosed))
             .TakeLast(Math.Max(limit, 0)).ToList());
 
     public Task<IReadOnlyList<Candle>> GetAfterAsync(CandleKey key, DateTime? afterExclusiveUtc, int limit,
         bool closedOnly, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<Candle>>(Candles.Values
-            .Where(c => (afterExclusiveUtc is null || c.OpenTimeUtc > afterExclusiveUtc) && (!closedOnly || c.IsClosed))
+            .Where(candle => (afterExclusiveUtc is null || candle.OpenTimeUtc > afterExclusiveUtc) && (!closedOnly
+                || candle.IsClosed))
             .Take(Math.Max(limit, 0)).ToList());
 }
 
@@ -69,10 +72,10 @@ internal sealed class InMemoryStrategyInstanceStore : IStrategyInstanceStore
         Task.FromResult<IReadOnlyList<StrategyInstance>>(Instances.ToList());
 
     public Task<StrategyInstance?> GetAsync(int id, CancellationToken ct) =>
-        Task.FromResult(Instances.FirstOrDefault(i => i.Id == id));
+        Task.FromResult(Instances.FirstOrDefault(instance => instance.Id == id));
 
     public Task<StrategyInstance?> FindByNameAsync(string name, CancellationToken ct) =>
-        Task.FromResult(Instances.FirstOrDefault(i => i.Name == name));
+        Task.FromResult(Instances.FirstOrDefault(instance => instance.Name == name));
 
     public Task AddAsync(StrategyInstance instance, CancellationToken ct)
     {
@@ -94,15 +97,17 @@ internal sealed class InMemorySignalStore : ISignalStore
 
     public Task<TradingSignal?> GetLastAsync(int strategyInstanceId, int configVersion, CancellationToken ct) =>
         Task.FromResult(Signals
-            .Where(s => s.StrategyInstanceId == strategyInstanceId && s.ConfigVersion == configVersion)
-            .MaxBy(s => s.CandleOpenTimeUtc));
+            .Where(signal => signal.StrategyInstanceId == strategyInstanceId && signal.ConfigVersion == configVersion)
+            .MaxBy(signal => signal.CandleOpenTimeUtc));
 
     public Task SaveEvaluationAsync(StrategyInstance instance, IReadOnlyList<TradingSignal> newSignals, CancellationToken ct)
     {
-        foreach (var s in newSignals)
+        foreach (var signal in newSignals)
         {
-            if (Signals.Any(x => x.StrategyInstanceId == s.StrategyInstanceId && x.ConfigVersion == s.ConfigVersion &&
-                                 x.CandleOpenTimeUtc == s.CandleOpenTimeUtc && x.Action == s.Action))
+            if (Signals.Any(candidate => candidate.StrategyInstanceId == signal.StrategyInstanceId
+                && candidate.ConfigVersion == signal.ConfigVersion &&
+                                 candidate.CandleOpenTimeUtc == signal.CandleOpenTimeUtc
+                                     && candidate.Action == signal.Action))
                 throw new InvalidOperationException("Unique constraint violated");
         }
         Signals.AddRange(newSignals);
@@ -130,8 +135,8 @@ internal sealed class FakeMarketDataClient(FakeClock clock) : IMarketDataClient
     {
         Calls++;
         return Task.FromResult<IReadOnlyList<KlineDto>>(Klines
-            .Where(k => k.OpenTimeUtc >= startTimeUtc && k.OpenTimeUtc <= clock.UtcNow)
-            .OrderBy(k => k.OpenTimeUtc).Take(limit).ToList());
+            .Where(kline => kline.OpenTimeUtc >= startTimeUtc && kline.OpenTimeUtc <= clock.UtcNow)
+            .OrderBy(kline => kline.OpenTimeUtc).Take(limit).ToList());
     }
 }
 
@@ -141,12 +146,12 @@ internal sealed class InMemoryDailyReportStore : IDailyReportStore
     private readonly List<DailyReport> _pending = [];
 
     public Task<bool> ExistsAsync(string symbol, DateTime periodEndUtc, CancellationToken ct) =>
-        Task.FromResult(Reports.Any(r => r.Symbol == symbol && r.PeriodEndUtc == periodEndUtc));
+        Task.FromResult(Reports.Any(report => report.Symbol == symbol && report.PeriodEndUtc == periodEndUtc));
 
     public Task<IReadOnlyList<DailyReport>> GetRecentAsync(string? symbol, int limit, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<DailyReport>>(Reports
-            .Where(r => symbol is null || r.Symbol == symbol)
-            .OrderByDescending(r => r.PeriodEndUtc).Take(limit).ToList());
+            .Where(report => symbol is null || report.Symbol == symbol)
+            .OrderByDescending(report => report.PeriodEndUtc).Take(limit).ToList());
 
     public void Add(DailyReport report) => _pending.Add(report);
 
@@ -176,17 +181,18 @@ internal sealed class InMemoryNewsStore : INewsStore
     public Task<IReadOnlySet<string>> GetExistingIdsAsync(string source, IReadOnlyCollection<string> externalIds,
         CancellationToken ct) =>
         Task.FromResult<IReadOnlySet<string>>(Articles
-            .Where(a => a.Source == source && externalIds.Contains(a.ExternalId))
-            .Select(a => a.ExternalId).ToHashSet());
+            .Where(article => article.Source == source && externalIds.Contains(article.ExternalId))
+            .Select(article => article.ExternalId).ToHashSet());
 
     public Task<IReadOnlyList<NewsArticle>> QueryAsync(NewsFilter filter, int limit, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<NewsArticle>>(Articles
-            .Where(a => filter.Coin is null || a.Coins.Split(',').Contains(filter.Coin))
-            .Where(a => filter.Source is null || a.Source == filter.Source)
-            .Where(a => filter.Search is null || a.Title.Contains(filter.Search) || a.Summary.Contains(filter.Search))
-            .Where(a => (filter.FromUtc is null || a.PublishedAtUtc >= filter.FromUtc) &&
-                        (filter.ToUtc is null || a.PublishedAtUtc < filter.ToUtc))
-            .OrderByDescending(a => a.PublishedAtUtc).Take(limit).ToList());
+            .Where(article => filter.Coin is null || article.Coins.Split(',').Contains(filter.Coin))
+            .Where(article => filter.Source is null || article.Source == filter.Source)
+            .Where(article => filter.Search is null || article.Title.Contains(filter.Search)
+                || article.Summary.Contains(filter.Search))
+            .Where(article => (filter.FromUtc is null || article.PublishedAtUtc >= filter.FromUtc) &&
+                        (filter.ToUtc is null || article.PublishedAtUtc < filter.ToUtc))
+            .OrderByDescending(article => article.PublishedAtUtc).Take(limit).ToList());
 
     public void AddRange(IEnumerable<NewsArticle> articles) => Articles.AddRange(articles);
 
