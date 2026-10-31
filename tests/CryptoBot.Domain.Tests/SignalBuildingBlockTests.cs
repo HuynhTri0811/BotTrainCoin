@@ -8,14 +8,14 @@ namespace CryptoBot.Domain.Tests;
 /// <summary>Các hàm nhỏ tách ra từ chiến lược EMA và chỉ báo MyRsi.</summary>
 public class SignalBuildingBlockTests
 {
-    private static decimal[] Walk(int n, int seed)
+    private static decimal[] Walk(int count, int seed)
     {
         var rnd = new Random(seed);
-        var v = new decimal[n];
-        var p = 100m;
-        for (var i = 0; i < n; i++)
-            v[i] = p = Math.Round(p * (1 + (decimal)((rnd.NextDouble() - 0.5) * 0.04)), 2);
-        return v;
+        var prices = new decimal[count];
+        var price = 100m;
+        for (var index = 0; index < count; index++)
+            prices[index] = price = Math.Round(price * (1 + (decimal)((rnd.NextDouble() - 0.5) * 0.04)), 2);
+        return prices;
     }
 
     [Theory]
@@ -61,10 +61,11 @@ public class SignalBuildingBlockTests
     [InlineData(10, 10, 9, 11, false, true)]    // bằng nhau rồi rơi xuống
     [InlineData(11, 10, 12, 11, false, false)]  // đã ở trên từ trước
     [InlineData(10, 10, 10, 10, false, false)]  // đứng yên
-    public void Crossover_detects_only_fresh_crosses(int aPrev, int bPrev, int a, int b, bool up, bool down)
+    public void Crossover_detects_only_fresh_crosses(int firstPrevious, int secondPrevious, int first, int second,
+        bool up, bool down)
     {
-        Assert.Equal(up, Crossover.Up(aPrev, bPrev, a, b));
-        Assert.Equal(down, Crossover.Down(aPrev, bPrev, a, b));
+        Assert.Equal(up, Crossover.Up(firstPrevious, secondPrevious, first, second));
+        Assert.Equal(down, Crossover.Down(firstPrevious, secondPrevious, first, second));
     }
 
     [Fact]

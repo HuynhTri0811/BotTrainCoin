@@ -29,7 +29,7 @@ export function SignalsPage({ strategy }: { strategy: Strategy }) {
         dataSource={signals.data ?? []}
         pagination={{ pageSize: 10, hideOnSinglePage: true }}
         scroll={{ x: true }}
-        onChange={(_, f) => setFilter({ action: picked(f.action), isBackfill: picked(f.isBackfill) })}
+        onChange={(_, filters) => setFilter({ action: picked(filters.action), isBackfill: picked(filters.isBackfill) })}
         columns={[
           {
             title: 'Hành động',
@@ -38,15 +38,15 @@ export function SignalsPage({ strategy }: { strategy: Strategy }) {
               { text: 'BUY', value: 'Buy' },
               { text: 'SELL', value: 'Sell' },
             ]),
-            render: (a: Signal['action']) => <Tag color={a === 'Buy' ? 'green' : 'red'}>{a.toUpperCase()}</Tag>,
+            render: (item: Signal['action']) => <Tag color={item === 'Buy' ? 'green' : 'red'}>{item.toUpperCase()}</Tag>,
           },
           { title: 'Nến (mở)', dataIndex: 'candleOpenTimeUtc', render: formatVn },
-          { title: 'Close', dataIndex: 'candleClose', align: 'right', render: (v: number) => priceFormat.format(v) },
+          { title: 'Close', dataIndex: 'candleClose', align: 'right', render: (value: number) => priceFormat.format(value) },
           {
             title: `${fastLabel} / ${slowLabel}`,
             key: 'ema',
             align: 'right',
-            render: (_, s) => `${priceFormat.format(s.fastEma)} / ${priceFormat.format(s.slowEma)}`,
+            render: (_, signal) => `${priceFormat.format(signal.fastEma)} / ${priceFormat.format(signal.slowEma)}`,
           },
           { title: 'Lý do', dataIndex: 'reason' },
           {
@@ -56,8 +56,8 @@ export function SignalsPage({ strategy }: { strategy: Strategy }) {
               { text: 'Mới', value: 'false' },
               { text: 'Backfill', value: 'true' },
             ]),
-            render: (b: boolean) =>
-              b ? <Tag>Backfill</Tag> : <Tag color="processing">Mới</Tag>,
+            render: (isBackfill: boolean) =>
+              isBackfill ? <Tag>Backfill</Tag> : <Tag color="processing">Mới</Tag>,
           },
           { title: 'Tạo lúc', dataIndex: 'createdAtUtc', render: formatVn },
         ]}

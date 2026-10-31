@@ -54,17 +54,18 @@ public sealed record DailyMoveRange(
 
         // Log return cộng dồn được qua nhiều ngày và đối xứng lên/xuống, nên dùng để tính σ.
         List<double> logReturns = new(dailyCloses.Count - 1);
-        for (int i = 1; i < dailyCloses.Count; i++)
-            logReturns.Add(Math.Log((double)(dailyCloses[i] / dailyCloses[i - 1])));
+        for (int index = 1; index < dailyCloses.Count; index++)
+            logReturns.Add(Math.Log((double)(dailyCloses[index] / dailyCloses[index - 1])));
 
         double mean = logReturns.Average();
-        double dailySigma = Math.Sqrt(logReturns.Sum(r => (r - mean) * (r - mean)) / (logReturns.Count - 1));
+        double dailySigma = Math.Sqrt(logReturns.Sum(logReturn =>
+            (logReturn - mean) * (logReturn - mean)) / (logReturns.Count - 1));
         double sigma = dailySigma * Math.Sqrt(horizonDays);
 
         // Thay đổi thực tế sau horizonDays ngày, trượt từng ngày một.
         List<decimal> changes = new(dailyCloses.Count - horizonDays);
-        for (int i = horizonDays; i < dailyCloses.Count; i++)
-            changes.Add(PercentChange.Between(dailyCloses[i - horizonDays], dailyCloses[i]));
+        for (int index = horizonDays; index < dailyCloses.Count; index++)
+            changes.Add(PercentChange.Between(dailyCloses[index - horizonDays], dailyCloses[index]));
 
         return new DailyMoveRange(
             HorizonDays: horizonDays,

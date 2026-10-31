@@ -8,22 +8,22 @@ public class VolumePressureTests
     public void Sell_80_percent_larger_than_buy_is_sell_heavy()
     {
         // Mua 10, bán 18: bán lớn hơn mua đúng 80%.
-        VolumePressure p = VolumePressure.Analyze(28, 10, 80);
+        VolumePressure pressure = VolumePressure.Analyze(28, 10, 80);
 
-        Assert.Equal(VolumePressureSide.SellHeavy, p.Side);
-        Assert.True(p.IsAlert);
-        Assert.Equal(10m, p.BuyVolume);
-        Assert.Equal(18m, p.SellVolume);
-        Assert.Equal(80m, p.ExcessPercent);
+        Assert.Equal(VolumePressureSide.SellHeavy, pressure.Side);
+        Assert.True(pressure.IsAlert);
+        Assert.Equal(10m, pressure.BuyVolume);
+        Assert.Equal(18m, pressure.SellVolume);
+        Assert.Equal(80m, pressure.ExcessPercent);
     }
 
     [Fact]
     public void Buy_80_percent_larger_than_sell_is_buy_heavy()
     {
-        VolumePressure p = VolumePressure.Analyze(28, 18, 80);
+        VolumePressure pressure = VolumePressure.Analyze(28, 18, 80);
 
-        Assert.Equal(VolumePressureSide.BuyHeavy, p.Side);
-        Assert.Equal(80m, p.ExcessPercent);
+        Assert.Equal(VolumePressureSide.BuyHeavy, pressure.Side);
+        Assert.Equal(80m, pressure.ExcessPercent);
     }
 
     [Theory]
@@ -32,10 +32,10 @@ public class VolumePressureTests
     [InlineData(27.9, 17.9)] // mua lớn hơn 79%
     public void Below_threshold_is_balanced(double volume, double takerBuy)
     {
-        VolumePressure p = VolumePressure.Analyze((decimal)volume, (decimal)takerBuy, 80);
+        VolumePressure pressure = VolumePressure.Analyze((decimal)volume, (decimal)takerBuy, 80);
 
-        Assert.Equal(VolumePressureSide.Balanced, p.Side);
-        Assert.False(p.IsAlert);
+        Assert.Equal(VolumePressureSide.Balanced, pressure.Side);
+        Assert.False(pressure.IsAlert);
     }
 
     [Fact]
@@ -53,10 +53,10 @@ public class VolumePressureTests
     [Fact]
     public void Empty_candle_is_balanced()
     {
-        VolumePressure p = VolumePressure.Analyze(0, 0, 80);
+        VolumePressure pressure = VolumePressure.Analyze(0, 0, 80);
 
-        Assert.Equal(VolumePressureSide.Balanced, p.Side);
-        Assert.Equal(50m, p.BuyPercent);
+        Assert.Equal(VolumePressureSide.Balanced, pressure.Side);
+        Assert.Equal(50m, pressure.BuyPercent);
     }
 
     [Fact]

@@ -14,10 +14,10 @@ export function Sparkline({ values, width = 220, height = 48, color = '#2563eb' 
   const span = max - min || 1;
   const pad = 3;
   const points = values
-    .map((v, i) => {
-      const x = pad + (i / (values.length - 1)) * (width - pad * 2);
-      const y = pad + (1 - (v - min) / span) * (height - pad * 2);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    .map((value, index) => {
+      const pointX = pad + (index / (values.length - 1)) * (width - pad * 2);
+      const pointY = pad + (1 - (value - min) / span) * (height - pad * 2);
+      return `${pointX.toFixed(1)},${pointY.toFixed(1)}`;
     })
     .join(' ');
   const last = points.split(' ').at(-1)!.split(',');

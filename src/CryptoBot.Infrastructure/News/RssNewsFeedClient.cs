@@ -46,7 +46,8 @@ public sealed class RssNewsFeedClient(HttpClient http) : INewsFeedClient
     private static NewsItemDto? FromAtom(XElement entry)
     {
         var link = entry.Elements(Atom + "link")
-            .FirstOrDefault(l => (string?)l.Attribute("rel") is null or "alternate")?.Attribute("href")?.Value ?? "";
+            .FirstOrDefault(element =>
+                (string?)element.Attribute("rel") is null or "alternate")?.Attribute("href")?.Value ?? "";
         return Create(entry.Element(Atom + "id")?.Value.Trim() ?? link, entry.Element(Atom + "title")?.Value, link,
             entry.Element(Atom + "summary")?.Value,
             entry.Element(Atom + "published")?.Value ?? entry.Element(Atom + "updated")?.Value);

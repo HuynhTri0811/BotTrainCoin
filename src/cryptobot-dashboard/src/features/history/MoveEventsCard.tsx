@@ -17,9 +17,9 @@ export function MoveEventsCard({ data }: { data: MonthlyHistory }) {
   const events = eventsByMonth(data.events);
   // Tháng biến động mạnh nhất đứng đầu.
   const moves = data.months
-    .filter((m) => (rise ? m.changePercent >= threshold : m.changePercent <= -threshold))
-    .sort((a, b) => (rise ? b.changePercent - a.changePercent : a.changePercent - b.changePercent));
-  const withEvents = moves.filter((m) => events.has(`${m.year}-${m.month}`)).length;
+    .filter((change) => (rise ? change.changePercent >= threshold : change.changePercent <= -threshold))
+    .sort((first, second) => (rise ? second.changePercent - first.changePercent : first.changePercent - second.changePercent));
+  const withEvents = moves.filter((change) => events.has(`${change.year}-${change.month}`)).length;
   const coin = data.symbol.replace(/USD$/, '');
 
   return (
@@ -41,7 +41,7 @@ export function MoveEventsCard({ data }: { data: MonthlyHistory }) {
             size="small"
             value={threshold}
             onChange={setThreshold}
-            options={THRESHOLDS.map((t) => ({ value: t, label: rise ? `≥ +${t}%` : `≤ −${t}%` }))}
+            options={THRESHOLDS.map((threshold) => ({ value: threshold, label: rise ? `≥ +${threshold}%` : `≤ −${threshold}%` }))}
           />
         </Space>
       }
@@ -51,7 +51,7 @@ export function MoveEventsCard({ data }: { data: MonthlyHistory }) {
         nhận.
       </Typography.Paragraph>
       <Table<MonthChange>
-        rowKey={(m) => `${m.year}-${m.month}`}
+        rowKey={(change) => `${change.year}-${change.month}`}
         size="small"
         dataSource={moves}
         pagination={{ pageSize: 10, hideOnSinglePage: true, size: 'small' }}
@@ -60,31 +60,31 @@ export function MoveEventsCard({ data }: { data: MonthlyHistory }) {
           {
             title: 'Tháng',
             key: 'month',
-            render: (_, m) => `${String(m.month).padStart(2, '0')}/${m.year}${m.complete ? '' : '*'}`,
+            render: (_, change) => `${String(change.month).padStart(2, '0')}/${change.year}${change.complete ? '' : '*'}`,
           },
           {
             title: 'Thay đổi',
             dataIndex: 'changePercent',
             align: 'right',
-            render: (v: number) => (
-              <span style={{ fontWeight: 600, color: pctColor(v), fontVariantNumeric: 'tabular-nums' }}>{fmtPct(v)}</span>
+            render: (value: number) => (
+              <span style={{ fontWeight: 600, color: pctColor(value), fontVariantNumeric: 'tabular-nums' }}>{fmtPct(value)}</span>
             ),
           },
           {
             title: 'Mở → Đóng',
             key: 'prices',
             align: 'right',
-            render: (_, m) => (
+            render: (_, change) => (
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                {fmtPrice(m.open)} → {fmtPrice(m.close)}
+                {fmtPrice(change.open)} → {fmtPrice(change.close)}
               </span>
             ),
           },
           {
             title: 'Sự kiện cùng tháng',
             key: 'events',
-            render: (_, m) => {
-              const list = events.get(`${m.year}-${m.month}`);
+            render: (_, change) => {
+              const list = events.get(`${change.year}-${change.month}`);
               if (!list)
                 return (
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -93,15 +93,15 @@ export function MoveEventsCard({ data }: { data: MonthlyHistory }) {
                 );
               return (
                 <div style={{ display: 'grid', gap: 4, maxWidth: 560, whiteSpace: 'normal' }}>
-                  {list.map((e) => (
-                    <div key={e.title} style={{ fontSize: 12 }}>
-                      <Typography.Text strong>{e.title}</Typography.Text>
-                      {!e.marketWide && (
+                  {list.map((monthEvent) => (
+                    <div key={monthEvent.title} style={{ fontSize: 12 }}>
+                      <Typography.Text strong>{monthEvent.title}</Typography.Text>
+                      {!monthEvent.marketWide && (
                         <Tag style={{ marginLeft: 6 }} color="purple">
                           riêng {coin}
                         </Tag>
                       )}
-                      {e.detail && <div style={{ color: '#475569' }}>{e.detail}</div>}
+                      {monthEvent.detail && <div style={{ color: '#475569' }}>{monthEvent.detail}</div>}
                     </div>
                   ))}
                 </div>

@@ -8,7 +8,7 @@ namespace CryptoBot.Application.Tests;
 public class IndicatorRegistryTests
 {
     private static Dictionary<string, string?> P(params (string Key, string Value)[] items) =>
-        items.ToDictionary(x => x.Key, x => (string?)x.Value, StringComparer.OrdinalIgnoreCase);
+        items.ToDictionary(entry => entry.Key, entry => (string?)entry.Value, StringComparer.OrdinalIgnoreCase);
 
     [Fact]
     public void Finds_indicator_classes_by_attribute_only()
@@ -57,6 +57,6 @@ public class IndicatorRegistryTests
         Assert.Equal("BTCUSDT", ok.Key.Symbol);
         Assert.Equal(CandleInterval.M15, ok.Key.Interval);
         Assert.Same(ok, registry.Find("OK"));
-        Assert.Equal(["ok", "bad-interval", "bad-param"], registry.Errors.Select(e => e.Name));
+        Assert.Equal(["ok", "bad-interval", "bad-param"], registry.Errors.Select(error => error.Name));
     }
 }

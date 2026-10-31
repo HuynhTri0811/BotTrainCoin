@@ -97,25 +97,26 @@ public sealed class PaperFuturesService(
         try
         {
             var triggered = 0;
-            foreach (var p in await store.GetOpenPositionsAsync(ct))
+            foreach (var position in await store.GetOpenPositionsAsync(ct))
             {
-                if (marks.GetFresh(p.Symbol) is not { } mark)
+                if (marks.GetFresh(position.Symbol) is not { } mark)
                     continue;
 
-                if (FuturesMath.IsLiquidated(p.Side, mark.Price, p.LiquidationPrice))
+                if (FuturesMath.IsLiquidated(position.Side, mark.Price, position.LiquidationPrice))
                 {
-                    p.Liquidate(mark.Price, clock.UtcNow);
-                    store.AddLedger(new PaperLedgerEntry(-p.Margin, LedgerEntryType.RealizedPnl, p, "Bị thanh lý", clock.UtcNow));
+                    position.Liquidate(mark.Price, clock.UtcNow);
+                    store.AddLedger(new PaperLedgerEntry(-position.Margin, LedgerEntryType.RealizedPnl, position,
+                        "Bị thanh lý", clock.UtcNow));
                     logger.LogWarning("Paper futures LIQUIDATED {Side} {Symbol} mark {Mark} liq {Liq} mất {Margin}",
-                        p.Side, p.Symbol, mark.Price, p.LiquidationPrice, p.Margin);
+                        position.Side, position.Symbol, mark.Price, position.LiquidationPrice, position.Margin);
                 }
-                else if (FuturesMath.StopHit(p.Side, mark.Price, p.StopLoss))
+                else if (FuturesMath.StopHit(position.Side, mark.Price, position.StopLoss))
                 {
-                    CloseAt(p, CloseReason.StopLoss, mark.Price, null);
+                    CloseAt(position, CloseReason.StopLoss, mark.Price, null);
                 }
-                else if (p.TakeProfit is { } tp && FuturesMath.TakeProfitHit(p.Side, mark.Price, tp))
+                else if (position.TakeProfit is { } tp && FuturesMath.TakeProfitHit(position.Side, mark.Price, tp))
                 {
-                    CloseAt(p, CloseReason.TakeProfit, mark.Price, null);
+                    CloseAt(position, CloseReason.TakeProfit, mark.Price, null);
                 }
                 else
                 {
@@ -140,16 +141,19 @@ public sealed class PaperFuturesService(
         var (wallet, available) = await BalancesAsync(ct);
         var open = await store.GetOpenPositionsAsync(ct);
 
-        var views = open.Select(p =>
+        var views = open.Select(position =>
         {
-            var mark = marks.Get(p.Symbol)?.Price;
-            var upnl = mark is { } m ? FuturesMath.UnrealizedPnl(p.Side, p.Quantity, p.EntryPrice, m) : (decimal?)null;
-            return new PositionView(p, mark, upnl, upnl is { } u && p.Margin > 0 ? u / p.Margin * 100 : null);
+            var mark = marks.Get(position.Symbol)?.Price;
+            var upnl = mark is { } markPrice ? FuturesMath.UnrealizedPnl(position.Side, position.Quantity,
+                position.EntryPrice, markPrice) : (decimal?)null;
+            return new PositionView(position, mark, upnl, upnl is { } unrealizedPnl && position.Margin > 0
+                ? unrealizedPnl / position.Margin * 100 : null);
         }).ToList();
 
-        var unrealized = views.Sum(v => v.UnrealizedPnl ?? 0);
-        var used = open.Sum(p => p.Margin);
-        var prices = options.Symbols.Select(s => marks.Get(s.Symbol)).OfType<MarkPrice>().ToList();
+        var unrealized = views.Sum(view => view.UnrealizedPnl ?? 0);
+        var used = open.Sum(position => position.Margin);
+        var prices = options.Symbols.Select(symbolOptions => marks.Get(symbolOptions.Symbol)).OfType<MarkPrice>()
+            .ToList();
         return new AccountSnapshot(wallet, used, unrealized, wallet + unrealized, available, views, prices);
     }
 
@@ -163,59 +167,62 @@ public sealed class PaperFuturesService(
         await store.SaveAsync(ct);
     }
 
-    private void CloseAt(FuturesPosition p, CloseReason reason, decimal markPrice, Guid? commandId)
+    private void CloseAt(FuturesPosition position, CloseReason reason, decimal markPrice, Guid? commandId)
     {
-        var rules = options.FindRules(p.Symbol);
-        var exit = FuturesMath.ApplySlippage(markPrice, p.Side, opening: false, options.SlippageRate);
+        var rules = options.FindRules(position.Symbol);
+        var exit = FuturesMath.ApplySlippage(markPrice, position.Side, opening: false, options.SlippageRate);
         if (rules is not null)
             exit = FuturesMath.RoundToTick(exit, rules.TickSize);
-        var fee = p.Quantity * exit * options.TakerFeeRate;
+        var fee = position.Quantity * exit * options.TakerFeeRate;
         var now = clock.UtcNow;
 
-        p.Close(reason, exit, fee, commandId, now);
-        store.AddLedger(new PaperLedgerEntry(p.RealizedPnl!.Value, LedgerEntryType.RealizedPnl, p, $"Đóng: {reason}", now));
-        store.AddLedger(new PaperLedgerEntry(-fee, LedgerEntryType.Fee, p, "Phí đóng vị thế", now));
+        position.Close(reason, exit, fee, commandId, now);
+        store.AddLedger(new PaperLedgerEntry(position.RealizedPnl!.Value, LedgerEntryType.RealizedPnl, position,
+            $"Đóng: {reason}", now));
+        store.AddLedger(new PaperLedgerEntry(-fee, LedgerEntryType.Fee, position, "Phí đóng vị thế", now));
 
         logger.LogInformation("Paper futures CLOSE {Reason} {Side} {Symbol} @ {Exit} PnL {Pnl} phí {Fee}",
-            reason, p.Side, p.Symbol, exit, p.RealizedPnl, p.OpenFee + fee);
+            reason, position.Side, position.Symbol, exit, position.RealizedPnl, position.OpenFee + fee);
     }
 
     private async Task<(decimal Wallet, decimal Available)> BalancesAsync(CancellationToken ct)
     {
-        var wallet = (await store.GetLedgerAsync(ct)).Sum(e => e.Amount);
-        var used = (await store.GetOpenPositionsAsync(ct)).Sum(p => p.Margin);
+        var wallet = (await store.GetLedgerAsync(ct)).Sum(entry => entry.Amount);
+        var used = (await store.GetOpenPositionsAsync(ct)).Sum(position => position.Margin);
         return (wallet, wallet - used);
     }
 
-    private OpenQuote BuildQuote(OpenPositionRequest r, decimal available, IReadOnlyList<FuturesPosition> open)
+    private OpenQuote BuildQuote(OpenPositionRequest request, decimal available, IReadOnlyList<FuturesPosition> open)
     {
         var errors = new List<string>();
-        OpenQuote Reject() => new(false, errors, r.Symbol, r.Side, r.Leverage, marks.Get(r.Symbol)?.Price,
+        OpenQuote Reject() => new(false, errors, request.Symbol, request.Side, request.Leverage,
+            marks.Get(request.Symbol)?.Price,
             null, null, null, null, null, null, null, null, available);
 
-        var rules = options.FindRules(r.Symbol);
+        var rules = options.FindRules(request.Symbol);
         if (rules is null)
-            errors.Add($"Symbol {r.Symbol} chưa được cấu hình cho paper futures.");
-        if (r.Leverage < 1 || r.Leverage > options.MaxLeverage)
+            errors.Add($"Symbol {request.Symbol} chưa được cấu hình cho paper futures.");
+        if (request.Leverage < 1 || request.Leverage > options.MaxLeverage)
             errors.Add($"Đòn bẩy phải từ 1 đến {options.MaxLeverage}x.");
-        if (r.Margin <= 0)
+        if (request.Margin <= 0)
             errors.Add("Margin phải lớn hơn 0.");
-        if (open.Any(p => p.Symbol == r.Symbol))
-            errors.Add($"Đã có vị thế mở trên {r.Symbol} (one-way mode). Đóng vị thế cũ trước.");
-        var mark = marks.GetFresh(r.Symbol);
+        if (open.Any(position => position.Symbol == request.Symbol))
+            errors.Add($"Đã có vị thế mở trên {request.Symbol} (one-way mode). Đóng vị thế cũ trước.");
+        var mark = marks.GetFresh(request.Symbol);
         if (mark is null)
             errors.Add("Chưa có mark price mới (dữ liệu stale); chặn mở vị thế.");
         if (errors.Count > 0)
             return Reject();
 
         var fill = FuturesMath.RoundToTick(
-            FuturesMath.ApplySlippage(mark!.Price, r.Side, opening: true, options.SlippageRate), rules!.TickSize);
-        var qty = FuturesMath.RoundDown(r.Margin * r.Leverage / fill, rules.QuantityStep);
+            FuturesMath.ApplySlippage(mark!.Price, request.Side, opening: true, options.SlippageRate), rules!.TickSize);
+        var qty = FuturesMath.RoundDown(request.Margin * request.Leverage / fill, rules.QuantityStep);
         var notional = qty * fill;
-        var margin = notional / r.Leverage;
+        var margin = notional / request.Leverage;
         var fee = notional * options.TakerFeeRate;
         var liq = FuturesMath.RoundToTick(
-            FuturesMath.LiquidationPrice(r.Side, fill, r.Leverage, rules.MaintenanceMarginRate), rules.TickSize);
+            FuturesMath.LiquidationPrice(request.Side, fill, request.Leverage, rules.MaintenanceMarginRate),
+                rules.TickSize);
 
         if (qty <= 0)
             errors.Add($"Margin quá nhỏ: khối lượng làm tròn theo bước {rules.QuantityStep} bằng 0.");
@@ -224,25 +231,29 @@ public sealed class PaperFuturesService(
         if (margin + fee > available)
             errors.Add($"Không đủ số dư khả dụng: cần {margin + fee:0.##} USDT, có {available:0.##} USDT.");
 
-        var isLong = r.Side == PositionSide.Long;
-        if (isLong ? r.StopLoss >= fill : r.StopLoss <= fill)
+        var isLong = request.Side == PositionSide.Long;
+        if (isLong ? request.StopLoss >= fill : request.StopLoss <= fill)
             errors.Add(isLong ? "Stop loss của Long phải thấp hơn giá vào." : "Stop loss của Short phải cao hơn giá vào.");
-        else if (isLong ? r.StopLoss <= liq : r.StopLoss >= liq)
+        else if (isLong ? request.StopLoss <= liq : request.StopLoss >= liq)
             errors.Add($"Stop loss phải nằm trước giá thanh lý {liq} (nếu không, vị thế bị thanh lý trước khi chạm stop).");
-        if (r.TakeProfit is { } tp && (isLong ? tp <= fill : tp >= fill))
+        if (request.TakeProfit is { } tp && (isLong ? tp <= fill : tp >= fill))
             errors.Add(isLong ? "Take profit của Long phải cao hơn giá vào." : "Take profit của Short phải thấp hơn giá vào.");
 
-        var stopExit = FuturesMath.ApplySlippage(r.StopLoss, r.Side, opening: false, options.SlippageRate);
-        var lossAtStop = -FuturesMath.UnrealizedPnl(r.Side, qty, fill, stopExit) + fee + qty * stopExit * options.TakerFeeRate;
-        decimal? profitAtTp = r.TakeProfit is { } t
-            ? FuturesMath.UnrealizedPnl(r.Side, qty, fill, t) - fee - qty * t * options.TakerFeeRate
+        var stopExit = FuturesMath.ApplySlippage(request.StopLoss, request.Side, opening: false, options.SlippageRate);
+        var lossAtStop = -FuturesMath.UnrealizedPnl(request.Side, qty, fill,
+            stopExit) + fee + qty * stopExit * options.TakerFeeRate;
+        decimal? profitAtTp = request.TakeProfit is { } takeProfit
+            ? FuturesMath.UnrealizedPnl(request.Side, qty, fill,
+                takeProfit) - fee - qty * takeProfit * options.TakerFeeRate
             : null;
 
-        return new OpenQuote(errors.Count == 0, errors, r.Symbol, r.Side, r.Leverage, mark.Price, fill, qty, notional,
+        return new OpenQuote(errors.Count == 0, errors, request.Symbol, request.Side, request.Leverage, mark.Price,
+            fill, qty, notional,
             margin, fee, liq, Math.Min(lossAtStop, margin + fee * 2), profitAtTp, available);
     }
 
-    private static OpenQuote QuoteFromPosition(FuturesPosition p) =>
-        new(true, [], p.Symbol, p.Side, p.Leverage, null, p.EntryPrice, p.Quantity, p.Quantity * p.EntryPrice,
-            p.Margin, p.OpenFee, p.LiquidationPrice, null, null, 0);
+    private static OpenQuote QuoteFromPosition(FuturesPosition position) =>
+        new(true, [], position.Symbol, position.Side, position.Leverage, null, position.EntryPrice, position.Quantity,
+            position.Quantity * position.EntryPrice,
+            position.Margin, position.OpenFee, position.LiquidationPrice, null, null, 0);
 }

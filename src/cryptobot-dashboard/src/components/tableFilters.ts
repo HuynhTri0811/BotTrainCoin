@@ -25,5 +25,5 @@ export const picked = (selected: FilterValue | null | undefined) => selected?.[0
 
 /** Lựa chọn lấy từ chính dữ liệu, dùng cho cột không có danh sách cố định như symbol. */
 export function optionsFrom<T>(rows: T[], value: (row: T) => string): FilterOption[] {
-  return [...new Set(rows.map(value))].sort().map((v) => ({ text: v, value: v }));
+  return [...new Set(rows.map(value))].sort().map((value) => ({ text: value, value: value }));
 }

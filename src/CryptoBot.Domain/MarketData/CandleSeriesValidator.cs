@@ -18,25 +18,25 @@ public static class CandleSeriesValidator
     {
         List<CandleIssue> issues = [];
 
-        for (int i = 0; i < candles.Count; i++)
+        for (int index = 0; index < candles.Count; index++)
         {
-            Candle c = candles[i];
-            if (c.Validate() is { } reason)
-                issues.Add(new CandleIssue(CandleIssueKind.InvalidValues, c.OpenTimeUtc, reason));
+            Candle candle = candles[index];
+            if (candle.Validate() is { } reason)
+                issues.Add(new CandleIssue(CandleIssueKind.InvalidValues, candle.OpenTimeUtc, reason));
 
-            if (i == 0)
+            if (index == 0)
                 continue;
 
-            DateTime prev = candles[i - 1].OpenTimeUtc;
-            TimeSpan diff = c.OpenTimeUtc - prev;
+            DateTime prev = candles[index - 1].OpenTimeUtc;
+            TimeSpan diff = candle.OpenTimeUtc - prev;
             if (diff == TimeSpan.Zero)
-                issues.Add(new CandleIssue(CandleIssueKind.Duplicate, c.OpenTimeUtc, "Trùng OpenTime."));
+                issues.Add(new CandleIssue(CandleIssueKind.Duplicate, candle.OpenTimeUtc, "Trùng OpenTime."));
             else if (diff < TimeSpan.Zero)
-                issues.Add(new CandleIssue(CandleIssueKind.OutOfOrder, c.OpenTimeUtc, $"Đứng sau {prev:O}."));
+                issues.Add(new CandleIssue(CandleIssueKind.OutOfOrder, candle.OpenTimeUtc, $"Đứng sau {prev:O}."));
             else if (diff != interval.Duration)
             {
                 int missing = (int)(diff.Ticks / interval.Duration.Ticks) - 1;
-                issues.Add(new CandleIssue(CandleIssueKind.Gap, c.OpenTimeUtc,
+                issues.Add(new CandleIssue(CandleIssueKind.Gap, candle.OpenTimeUtc,
                     $"Thiếu khoảng {missing} nến sau {prev:O}."));
             }
         }
@@ -50,7 +50,8 @@ public static class CandleSeriesValidator
     /// </summary>
     public static List<Candle> WithoutRejected(IReadOnlyList<Candle> candles, IReadOnlyList<CandleIssue> issues)
     {
-        HashSet<DateTime> rejected = issues.Where(i => i.RejectsCandle).Select(i => i.OpenTimeUtc).ToHashSet();
-        return candles.Where(c => !rejected.Contains(c.OpenTimeUtc)).ToList();
+        HashSet<DateTime> rejected = issues.Where(issue => issue.RejectsCandle).Select(issue => issue.OpenTimeUtc)
+            .ToHashSet();
+        return candles.Where(candle => !rejected.Contains(candle.OpenTimeUtc)).ToList();
     }
 }

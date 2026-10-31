@@ -14,5 +14,5 @@ internal static class TestCandles
     }
 
     public static List<Candle> FromCloses(params decimal[] closes) =>
-        closes.Select((c, i) => At(i, c)).ToList();
+        closes.Select((close, index) => At(index, close)).ToList();
 }

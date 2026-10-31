@@ -31,7 +31,7 @@ public class EmaTests
     {
         var ema = Ema.Calculate([1m, 2m], 3);
 
-        Assert.All(ema, v => Assert.Null(v));
+        Assert.All(ema, value => Assert.Null(value));
     }
 
     [Fact]

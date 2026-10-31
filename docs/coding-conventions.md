@@ -100,6 +100,8 @@ Lý do cho Domain: đây là nơi người đọc học công thức, kiểu tư
 
 ### Định dạng
 
+- Không đặt tên biến, tham số hay tham số lambda một chữ cái (C# và TypeScript): viết `candle => candle.OpenTimeUtc`,
+  `var query`, `index`. Riêng `_` cho tham số bỏ qua và tham số kiểu như `T` vẫn dùng bình thường.
 - Thụt lề 4 dấu cách. Dòng dài tối đa khoảng 120 ký tự; xuống dòng tham số thì thụt thêm 4.
 - `if` một dòng không cần ngoặc nhọn khi thân là một câu lệnh ngắn (đang dùng rộng rãi):
   ```csharp

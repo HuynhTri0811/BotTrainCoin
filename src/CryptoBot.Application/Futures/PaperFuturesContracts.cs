@@ -26,7 +26,7 @@ public sealed class PaperFuturesOptions
     public List<FuturesSymbolOptions> Symbols { get; set; } = [];
 
     public FuturesSymbolRules? FindRules(string symbol) =>
-        Symbols.FirstOrDefault(s => s.Symbol == symbol)?.ToRules();
+        Symbols.FirstOrDefault(symbolOptions => symbolOptions.Symbol == symbol)?.ToRules();
 }
 
 public sealed record MarkPrice(string Symbol, decimal Price, DateTime TimeUtc);
@@ -46,7 +46,7 @@ public sealed class MarkPriceCache(IClock clock, PaperFuturesOptions options)
     public MarkPrice? Get(string symbol) => _prices.GetValueOrDefault(symbol);
 
     public MarkPrice? GetFresh(string symbol) =>
-        Get(symbol) is { } p && clock.UtcNow - p.TimeUtc <= options.MarkPriceMaxAge ? p : null;
+        Get(symbol) is { } markPrice && clock.UtcNow - markPrice.TimeUtc <= options.MarkPriceMaxAge ? markPrice : null;
 }
 
 /// <summary>Mọi thay đổi số dư/vị thế paper futures đi qua một khóa: API và worker không ghi chồng nhau.</summary>

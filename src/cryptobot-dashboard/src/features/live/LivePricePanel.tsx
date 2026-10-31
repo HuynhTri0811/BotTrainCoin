@@ -11,8 +11,8 @@ interface Row extends LiveSample {
   deltaPct: number | null;
 }
 
-const pct = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(3)}%`;
-const deltaColor = (v: number | null) => (v == null || v === 0 ? undefined : v > 0 ? '#16a34a' : '#dc2626');
+const pct = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(3)}%`;
+const deltaColor = (value: number | null) => (value == null || value === 0 ? undefined : value > 0 ? '#16a34a' : '#dc2626');
 
 export function LivePricePanel({ symbol }: { symbol: string }) {
   const live = useQuery({
@@ -29,14 +29,14 @@ export function LivePricePanel({ symbol }: { symbol: string }) {
   }, []);
 
   const interval = live.data?.intervalSeconds ?? 15;
-  const samples = live.data?.symbols.find((s) => s.symbol === symbol)?.samples ?? [];
+  const samples = live.data?.symbols.find((entry) => entry.symbol === symbol)?.samples ?? [];
   const latest = samples.at(-1);
 
   const rows: Row[] = samples
-    .map((s, i) => {
-      const prev = samples[i - 1]?.spotPrice;
-      const deltaPct = prev && s.spotPrice ? ((s.spotPrice - prev) / prev) * 100 : null;
-      return { ...s, key: s.timeUtc, deltaPct };
+    .map((sample, index) => {
+      const prev = samples[index - 1]?.spotPrice;
+      const deltaPct = prev && sample.spotPrice ? ((sample.spotPrice - prev) / prev) * 100 : null;
+      return { ...sample, key: sample.timeUtc, deltaPct };
     })
     .reverse();
 
@@ -99,7 +99,7 @@ export function LivePricePanel({ symbol }: { symbol: string }) {
           value={spread != null ? `${spread > 0 ? '+' : ''}${spread.toFixed(2)}` : '—'}
           styles={{ content: { fontSize: 20 } }}
         />
-        <Sparkline values={samples.flatMap((s) => (s.spotPrice != null ? [s.spotPrice] : []))} />
+        <Sparkline values={samples.flatMap((sample) => (sample.spotPrice != null ? [sample.spotPrice] : []))} />
       </Flex>
 
       <DailyRangeBar symbol={symbol} />

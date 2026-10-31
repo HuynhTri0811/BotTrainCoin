@@ -10,28 +10,31 @@ public class PriceDirectionPredictorTests
     [Fact]
     public void Rising_prices_predict_up()
     {
-        PricePrediction p = PriceDirectionPredictor.Predict(TestCandles.FromCloses(100, 101, 102, 103, 104, 105), Small);
+        PricePrediction prediction = PriceDirectionPredictor.Predict(TestCandles.FromCloses(100, 101, 102, 103, 104,
+            105), Small);
 
-        Assert.Equal(PriceDirection.Up, p.Direction);
-        Assert.True(p.Score > 0);
+        Assert.Equal(PriceDirection.Up, prediction.Direction);
+        Assert.True(prediction.Score > 0);
     }
 
     [Fact]
     public void Falling_prices_predict_down()
     {
-        PricePrediction p = PriceDirectionPredictor.Predict(TestCandles.FromCloses(105, 104, 103, 102, 101, 100), Small);
+        PricePrediction prediction = PriceDirectionPredictor.Predict(TestCandles.FromCloses(105, 104, 103, 102, 101,
+            100), Small);
 
-        Assert.Equal(PriceDirection.Down, p.Direction);
-        Assert.True(p.Score < 0);
+        Assert.Equal(PriceDirection.Down, prediction.Direction);
+        Assert.True(prediction.Score < 0);
     }
 
     [Fact]
     public void Flat_prices_still_answer_up_or_down()
     {
-        PricePrediction p = PriceDirectionPredictor.Predict(TestCandles.FromCloses(100, 100, 100, 100, 100), Small);
+        PricePrediction prediction = PriceDirectionPredictor.Predict(TestCandles.FromCloses(100, 100, 100, 100, 100),
+            Small);
 
-        Assert.Equal(PriceDirection.Up, p.Direction);
-        Assert.Equal(0m, p.Score);
+        Assert.Equal(PriceDirection.Up, prediction.Direction);
+        Assert.Equal(0m, prediction.Score);
     }
 
     [Fact]
@@ -71,10 +74,10 @@ public class PriceDirectionPredictorTests
         // 5 nến giảm rồi 3 nến tăng mạnh: đoán tại vị trí 5 chỉ thấy đoạn giảm.
         List<Candle> candles = TestCandles.FromCloses(105, 104, 103, 102, 101, 150, 160, 170);
 
-        PricePrediction p = PriceDirectionPredictor.PredictAt(candles, 5, Small);
+        PricePrediction prediction = PriceDirectionPredictor.PredictAt(candles, 5, Small);
 
-        Assert.Equal(PriceDirectionPredictor.Predict(candles[..5], Small), p);
-        Assert.Equal(PriceDirection.Down, p.Direction);
+        Assert.Equal(PriceDirectionPredictor.Predict(candles[..5], Small), prediction);
+        Assert.Equal(PriceDirection.Down, prediction.Direction);
     }
 
     [Fact]
@@ -90,7 +93,8 @@ public class PriceDirectionPredictorTests
     public void Backtest_counts_hits_using_only_past_candles()
     {
         // Tăng đều: mọi lần đoán đều Up và đều đúng.
-        List<Candle> rising = TestCandles.FromCloses(Enumerable.Range(100, 20).Select(x => (decimal)x).ToArray());
+        List<Candle> rising = TestCandles.FromCloses(Enumerable.Range(100, 20).Select(value => (decimal)value)
+            .ToArray());
 
         PredictionAccuracy result = PriceDirectionPredictor.Backtest(rising, Small);
 

@@ -63,8 +63,8 @@ public static class IndicatorWindow
             throw new ArgumentException($"Cần {count} nến, chỉ có {candles.Count}.", nameof(candles));
         decimal[] closes = new decimal[count];
         int offset = candles.Count - count;
-        for (int i = 0; i < count; i++)
-            closes[i] = candles[offset + i].Close;
+        for (int index = 0; index < count; index++)
+            closes[index] = candles[offset + index].Close;
         return closes;
     }
 }
