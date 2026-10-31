@@ -43,24 +43,25 @@ public sealed class IndicatorRegistry
     /// <summary>Các loại chỉ báo tìm thấy: tên loại → class.</summary>
     public static IReadOnlyDictionary<string, Type> AvailableTypes { get; } = typeof(ICustomIndicator).Assembly
         .GetTypes()
-        .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(ICustomIndicator).IsAssignableFrom(t))
-        .Select(t => (Type: t, Attr: t.GetCustomAttribute<IndicatorAttribute>()))
-        .Where(x => x.Attr is not null)
-        .ToDictionary(x => x.Attr!.Type, x => x.Type, StringComparer.OrdinalIgnoreCase);
+        .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(ICustomIndicator).IsAssignableFrom(type))
+        .Select(type => (Type: type, Attr: type.GetCustomAttribute<IndicatorAttribute>()))
+        .Where(entry => entry.Attr is not null)
+        .ToDictionary(entry => entry.Attr!.Type, entry => entry.Type, StringComparer.OrdinalIgnoreCase);
 
     public IndicatorRegistry(IEnumerable<IndicatorDefinition> definitions, ILogger<IndicatorRegistry> logger)
     {
-        foreach (var d in definitions.Where(d => d.Enabled))
+        foreach (var definition in definitions.Where(candidate => candidate.Enabled))
         {
-            if (TryBuild(d, out var configured, out var error) && _byName.TryAdd(d.Name, configured!))
+            if (TryBuild(definition, out var configured, out var error) && _byName.TryAdd(definition.Name, configured!))
             {
-                logger.LogInformation("Chỉ báo '{Name}' ({Type}) trên {Key}", d.Name, configured!.Type, configured.Key);
+                logger.LogInformation("Chỉ báo '{Name}' ({Type}) trên {Key}", definition.Name, configured!.Type,
+                    configured.Key);
                 continue;
             }
 
-            error ??= $"Tên chỉ báo '{d.Name}' bị trùng.";
-            _errors.Add(new IndicatorConfigError(d.Name, error));
-            logger.LogError("Bỏ qua chỉ báo '{Name}': {Error}", d.Name, error);
+            error ??= $"Tên chỉ báo '{definition.Name}' bị trùng.";
+            _errors.Add(new IndicatorConfigError(definition.Name, error));
+            logger.LogError("Bỏ qua chỉ báo '{Name}': {Error}", definition.Name, error);
         }
     }
 
@@ -68,7 +69,7 @@ public sealed class IndicatorRegistry
     public IReadOnlyList<IndicatorConfigError> Errors => _errors;
 
     public ConfiguredIndicator? Find(string? name) =>
-        name is not null && _byName.TryGetValue(name, out var c) ? c : null;
+        name is not null && _byName.TryGetValue(name, out var indicator) ? indicator : null;
 
     /// <summary>Tạo chỉ báo theo tên loại và gán tham số. Trả về lỗi nếu loại/tham số không hợp lệ.</summary>
     public static ICustomIndicator Create(string type, IReadOnlyDictionary<string, string?> parameters)
@@ -81,8 +82,8 @@ public sealed class IndicatorRegistry
             ?? throw new ArgumentException($"Không tạo được '{type}': cần constructor không tham số."));
 
         var props = clr.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.CanWrite && p.SetMethod!.IsPublic)
-            .ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
+            .Where(property => property.CanWrite && property.SetMethod!.IsPublic)
+            .ToDictionary(property => property.Name, StringComparer.OrdinalIgnoreCase);
 
         foreach (var (key, raw) in parameters)
         {
@@ -106,26 +107,28 @@ public sealed class IndicatorRegistry
         return indicator;
     }
 
-    private static bool TryBuild(IndicatorDefinition d, out ConfiguredIndicator? configured, out string? error)
+    private static bool TryBuild(IndicatorDefinition definition, out ConfiguredIndicator? configured, out string? error)
     {
         configured = null;
         error = null;
-        if (string.IsNullOrWhiteSpace(d.Name))
+        if (string.IsNullOrWhiteSpace(definition.Name))
             error = "Thiếu Name.";
-        else if (string.IsNullOrWhiteSpace(d.Symbol) || !d.Symbol.All(char.IsAsciiLetterOrDigit))
+        else if (string.IsNullOrWhiteSpace(definition.Symbol) || !definition.Symbol.All(char.IsAsciiLetterOrDigit))
             error = "Symbol không hợp lệ.";
-        else if (!CandleInterval.TryParse(d.Interval, out _))
-            error = $"Interval không hỗ trợ: '{d.Interval}'.";
+        else if (!CandleInterval.TryParse(definition.Interval, out _))
+            error = $"Interval không hỗ trợ: '{definition.Interval}'.";
         if (error is not null)
             return false;
 
         try
         {
-            var indicator = Create(d.Type, d.Parameters);
-            var type = AvailableTypes.Keys.First(k => string.Equals(k, d.Type, StringComparison.OrdinalIgnoreCase));
+            var indicator = Create(definition.Type, definition.Parameters);
+            var type = AvailableTypes.Keys.First(typeName => string.Equals(typeName, definition.Type,
+                StringComparison.OrdinalIgnoreCase));
             var description = AvailableTypes[type].GetCustomAttribute<IndicatorAttribute>()!.Description;
-            configured = new ConfiguredIndicator(d.Name, type, description,
-                new CandleKey(d.Exchange, d.Symbol.ToUpperInvariant(), CandleInterval.Parse(d.Interval)), indicator);
+            configured = new ConfiguredIndicator(definition.Name, type, description,
+                new CandleKey(definition.Exchange, definition.Symbol.ToUpperInvariant(),
+                    CandleInterval.Parse(definition.Interval)), indicator);
             return true;
         }
         catch (ArgumentException ex)
