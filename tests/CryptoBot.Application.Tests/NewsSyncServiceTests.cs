@@ -47,13 +47,13 @@ public class NewsSyncServiceTests
         var result = await _service.SyncAsync(default);
 
         Assert.Equal(1, result.Added);
-        var a = Assert.Single(_store.Articles);
-        Assert.Equal("CoinDesk", a.Source);
-        Assert.Equal("a1", a.ExternalId);
-        Assert.Equal("BTC,ETH", a.Coins);
-        Assert.Equal("Bitcoin & ether slid after a suspected…", a.Summary);
-        Assert.Equal(T0.AddHours(-1), a.PublishedAtUtc);
-        Assert.Equal(T0, a.FetchedAtUtc);
+        var article = Assert.Single(_store.Articles);
+        Assert.Equal("CoinDesk", article.Source);
+        Assert.Equal("a1", article.ExternalId);
+        Assert.Equal("BTC,ETH", article.Coins);
+        Assert.Equal("Bitcoin & ether slid after a suspected…", article.Summary);
+        Assert.Equal(T0.AddHours(-1), article.PublishedAtUtc);
+        Assert.Equal(T0, article.FetchedAtUtc);
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class NewsSyncServiceTests
         var result = await _service.SyncAsync(default);
 
         Assert.Equal(1, result.Added);
-        Assert.Equal(["a1", "a2"], _store.Articles.Select(a => a.ExternalId));
+        Assert.Equal(["a1", "a2"], _store.Articles.Select(article => article.ExternalId));
     }
 
     [Fact]
