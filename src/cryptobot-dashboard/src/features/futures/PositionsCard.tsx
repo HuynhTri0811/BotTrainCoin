@@ -6,9 +6,9 @@ import { columnFilter, optionsFrom, picked, serverFilter } from '../../component
 import { formatVn } from '../../time';
 import { fmtPrice, fmtSigned, fmtUsdt, pnlColor } from './format';
 
-const sideTag = (p: FuturesPosition) => (
-  <Tag color={p.side === 'Long' ? 'green' : 'red'}>
-    {p.side} {p.leverage}x
+const sideTag = (position: FuturesPosition) => (
+  <Tag color={position.side === 'Long' ? 'green' : 'red'}>
+    {position.side} {position.leverage}x
   </Tag>
 );
 
@@ -39,12 +39,12 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
 
   const close = useMutation({
     mutationFn: (id: number) => futuresApi.close(id, crypto.randomUUID()),
-    onSuccess: (p) => {
-      message.success(`Đã đóng ${p.side} ${p.symbol} @ ${fmtPrice(p.exitPrice)}, PnL ròng ${fmtSigned(p.netPnl)} USDT`);
+    onSuccess: (position) => {
+      message.success(`Đã đóng ${position.side} ${position.symbol} @ ${fmtPrice(position.exitPrice)}, PnL ròng ${fmtSigned(position.netPnl)} USDT`);
       queryClient.invalidateQueries({ queryKey: ['futures-account'] });
       queryClient.invalidateQueries({ queryKey: ['futures-history'] });
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : String(e)),
+    onError: (error) => message.error(error instanceof ApiError ? error.message : String(error)),
   });
 
   const open = account?.openPositions ?? [];
@@ -68,7 +68,7 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
                 locale={{ emptyText: 'Chưa có vị thế' }}
                 columns={[
                   { title: 'Symbol', dataIndex: 'symbol' },
-                  { title: 'Hướng', key: 'side', render: (_, p) => sideTag(p) },
+                  { title: 'Hướng', key: 'side', render: (_, position) => sideTag(position) },
                   { title: 'KL', dataIndex: 'quantity', align: 'right' },
                   { title: 'Giá vào', dataIndex: 'entryPrice', align: 'right', render: fmtPrice },
                   { title: 'Mark', dataIndex: 'markPrice', align: 'right', render: fmtPrice },
@@ -76,38 +76,38 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
                     title: 'Thanh lý',
                     dataIndex: 'liquidationPrice',
                     align: 'right',
-                    render: (v: number) => <span style={{ color: '#dc2626' }}>{fmtPrice(v)}</span>,
+                    render: (value: number) => <span style={{ color: '#dc2626' }}>{fmtPrice(value)}</span>,
                   },
                   {
                     title: 'SL / TP',
                     key: 'sltp',
                     align: 'right',
-                    render: (_, p) => `${fmtPrice(p.stopLoss)} / ${fmtPrice(p.takeProfit)}`,
+                    render: (_, position) => `${fmtPrice(position.stopLoss)} / ${fmtPrice(position.takeProfit)}`,
                   },
                   { title: 'Margin', dataIndex: 'margin', align: 'right', render: fmtUsdt },
                   {
                     title: 'uPnL (ROE)',
                     key: 'upnl',
                     align: 'right',
-                    render: (_, p) => (
-                      <span style={{ color: pnlColor(p.unrealizedPnl) }}>
-                        {fmtSigned(p.unrealizedPnl)}
-                        {p.roePercent != null && ` (${p.roePercent.toFixed(2)}%)`}
+                    render: (_, position) => (
+                      <span style={{ color: pnlColor(position.unrealizedPnl) }}>
+                        {fmtSigned(position.unrealizedPnl)}
+                        {position.roePercent != null && ` (${position.roePercent.toFixed(2)}%)`}
                       </span>
                     ),
                   },
                   {
                     title: '',
                     key: 'close',
-                    render: (_, p) => (
+                    render: (_, position) => (
                       <Popconfirm
-                        title={`Đóng ${p.side} ${p.symbol}?`}
-                        description={`Lệnh market giả lập tại khoảng ${fmtPrice(p.markPrice)}.`}
+                        title={`Đóng ${position.side} ${position.symbol}?`}
+                        description={`Lệnh market giả lập tại khoảng ${fmtPrice(position.markPrice)}.`}
                         okText="Đóng vị thế"
                         cancelText="Hủy"
-                        onConfirm={() => close.mutateAsync(p.id)}
+                        onConfirm={() => close.mutateAsync(position.id)}
                       >
-                        <Button size="small" danger loading={close.isPending && close.variables === p.id}>
+                        <Button size="small" danger loading={close.isPending && close.variables === position.id}>
                           Đóng
                         </Button>
                       </Popconfirm>
@@ -128,27 +128,27 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
                 dataSource={closed}
                 pagination={{ pageSize: 10, hideOnSinglePage: true }}
                 scroll={{ x: true }}
-                onChange={(_, f) =>
-                  setFilter({ symbol: picked(f.symbol), side: picked(f.side), closeReason: picked(f.closeReason) })
+                onChange={(_, filters) =>
+                  setFilter({ symbol: picked(filters.symbol), side: picked(filters.side), closeReason: picked(filters.closeReason) })
                 }
                 columns={[
                   { title: 'Đóng lúc', dataIndex: 'closedAtUtc', render: formatVn },
                   {
                     title: 'Symbol',
                     dataIndex: 'symbol',
-                    ...serverFilter(optionsFrom(status.data?.strategies ?? [], (s) => s.symbol)),
+                    ...serverFilter(optionsFrom(status.data?.strategies ?? [], (strategy) => strategy.symbol)),
                   },
                   {
                     title: 'Hướng',
                     key: 'side',
                     ...serverFilter(SIDES),
-                    render: (_, p) => sideTag(p),
+                    render: (_, position) => sideTag(position),
                   },
                   {
                     title: 'Lý do',
                     dataIndex: 'closeReason',
                     ...serverFilter(Object.entries(reasonLabel).map(([value, { text }]) => ({ text, value }))),
-                    render: (r: string) => <Tag color={reasonLabel[r]?.color}>{reasonLabel[r]?.text ?? r}</Tag>,
+                    render: (reason: string) => <Tag color={reasonLabel[reason]?.color}>{reasonLabel[reason]?.text ?? reason}</Tag>,
                   },
                   { title: 'Giá vào', dataIndex: 'entryPrice', align: 'right', render: fmtPrice },
                   { title: 'Giá ra', dataIndex: 'exitPrice', align: 'right', render: fmtPrice },
@@ -156,25 +156,25 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
                     title: 'PnL giá',
                     dataIndex: 'realizedPnl',
                     align: 'right',
-                    render: (v: number) => <span style={{ color: pnlColor(v) }}>{fmtSigned(v)}</span>,
+                    render: (value: number) => <span style={{ color: pnlColor(value) }}>{fmtSigned(value)}</span>,
                   },
                   {
                     title: 'Phí',
                     key: 'fees',
                     align: 'right',
-                    render: (_, p) => fmtSigned(-(p.openFee + p.closeFee)),
+                    render: (_, position) => fmtSigned(-(position.openFee + position.closeFee)),
                   },
                   {
                     title: 'PnL ròng',
                     dataIndex: 'netPnl',
-                    ...columnFilter<FuturesPosition>((p) => ((p.netPnl ?? 0) >= 0 ? 'Win' : 'Loss'), [
+                    ...columnFilter<FuturesPosition>((position) => ((position.netPnl ?? 0) >= 0 ? 'Win' : 'Loss'), [
                       { text: 'Lời', value: 'Win' },
                       { text: 'Lỗ', value: 'Loss' },
                     ]),
                     align: 'right',
-                    render: (v: number) => (
-                      <Typography.Text strong style={{ color: pnlColor(v) }}>
-                        {fmtSigned(v)}
+                    render: (value: number) => (
+                      <Typography.Text strong style={{ color: pnlColor(value) }}>
+                        {fmtSigned(value)}
                       </Typography.Text>
                     ),
                   },

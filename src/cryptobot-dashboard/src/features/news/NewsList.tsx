@@ -8,25 +8,25 @@ export function NewsList({ articles, showSummary = true }: { articles: NewsArtic
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {articles.map((a) => (
-        <div key={a.id} style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
+      {articles.map((article) => (
+        <div key={article.id} style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
           <Space size={4} wrap style={{ fontSize: 12 }}>
-            <Typography.Text type="secondary">{formatVn(a.publishedAtUtc)}</Typography.Text>
-            <Tag>{a.source}</Tag>
-            {a.coins.map((c) => (
-              <Tag key={c} color={c === 'BTC' ? 'orange' : c === 'ETH' ? 'blue' : 'green'}>
-                {c}
+            <Typography.Text type="secondary">{formatVn(article.publishedAtUtc)}</Typography.Text>
+            <Tag>{article.source}</Tag>
+            {article.coins.map((coin) => (
+              <Tag key={coin} color={coin === 'BTC' ? 'orange' : coin === 'ETH' ? 'blue' : 'green'}>
+                {coin}
               </Tag>
             ))}
           </Space>
           <div>
-            <Typography.Link href={a.url} target="_blank" rel="noreferrer" strong>
-              {a.title}
+            <Typography.Link href={article.url} target="_blank" rel="noreferrer" strong>
+              {article.title}
             </Typography.Link>
           </div>
-          {showSummary && a.summary && (
+          {showSummary && article.summary && (
             <Typography.Paragraph type="secondary" style={{ margin: 0 }} ellipsis={{ rows: 2, expandable: true }}>
-              {a.summary}
+              {article.summary}
             </Typography.Paragraph>
           )}
         </div>
