@@ -34,26 +34,26 @@ public sealed class MarketDataStatusRegistry(IClock clock, MarketDataOptions opt
 
     public void RecordSuccess(SyncResult result)
     {
-        var e = _entries.GetOrAdd(result.Key.ToString(), _ => new Entry());
-        lock (e)
+        var entry = _entries.GetOrAdd(result.Key.ToString(), _ => new Entry());
+        lock (entry)
         {
-            e.LastAttemptAtUtc = e.LastSuccessAtUtc = clock.UtcNow;
-            e.LastError = null;
-            e.ConsecutiveFailures = 0;
-            e.LatestClosedOpenTimeUtc = result.LatestClosedOpenTimeUtc ?? e.LatestClosedOpenTimeUtc;
+            entry.LastAttemptAtUtc = entry.LastSuccessAtUtc = clock.UtcNow;
+            entry.LastError = null;
+            entry.ConsecutiveFailures = 0;
+            entry.LatestClosedOpenTimeUtc = result.LatestClosedOpenTimeUtc ?? entry.LatestClosedOpenTimeUtc;
             if (result.Issues.Count > 0)
-                e.RecentIssues = result.Issues.TakeLast(MaxRecentIssues).ToList();
+                entry.RecentIssues = result.Issues.TakeLast(MaxRecentIssues).ToList();
         }
     }
 
     public int RecordFailure(CandleKey key, string error)
     {
-        var e = _entries.GetOrAdd(key.ToString(), _ => new Entry());
-        lock (e)
+        var entry = _entries.GetOrAdd(key.ToString(), _ => new Entry());
+        lock (entry)
         {
-            e.LastAttemptAtUtc = clock.UtcNow;
-            e.LastError = error;
-            return ++e.ConsecutiveFailures;
+            entry.LastAttemptAtUtc = clock.UtcNow;
+            entry.LastError = error;
+            return ++entry.ConsecutiveFailures;
         }
     }
 
@@ -61,19 +61,19 @@ public sealed class MarketDataStatusRegistry(IClock clock, MarketDataOptions opt
 
     public MarketDataStatus? Get(string key, CandleInterval interval)
     {
-        if (!_entries.TryGetValue(key, out var e))
+        if (!_entries.TryGetValue(key, out var entry))
             return null;
 
-        lock (e)
+        lock (entry)
         {
             var now = clock.UtcNow;
-            var syncStale = e.LastSuccessAtUtc is not { } ok || now - ok > options.StaleAfter;
+            var syncStale = entry.LastSuccessAtUtc is not { } ok || now - ok > options.StaleAfter;
             // Nến đóng mới nhất phải là nến ngay trước nến đang chạy (cho phép trễ bằng StaleAfter).
-            var candleStale = e.LatestClosedOpenTimeUtc is not { } lc ||
+            var candleStale = entry.LatestClosedOpenTimeUtc is not { } lc ||
                               now - (lc + interval.Duration) > interval.Duration + options.StaleAfter;
 
-            return new MarketDataStatus(key, e.LastSuccessAtUtc, e.LastAttemptAtUtc, e.LastError,
-                e.ConsecutiveFailures, e.LatestClosedOpenTimeUtc, e.RecentIssues, syncStale || candleStale);
+            return new MarketDataStatus(key, entry.LastSuccessAtUtc, entry.LastAttemptAtUtc, entry.LastError,
+                entry.ConsecutiveFailures, entry.LatestClosedOpenTimeUtc, entry.RecentIssues, syncStale || candleStale);
         }
     }
 }

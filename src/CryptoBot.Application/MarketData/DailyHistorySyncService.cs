@@ -44,11 +44,11 @@ public sealed class DailyHistorySyncService(
                 break;
 
             var now = clock.UtcNow;
-            var candles = klines.Select(k => k.ToCandle(key, now)).ToList();
+            var candles = klines.Select(kline => kline.ToCandle(key, now)).ToList();
 
             // Sàn bỏ qua ngày không có giao dịch (Gap) nên chỉ loại nến sai giá trị/thứ tự.
             var batchIssues = CandleSeriesValidator.Validate(candles, key.Interval);
-            foreach (var issue in batchIssues.Where(i => i.RejectsCandle))
+            foreach (var issue in batchIssues.Where(candidate => candidate.RejectsCandle))
                 logger.LogWarning("Daily history {Key}: {Kind} tại {OpenTime:O} - {Detail}",
                     key, issue.Kind, issue.OpenTimeUtc, issue.Detail);
 

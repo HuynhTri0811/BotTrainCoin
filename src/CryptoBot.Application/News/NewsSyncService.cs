@@ -101,17 +101,18 @@ public sealed class NewsSyncService(
 
     private async Task<int> SyncFeedAsync(NewsFeedOptions feed, CancellationToken ct)
     {
-        var items = (await client.GetItemsAsync(feed.Url, ct)).DistinctBy(i => i.Id).ToList();
-        var existing = await store.GetExistingIdsAsync(feed.Name, items.Select(i => i.Id).ToList(), ct);
+        var items = (await client.GetItemsAsync(feed.Url, ct)).DistinctBy(item => item.Id).ToList();
+        var existing = await store.GetExistingIdsAsync(feed.Name, items.Select(item => item.Id).ToList(), ct);
         var now = clock.UtcNow;
         var articles = items
-            .Where(i => !existing.Contains(i.Id))
-            .Select(i =>
+            .Where(item => !existing.Contains(item.Id))
+            .Select(item =>
             {
-                var summary = NewsText.ToPlainText(i.Description, options.MaxSummaryLength);
-                var title = NewsText.ToPlainText(i.Title, 500);
-                return new NewsArticle(feed.Name, i.Id, title, i.Url, summary, NewsText.CoinsIn($"{title} {summary}"),
-                    i.PublishedAtUtc, now);
+                var summary = NewsText.ToPlainText(item.Description, options.MaxSummaryLength);
+                var title = NewsText.ToPlainText(item.Title, 500);
+                return new NewsArticle(feed.Name, item.Id, title, item.Url, summary,
+                    NewsText.CoinsIn($"{title} {summary}"),
+                    item.PublishedAtUtc, now);
             })
             .ToList();
 

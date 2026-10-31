@@ -32,7 +32,7 @@ public sealed class DailyRangeService(IMarketDataClient client, LivePriceHistory
 
         // 24 giờ: 90 ngày gần nhất phản ánh biến động hiện tại. Mốc dài cần nhiều đoạn lịch sử hơn: dùng cả năm.
         var lookback = horizonDays == 1 ? LookbackDays : FetchDays;
-        var closes = candles.TakeLast(lookback + 1).Select(c => c.Close).ToList();
+        var closes = candles.TakeLast(lookback + 1).Select(candle => candle.Close).ToList();
         var spot = history.Get(symbol, 1).LastOrDefault()?.SpotPrice;
         return DailyMoveRange.Compute(closes, spot ?? closes[^1], horizonDays);
     }
@@ -49,10 +49,11 @@ public sealed class DailyRangeService(IMarketDataClient client, LivePriceHistory
             FetchDays + 1, ct);
         // Bỏ ngày đang chạy: giá đóng của nó chưa chốt.
         var candles = klines
-            .Where(k => k.OpenTimeUtc + day <= now)
-            .Select(k => new Candle(client.Exchange, symbol, CandleInterval.D1, k.OpenTimeUtc, k.Open, k.High, k.Low,
-                k.Close, k.Volume, isClosed: true, receivedAtUtc: now, quoteVolume: k.QuoteVolume,
-                tradeCount: k.TradeCount, takerBuyVolume: k.TakerBuyVolume))
+            .Where(kline => kline.OpenTimeUtc + day <= now)
+            .Select(kline => new Candle(client.Exchange, symbol, CandleInterval.D1, kline.OpenTimeUtc, kline.Open,
+                kline.High, kline.Low,
+                kline.Close, kline.Volume, isClosed: true, receivedAtUtc: now, quoteVolume: kline.QuoteVolume,
+                tradeCount: kline.TradeCount, takerBuyVolume: kline.TakerBuyVolume))
             .ToList();
         _cache[symbol] = (now, candles);
         return candles;
