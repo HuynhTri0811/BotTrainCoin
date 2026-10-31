@@ -15,12 +15,15 @@ public static class PaperFuturesEndpoints
 
         api.MapGet("/account", async (PaperFuturesService svc, PaperFuturesOptions options, CancellationToken ct) =>
         {
-            var a = await svc.GetAccountAsync(ct);
-            return new AccountDto("Paper", a.WalletBalance, a.UsedMargin, a.UnrealizedPnl, a.Equity, a.AvailableBalance,
-                a.OpenPositions.Select(v => ToDto(v.Position, v.MarkPrice, v.UnrealizedPnl, v.RoePercent)).ToList(),
-                a.MarkPrices.Select(m => new MarkPriceDto(m.Symbol, m.Price, m.TimeUtc)).ToList(),
+            var account = await svc.GetAccountAsync(ct);
+            return new AccountDto("Paper", account.WalletBalance, account.UsedMargin, account.UnrealizedPnl,
+                account.Equity, account.AvailableBalance,
+                account.OpenPositions.Select(view => ToDto(view.Position, view.MarkPrice, view.UnrealizedPnl,
+                    view.RoePercent)).ToList(),
+                account.MarkPrices.Select(markPrice => new MarkPriceDto(markPrice.Symbol, markPrice.Price,
+                    markPrice.TimeUtc)).ToList(),
                 new RulesDto(options.MaxLeverage, options.TakerFeeRate, options.SlippageRate,
-                    options.Symbols.Select(s => s.Symbol).ToList()));
+                    options.Symbols.Select(symbolOptions => symbolOptions.Symbol).ToList()));
         });
 
         api.MapPost("/quote", async (OpenRequestDto body, PaperFuturesService svc, CancellationToken ct) =>
@@ -36,8 +39,8 @@ public static class PaperFuturesEndpoints
                 return Results.BadRequest(new { error = "Side phải là Long hoặc Short." });
 
             var result = await svc.OpenAsync(req, ct);
-            return result.Position is { } p
-                ? Results.Ok(new OpenResponseDto(true, result.Duplicate, [], ToDto(p, null, null, null)))
+            return result.Position is { } position
+                ? Results.Ok(new OpenResponseDto(true, result.Duplicate, [], ToDto(position, null, null, null)))
                 : Results.UnprocessableEntity(new OpenResponseDto(false, false, result.Quote.Errors, null));
         });
 
@@ -66,19 +69,24 @@ public static class PaperFuturesEndpoints
                 string.IsNullOrWhiteSpace(symbol) ? null : symbol.Trim().ToUpperInvariant(), pickedSide, pickedReason,
                 fromUtc?.UtcDateTime, toUtc?.UtcDateTime);
             var closed = await store.GetClosedAsync(filter, Math.Clamp(limit ?? 50, 1, 500), ct);
-            return Results.Ok(closed.Select(p => ToDto(p, null, null, null)));
+            return Results.Ok(closed.Select(position => ToDto(position, null, null, null)));
         });
     }
 
-    private static PositionDto ToDto(FuturesPosition p, decimal? mark, decimal? upnl, decimal? roe) => new(
-        p.Id, p.Environment, p.Symbol, p.Side.ToString(), p.Leverage, p.Quantity, p.EntryPrice, p.Margin,
-        p.LiquidationPrice, p.StopLoss, p.TakeProfit, p.OpenFee, p.CloseFee, p.Status.ToString(),
-        p.CloseReason?.ToString(), p.ExitPrice, p.RealizedPnl, p.Status == PositionStatus.Open ? null : p.NetPnl,
-        p.OpenedAtUtc, p.ClosedAtUtc, mark, upnl, roe);
+    private static PositionDto ToDto(FuturesPosition position, decimal? mark, decimal? upnl, decimal? roe) => new(
+        position.Id, position.Environment, position.Symbol, position.Side.ToString(), position.Leverage,
+            position.Quantity, position.EntryPrice, position.Margin,
+        position.LiquidationPrice, position.StopLoss, position.TakeProfit, position.OpenFee, position.CloseFee,
+            position.Status.ToString(),
+        position.CloseReason?.ToString(), position.ExitPrice, position.RealizedPnl,
+            position.Status == PositionStatus.Open ? null : position.NetPnl,
+        position.OpenedAtUtc, position.ClosedAtUtc, mark, upnl, roe);
 
-    private static QuoteDto ToDto(OpenQuote q) => new(q.Accepted, q.Errors, q.Symbol, q.Side.ToString(), q.Leverage,
-        q.MarkPrice, q.FillPrice, q.Quantity, q.Notional, q.Margin, q.OpenFee, q.LiquidationPrice, q.LossAtStop,
-        q.ProfitAtTakeProfit, q.AvailableBalance);
+    private static QuoteDto ToDto(OpenQuote quote) => new(quote.Accepted, quote.Errors, quote.Symbol,
+        quote.Side.ToString(), quote.Leverage,
+        quote.MarkPrice, quote.FillPrice, quote.Quantity, quote.Notional, quote.Margin, quote.OpenFee,
+            quote.LiquidationPrice, quote.LossAtStop,
+        quote.ProfitAtTakeProfit, quote.AvailableBalance);
 }
 
 public sealed record OpenRequestDto(Guid CommandId, string Symbol, string Side, int Leverage, decimal Margin,

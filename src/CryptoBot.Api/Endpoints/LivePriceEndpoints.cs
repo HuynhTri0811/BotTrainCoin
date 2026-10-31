@@ -10,9 +10,10 @@ public static class LivePriceEndpoints
         app.MapGet("/api/live/prices", (int? limit, LivePriceHistory history, LivePriceOptions options, IClock clock) =>
         {
             var take = Math.Clamp(limit ?? 60, 1, options.HistorySize);
-            var symbols = options.Symbols.Select(s => new LiveSymbolDto(s,
-                history.Get(s, take).Select(x => new LiveSampleDto(x.TimeUtc, x.SpotPrice, x.MarkPrice,
-                    x.SpotLatencyMs, x.MarkLatencyMs, x.Error)).ToList())).ToList();
+            var symbols = options.Symbols.Select(symbol => new LiveSymbolDto(symbol,
+                history.Get(symbol, take).Select(sample => new LiveSampleDto(sample.TimeUtc, sample.SpotPrice,
+                    sample.MarkPrice,
+                    sample.SpotLatencyMs, sample.MarkLatencyMs, sample.Error)).ToList())).ToList();
             return new LivePricesDto((int)options.PollInterval.TotalSeconds, clock.UtcNow, symbols);
         });
 
@@ -26,19 +27,24 @@ public static class LivePriceEndpoints
             if (horizon < 1 || horizon > DailyRangeService.MaxHorizonDays)
                 return Results.BadRequest(new { error = $"days phải từ 1 đến {DailyRangeService.MaxHorizonDays}." });
 
-            var r = await ranges.GetAsync(symbol.ToUpperInvariant(), horizon, ct);
-            if (r is null)
+            var range = await ranges.GetAsync(symbol.ToUpperInvariant(), horizon, ct);
+            if (range is null)
                 return Results.NotFound(new { error = "Chưa đủ dữ liệu nến ngày." });
 
             // Ngày tương tự chỉ cho 24 giờ: chạy thử cho thấy 7/30 ngày không có lợi thế so với đoán mặc định.
-            var s = horizon == 1 ? await similar.GetAsync(symbol.ToUpperInvariant(), horizon, ct) : null;
-            var similarDto = s is null ? null : new SimilarDaysDto(s.HistorySymbol, s.Exchange, s.AsOfDayUtc,
-                s.AnchorPrice, s.TargetCloseUtc, s.Forecast.Neighbors, s.Forecast.UpPercent, s.Forecast.MedianPercent,
-                s.Forecast.Low68Percent, s.Forecast.High68Percent, s.Low68, s.High68, s.Forecast.Lean.ToString(),
-                s.Backtest.Days, s.Backtest.HitRatePercent, s.Backtest.StrongDays, s.Backtest.StrongHitRatePercent);
-            return Results.Ok(new DailyRangeDto(symbol.ToUpperInvariant(), r.HorizonDays, r.Days, r.Price,
-                r.TypicalMovePercent, r.Low68, r.High68, r.Low95, r.High95, r.AverageMovePercent,
-                r.LargestRisePercent, r.LargestDropPercent, r.UpDaysPercent, r.Samples, similarDto));
+            var result = horizon == 1 ? await similar.GetAsync(symbol.ToUpperInvariant(), horizon, ct) : null;
+            var similarDto = result is null ? null : new SimilarDaysDto(result.HistorySymbol, result.Exchange,
+                result.AsOfDayUtc,
+                result.AnchorPrice, result.TargetCloseUtc, result.Forecast.Neighbors, result.Forecast.UpPercent,
+                    result.Forecast.MedianPercent,
+                result.Forecast.Low68Percent, result.Forecast.High68Percent, result.Low68, result.High68,
+                    result.Forecast.Lean.ToString(),
+                result.Backtest.Days, result.Backtest.HitRatePercent, result.Backtest.StrongDays,
+                    result.Backtest.StrongHitRatePercent);
+            return Results.Ok(new DailyRangeDto(symbol.ToUpperInvariant(), range.HorizonDays, range.Days, range.Price,
+                range.TypicalMovePercent, range.Low68, range.High68, range.Low95, range.High95,
+                    range.AverageMovePercent,
+                range.LargestRisePercent, range.LargestDropPercent, range.UpDaysPercent, range.Samples, similarDto));
         });
     }
 }

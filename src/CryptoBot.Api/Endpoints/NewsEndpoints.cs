@@ -15,7 +15,8 @@ public static class NewsEndpoints
         {
             var picked = coin is null
                 ? null
-                : NewsText.Coins.FirstOrDefault(c => c.Equals(coin, StringComparison.OrdinalIgnoreCase));
+                : NewsText.Coins.FirstOrDefault(candidate => candidate.Equals(coin,
+                    StringComparison.OrdinalIgnoreCase));
             if (coin is not null && picked is null)
                 return Results.BadRequest(new { error = $"Coin không hỗ trợ: {coin}. Chọn {string.Join(", ", NewsText.Coins)}." });
 
@@ -23,7 +24,7 @@ public static class NewsEndpoints
             var filter = new NewsFilter(picked, string.IsNullOrWhiteSpace(source) ? null : source.Trim(), keyword,
                 fromUtc?.UtcDateTime, toUtc?.UtcDateTime);
             var articles = await store.QueryAsync(filter, Math.Clamp(limit ?? 50, 1, 200), ct);
-            return Results.Ok(new NewsListDto(NewsText.Coins, options.Feeds.Select(f => f.Name).ToList(),
+            return Results.Ok(new NewsListDto(NewsText.Coins, options.Feeds.Select(feed => feed.Name).ToList(),
                 options.PollInterval.TotalHours, articles.Select(ToDto).ToList()));
         });
 
@@ -35,9 +36,9 @@ public static class NewsEndpoints
         });
     }
 
-    private static NewsArticleDto ToDto(NewsArticle a) =>
-        new(a.Id, a.Source, a.Title, a.Url, a.Summary,
-            a.Coins.Length == 0 ? [] : a.Coins.Split(','), a.PublishedAtUtc);
+    private static NewsArticleDto ToDto(NewsArticle article) =>
+        new(article.Id, article.Source, article.Title, article.Url, article.Summary,
+            article.Coins.Length == 0 ? [] : article.Coins.Split(','), article.PublishedAtUtc);
 }
 
 public sealed record NewsArticleDto(long Id, string Source, string Title, string Url, string Summary,

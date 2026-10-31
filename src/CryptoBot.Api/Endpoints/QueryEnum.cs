@@ -9,7 +9,8 @@ internal static class QueryEnum
         value = null;
         if (text is null)
             return true;
-        var name = Enum.GetNames<T>().FirstOrDefault(n => n.Equals(text, StringComparison.OrdinalIgnoreCase));
+        var name = Enum.GetNames<T>().FirstOrDefault(candidate => candidate.Equals(text,
+            StringComparison.OrdinalIgnoreCase));
         if (name is null)
             return false;
         value = Enum.Parse<T>(name);

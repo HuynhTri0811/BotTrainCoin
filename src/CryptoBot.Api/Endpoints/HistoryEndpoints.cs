@@ -19,7 +19,8 @@ public static class HistoryEndpoints
                 return Results.NotFound(new { error = "Chưa cấu hình DailyHistory:Symbols." });
             var picked = symbol is null
                 ? options.Symbols[0]
-                : options.Symbols.FirstOrDefault(s => s.Equals(symbol, StringComparison.OrdinalIgnoreCase));
+                : options.Symbols.FirstOrDefault(candidate => candidate.Equals(symbol,
+                    StringComparison.OrdinalIgnoreCase));
             if (picked is null)
                 return Results.BadRequest(new { error = $"Symbol không có trong DailyHistory: {symbol}" });
 
@@ -31,13 +32,17 @@ public static class HistoryEndpoints
             var report = MonthlyChangeReport.Build(daily);
             return Results.Ok(new MonthlyHistoryDto(picked, client.Exchange, options.Symbols,
                 daily[0].OpenTimeUtc, daily[^1].OpenTimeUtc,
-                report.Months.Select(m => new MonthChangeDto(m.Year, m.Month, m.Open, m.Close, m.ChangePercent,
-                    m.Days, m.Complete)).ToList(),
-                report.Years.Select(y => new YearChangeDto(y.Year, y.Open, y.Close, y.ChangePercent, y.Complete))
+                report.Months.Select(change => new MonthChangeDto(change.Year, change.Month, change.Open, change.Close,
+                    change.ChangePercent,
+                    change.Days, change.Complete)).ToList(),
+                report.Years.Select(change => new YearChangeDto(change.Year, change.Open, change.Close,
+                    change.ChangePercent, change.Complete))
                     .ToList(),
-                report.MonthStats.Select(s => new MonthStatsDto(s.Month, s.Years, s.AverageChangePercent,
-                    s.BestChangePercent, s.WorstChangePercent, s.UpCount, s.UpPercent)).ToList(),
-                events.For(picked).Select(e => new MonthEventDto(e.Year, e.Month, e.Title, e.Detail, e.MarketWide))
+                report.MonthStats.Select(stats => new MonthStatsDto(stats.Month, stats.Years,
+                    stats.AverageChangePercent,
+                    stats.BestChangePercent, stats.WorstChangePercent, stats.UpCount, stats.UpPercent)).ToList(),
+                events.For(picked).Select(monthEvent => new MonthEventDto(monthEvent.Year, monthEvent.Month,
+                    monthEvent.Title, monthEvent.Detail, monthEvent.MarketWide))
                     .ToList()));
         });
     }

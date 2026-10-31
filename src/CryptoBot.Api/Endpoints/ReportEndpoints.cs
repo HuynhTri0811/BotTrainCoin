@@ -16,14 +16,16 @@ public static class ReportEndpoints
         {
             var picked = symbol is null
                 ? null
-                : options.Symbols.FirstOrDefault(s => s.Equals(symbol, StringComparison.OrdinalIgnoreCase));
+                : options.Symbols.FirstOrDefault(candidate => candidate.Equals(symbol,
+                    StringComparison.OrdinalIgnoreCase));
             if (symbol is not null && picked is null)
                 return Results.BadRequest(new { error = $"Symbol không có trong DailyReports: {symbol}" });
 
             var reports = await svc.GetRecentAsync(picked, Math.Clamp(limit ?? 14, 1, 100), ct);
             return Results.Ok(new DailyReportListDto(options.Symbols, options.RunAt.ToString(@"hh\:mm"),
                 options.TimeZone, svc.NextRunUtc(clock.UtcNow),
-                reports.Select(r => new DailyReportDto(r.Symbol, r.Interval, r.CreatedAtUtc, r.Report)).ToList()));
+                reports.Select(saved => new DailyReportDto(saved.Symbol, saved.Interval, saved.CreatedAtUtc,
+                    saved.Report)).ToList()));
         });
 
         // Lập ngay báo cáo còn thiếu của giờ lập gần nhất (không tạo trùng nếu đã có).
