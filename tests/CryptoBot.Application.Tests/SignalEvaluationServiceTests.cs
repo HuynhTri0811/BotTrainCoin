@@ -27,11 +27,12 @@ public class SignalEvaluationServiceTests
     private void AddCandles(params decimal[] closes)
     {
         var start = _candles.Candles.Count;
-        for (var i = 0; i < closes.Length; i++)
+        for (var index = 0; index < closes.Length; index++)
         {
-            var c = closes[i];
-            var open = T0 + TimeSpan.FromHours(start + i);
-            _candles.Candles[open] = new Candle("Binance", "BTCUSDT", CandleInterval.H1, open, c, c, c, c, 1, true, T0);
+            var close = closes[index];
+            var open = T0 + TimeSpan.FromHours(start + index);
+            _candles.Candles[open] = new Candle("Binance", "BTCUSDT", CandleInterval.H1, open, close, close, close,
+                close, 1, true, T0);
         }
     }
 
@@ -48,7 +49,7 @@ public class SignalEvaluationServiceTests
         var result = await CreateService().EvaluatePendingAsync(instance, CancellationToken.None);
 
         Assert.Equal(7, result.Evaluated);
-        Assert.Equal([SignalAction.Buy, SignalAction.Sell], _signals.Signals.Select(s => s.Action));
+        Assert.Equal([SignalAction.Buy, SignalAction.Sell], _signals.Signals.Select(signal => signal.Action));
         Assert.Equal(T0 + TimeSpan.FromHours(3), _signals.Signals[0].CandleOpenTimeUtc);
         Assert.Equal(T0 + TimeSpan.FromHours(6), instance.LastEvaluatedCandleOpenTimeUtc);
     }
@@ -76,11 +77,13 @@ public class SignalEvaluationServiceTests
         await service.EvaluatePendingAsync(incremental, CancellationToken.None);
         AddCandles(UpThenDown[5..]);
         await service.EvaluatePendingAsync(incremental, CancellationToken.None);
-        var incrementalSignals = _signals.Signals.Select(s => (s.Action, s.CandleOpenTimeUtc, s.FastEma, s.SlowEma)).ToList();
+        var incrementalSignals = _signals.Signals.Select(signal => (signal.Action, signal.CandleOpenTimeUtc,
+            signal.FastEma, signal.SlowEma)).ToList();
 
         _signals.Signals.Clear();
         await CreateService().EvaluatePendingAsync(CreateInstance(), CancellationToken.None);
-        var replaySignals = _signals.Signals.Select(s => (s.Action, s.CandleOpenTimeUtc, s.FastEma, s.SlowEma)).ToList();
+        var replaySignals = _signals.Signals.Select(signal => (signal.Action, signal.CandleOpenTimeUtc, signal.FastEma,
+            signal.SlowEma)).ToList();
 
         Assert.Equal(replaySignals, incrementalSignals);
     }
@@ -140,7 +143,7 @@ public class SignalEvaluationServiceTests
             "Binance", "BTCUSDT", "1h", true);
         await service.EvaluatePendingAsync(instance, CancellationToken.None);
 
-        Assert.Equal(2, _signals.Signals.Count(s => s.ConfigVersion == 1));
+        Assert.Equal(2, _signals.Signals.Count(signal => signal.ConfigVersion == 1));
         Assert.Equal(2, instance.Version);
         Assert.Equal(T0 + TimeSpan.FromHours(6), instance.LastEvaluatedCandleOpenTimeUtc);
     }

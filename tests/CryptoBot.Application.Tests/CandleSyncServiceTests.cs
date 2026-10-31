@@ -22,8 +22,8 @@ public class CandleSyncServiceTests
 
     private void AddKlines(int from, int count, decimal price = 100)
     {
-        for (var i = from; i < from + count; i++)
-            _client.Klines.Add(new KlineDto(T0 + TimeSpan.FromHours(i), price, price, price, price, 1));
+        for (var index = from; index < from + count; index++)
+            _client.Klines.Add(new KlineDto(T0 + TimeSpan.FromHours(index), price, price, price, price, 1));
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class CandleSyncServiceTests
         var result = await CreateService(bootstrap: 3).SyncAsync(Key, CancellationToken.None);
 
         Assert.False(_store.Candles.ContainsKey(T0 + TimeSpan.FromHours(1)));
-        Assert.Contains(result.Issues, i => i.Kind == CandleIssueKind.InvalidValues);
+        Assert.Contains(result.Issues, issue => issue.Kind == CandleIssueKind.InvalidValues);
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public class CandleSyncServiceTests
 
         var result = await CreateService().SyncAsync(Key, CancellationToken.None);
 
-        Assert.Contains(result.Issues, i => i.Kind == CandleIssueKind.Gap);
+        Assert.Contains(result.Issues, issue => issue.Kind == CandleIssueKind.Gap);
         Assert.Equal(6, _store.Candles.Count);
     }
 
@@ -106,10 +106,10 @@ public class CandleSyncServiceTests
 
         await CreateService().SyncAsync(Key, CancellationToken.None);
 
-        var c = _store.Candles[T0];
-        Assert.Equal(37, c.TradeCount);
-        Assert.Equal(200m, c.QuoteVolume);
-        Assert.Equal(0.5m, c.TakerBuyVolume);
+        var candle = _store.Candles[T0];
+        Assert.Equal(37, candle.TradeCount);
+        Assert.Equal(200m, candle.QuoteVolume);
+        Assert.Equal(0.5m, candle.TakerBuyVolume);
     }
 
     [Fact]
@@ -118,32 +118,33 @@ public class CandleSyncServiceTests
         AddKlines(0, 5);                            // bản cũ: chưa có số giao dịch
         _clock.UtcNow = T0 + TimeSpan.FromHours(5);
         await CreateService().SyncAsync(Key, CancellationToken.None);
-        Assert.All(_store.Candles.Values, c => Assert.Null(c.TradeCount));
+        Assert.All(_store.Candles.Values, candle => Assert.Null(candle.TradeCount));
 
         // Sàn trả lại đúng các nến đó, nay kèm số giao dịch.
-        for (var i = 0; i < _client.Klines.Count; i++)
-            _client.Klines[i] = _client.Klines[i] with { QuoteVolume = 100, TradeCount = 10 + i, TakerBuyVolume = 1 };
+        for (var index = 0; index < _client.Klines.Count; index++)
+            _client.Klines[index] = _client.Klines[index] with { QuoteVolume = 100, TradeCount = 10 + index,
+                TakerBuyVolume = 1 };
         var result = await CreateService().SyncAsync(Key, CancellationToken.None);
 
         Assert.Equal(0, result.Inserted);
         Assert.Empty(result.Issues);
-        Assert.Equal([10L, 11L, 12L, 13L, 14L], _store.Candles.Values.Select(c => c.TradeCount!.Value));
-        Assert.All(_store.Candles.Values, c => Assert.Equal(1m, c.TakerBuyVolume));
+        Assert.Equal([10L, 11L, 12L, 13L, 14L], _store.Candles.Values.Select(candle => candle.TradeCount!.Value));
+        Assert.All(_store.Candles.Values, candle => Assert.Equal(1m, candle.TakerBuyVolume));
     }
 
     [Fact]
     public async Task Resync_backfills_taker_buy_volume_when_only_it_is_missing()
     {
         AddKlines(0, 5);
-        for (var i = 0; i < _client.Klines.Count; i++)
-            _client.Klines[i] = _client.Klines[i] with { QuoteVolume = 100, TradeCount = 10 };
+        for (var index = 0; index < _client.Klines.Count; index++)
+            _client.Klines[index] = _client.Klines[index] with { QuoteVolume = 100, TradeCount = 10 };
         _clock.UtcNow = T0 + TimeSpan.FromHours(5);
         await CreateService().SyncAsync(Key, CancellationToken.None);
 
-        for (var i = 0; i < _client.Klines.Count; i++)
-            _client.Klines[i] = _client.Klines[i] with { TakerBuyVolume = 0.25m };
+        for (var index = 0; index < _client.Klines.Count; index++)
+            _client.Klines[index] = _client.Klines[index] with { TakerBuyVolume = 0.25m };
         await CreateService().SyncAsync(Key, CancellationToken.None);
 
-        Assert.All(_store.Candles.Values, c => Assert.Equal(0.25m, c.TakerBuyVolume));
+        Assert.All(_store.Candles.Values, candle => Assert.Equal(0.25m, candle.TakerBuyVolume));
     }
 }

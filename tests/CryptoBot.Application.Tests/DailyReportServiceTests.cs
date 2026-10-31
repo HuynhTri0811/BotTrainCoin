@@ -25,10 +25,10 @@ public class DailyReportServiceTests
     /// <summary>Nến 1h đi lên đều 1 đơn vị mỗi giờ, từ <paramref name="hoursBack"/> giờ trước giờ lập.</summary>
     private void AddRisingKlines(int hoursBack)
     {
-        for (var i = 0; i < hoursBack; i++)
+        for (var index = 0; index < hoursBack; index++)
         {
-            var open = 100m + i;
-            _client.Klines.Add(new KlineDto(RunUtc.AddHours(i - hoursBack), open, open + 1, open, open + 1, 10,
+            var open = 100m + index;
+            _client.Klines.Add(new KlineDto(RunUtc.AddHours(index - hoursBack), open, open + 1, open, open + 1, 10,
                 TakerBuyVolume: 6));
         }
     }

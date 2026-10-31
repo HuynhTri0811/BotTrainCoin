@@ -11,16 +11,18 @@ internal sealed class InMemoryPaperFuturesStore : IPaperFuturesStore
     private long _nextId = 1;
 
     public Task<IReadOnlyList<FuturesPosition>> GetOpenPositionsAsync(CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<FuturesPosition>>(Positions.Where(p => p.Status == PositionStatus.Open).ToList());
+        Task.FromResult<IReadOnlyList<FuturesPosition>>(Positions.Where(position =>
+            position.Status == PositionStatus.Open).ToList());
 
     public Task<FuturesPosition?> GetAsync(long id, CancellationToken ct) =>
-        Task.FromResult(Positions.FirstOrDefault(p => p.Id == id));
+        Task.FromResult(Positions.FirstOrDefault(position => position.Id == id));
 
     public Task<FuturesPosition?> FindByOpenCommandAsync(Guid commandId, CancellationToken ct) =>
-        Task.FromResult(Positions.FirstOrDefault(p => p.OpenCommandId == commandId));
+        Task.FromResult(Positions.FirstOrDefault(position => position.OpenCommandId == commandId));
 
     public Task<IReadOnlyList<FuturesPosition>> GetClosedAsync(ClosedPositionFilter filter, int limit, CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<FuturesPosition>>(Positions.Where(p => p.Status != PositionStatus.Open).ToList());
+        Task.FromResult<IReadOnlyList<FuturesPosition>>(Positions.Where(position =>
+            position.Status != PositionStatus.Open).ToList());
 
     public Task<IReadOnlyList<PaperLedgerEntry>> GetLedgerAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<PaperLedgerEntry>>(Ledger.ToList());
@@ -67,18 +69,18 @@ public class PaperFuturesServiceTests
         decimal? tp = 110_000m, Guid? id = null) =>
         new(id ?? Guid.NewGuid(), "BTCUSDT", PositionSide.Long, leverage, margin, stop, tp);
 
-    private decimal Wallet => _store.Ledger.Sum(e => e.Amount);
+    private decimal Wallet => _store.Ledger.Sum(entry => entry.Amount);
 
     [Fact]
     public async Task Open_long_computes_quantity_margin_fee_and_liquidation()
     {
         var result = await _svc.OpenAsync(Long(), default);
 
-        var p = Assert.IsType<FuturesPosition>(result.Position);
-        Assert.Equal(0.01m, p.Quantity);          // 100 * 10 / 100000
-        Assert.Equal(100m, p.Margin);
-        Assert.Equal(0.5m, p.OpenFee);            // 1000 notional * 0.05%
-        Assert.Equal(90361.4m, p.LiquidationPrice);
+        var position = Assert.IsType<FuturesPosition>(result.Position);
+        Assert.Equal(0.01m, position.Quantity);          // 100 * 10 / 100000
+        Assert.Equal(100m, position.Margin);
+        Assert.Equal(0.5m, position.OpenFee);            // 1000 notional * 0.05%
+        Assert.Equal(90361.4m, position.LiquidationPrice);
         Assert.Equal(1000m - 0.5m, Wallet);
     }
 
@@ -101,7 +103,7 @@ public class PaperFuturesServiceTests
         var result = await _svc.OpenAsync(Long(stop: stop), default);
 
         Assert.Null(result.Position);
-        Assert.Contains(result.Quote.Errors, e => e.Contains(expected));
+        Assert.Contains(result.Quote.Errors, error => error.Contains(expected));
     }
 
     [Fact]
@@ -113,7 +115,7 @@ public class PaperFuturesServiceTests
         // Giá 30000: 4 * 10 / 30000 = 0.00133 -> 0.001 BTC = 30 USDT < 50 USDT tối thiểu.
         SetMark(30_000m);
         Assert.Contains((await _svc.QuoteAsync(Long(margin: 4m, stop: 29_000m, tp: null), default)).Errors,
-            e => e.Contains("tối thiểu"));
+            error => error.Contains("tối thiểu"));
     }
 
     [Fact]
@@ -124,7 +126,7 @@ public class PaperFuturesServiceTests
         var result = await _svc.OpenAsync(Long(), default);
 
         Assert.Null(result.Position);
-        Assert.Contains(result.Quote.Errors, e => e.Contains("stale"));
+        Assert.Contains(result.Quote.Errors, error => error.Contains("stale"));
     }
 
     [Fact]
@@ -145,10 +147,10 @@ public class PaperFuturesServiceTests
 
         Assert.Equal(1, await _svc.EvaluateTriggersAsync(default));
 
-        var p = _store.Positions.Single();
-        Assert.Equal(CloseReason.StopLoss, p.CloseReason);
-        Assert.Equal(-60m, p.RealizedPnl);        // 0.01 * (94000 - 100000)
-        Assert.Equal(0.47m, p.CloseFee);
+        var position = _store.Positions.Single();
+        Assert.Equal(CloseReason.StopLoss, position.CloseReason);
+        Assert.Equal(-60m, position.RealizedPnl);        // 0.01 * (94000 - 100000)
+        Assert.Equal(0.47m, position.CloseFee);
         Assert.Equal(1000m - 0.5m - 60m - 0.47m, Wallet);
     }
 
@@ -160,9 +162,9 @@ public class PaperFuturesServiceTests
 
         await _svc.EvaluateTriggersAsync(default);
 
-        var p = _store.Positions.Single();
-        Assert.Equal(PositionStatus.Liquidated, p.Status);
-        Assert.Equal(-100m, p.RealizedPnl);
+        var position = _store.Positions.Single();
+        Assert.Equal(PositionStatus.Liquidated, position.Status);
+        Assert.Equal(-100m, position.RealizedPnl);
         Assert.Equal(1000m - 0.5m - 100m, Wallet);
     }
 
@@ -175,9 +177,9 @@ public class PaperFuturesServiceTests
 
         await _svc.EvaluateTriggersAsync(default);
 
-        var p = _store.Positions.Single();
-        Assert.Equal(CloseReason.TakeProfit, p.CloseReason);
-        Assert.Equal(25.5m, p.RealizedPnl); // 0.005 * (100000 - 94900)
+        var position = _store.Positions.Single();
+        Assert.Equal(CloseReason.TakeProfit, position.CloseReason);
+        Assert.Equal(25.5m, position.RealizedPnl); // 0.005 * (100000 - 94900)
     }
 
     [Fact]
@@ -190,7 +192,7 @@ public class PaperFuturesServiceTests
         Assert.True((await _svc.CloseAsync(open.Position!.Id, cmd, default)).Ok);
         Assert.True((await _svc.CloseAsync(open.Position!.Id, cmd, default)).Ok);
         Assert.False((await _svc.CloseAsync(open.Position!.Id, Guid.NewGuid(), default)).Ok);
-        Assert.Equal(2, _store.Ledger.Count(e => e.Type == LedgerEntryType.Fee));
+        Assert.Equal(2, _store.Ledger.Count(entry => entry.Type == LedgerEntryType.Fee));
     }
 
     [Fact]
@@ -199,12 +201,12 @@ public class PaperFuturesServiceTests
         await _svc.OpenAsync(Long(), default);
         SetMark(102_000m);
 
-        var a = await _svc.GetAccountAsync(default);
+        var account = await _svc.GetAccountAsync(default);
 
-        Assert.Equal(999.5m, a.WalletBalance);
-        Assert.Equal(20m, a.UnrealizedPnl);
-        Assert.Equal(1019.5m, a.Equity);
-        Assert.Equal(899.5m, a.AvailableBalance);
-        Assert.Equal(20m, a.OpenPositions.Single().RoePercent);
+        Assert.Equal(999.5m, account.WalletBalance);
+        Assert.Equal(20m, account.UnrealizedPnl);
+        Assert.Equal(1019.5m, account.Equity);
+        Assert.Equal(899.5m, account.AvailableBalance);
+        Assert.Equal(20m, account.OpenPositions.Single().RoePercent);
     }
 }

@@ -34,13 +34,13 @@ public class SimilarDaysServiceTests
     private void AddAlternatingHistory(int count)
     {
         var close = 100m;
-        for (var i = 0; i < count; i++)
+        for (var index = 0; index < count; index++)
         {
             var open = close;
-            close = i == 0 ? 100m : close * (i % 2 == 1 ? 1.01m : 0.99m);
-            var t = D0.AddDays(i);
-            _store.Inner.Candles[t] = new Candle("Bitfinex", "BTCUSD", CandleInterval.D1, t, open,
-                Math.Max(open, close), Math.Min(open, close), close, 1, isClosed: true, receivedAtUtc: t);
+            close = index == 0 ? 100m : close * (index % 2 == 1 ? 1.01m : 0.99m);
+            var openTime = D0.AddDays(index);
+            _store.Inner.Candles[openTime] = new Candle("Bitfinex", "BTCUSD", CandleInterval.D1, openTime, open,
+                Math.Max(open, close), Math.Min(open, close), close, 1, isClosed: true, receivedAtUtc: openTime);
         }
     }
 
@@ -58,15 +58,16 @@ public class SimilarDaysServiceTests
     [Fact]
     public async Task Anchors_range_to_yesterdays_close_for_todays_close()
     {
-        var r = await CreateService().GetAsync("BTCUSDT", 1, CancellationToken.None);
+        var result = await CreateService().GetAsync("BTCUSDT", 1, CancellationToken.None);
 
-        Assert.NotNull(r);
-        Assert.Equal((Yesterday, 200m, D0.AddDays(Days + 1)), (r.AsOfDayUtc, r.AnchorPrice, r.TargetCloseUtc));
-        Assert.Equal(200m * (1 + r.Forecast.Low68Percent / 100), r.Low68);
-        Assert.Equal(200m * (1 + r.Forecast.High68Percent / 100), r.High68);
-        Assert.Equal(ForecastLean.Down, r.Forecast.Lean);
+        Assert.NotNull(result);
+        Assert.Equal((Yesterday, 200m, D0.AddDays(Days + 1)), (result.AsOfDayUtc, result.AnchorPrice,
+            result.TargetCloseUtc));
+        Assert.Equal(200m * (1 + result.Forecast.Low68Percent / 100), result.Low68);
+        Assert.Equal(200m * (1 + result.Forecast.High68Percent / 100), result.High68);
+        Assert.Equal(ForecastLean.Down, result.Forecast.Lean);
         // Đọc đúng lịch sử Bitfinex BTCUSD 1d, không phải symbol/sàn của bảng giá.
-        Assert.All(_store.Keys, k => Assert.Equal(new CandleKey("Bitfinex", "BTCUSD", CandleInterval.D1), k));
+        Assert.All(_store.Keys, key => Assert.Equal(new CandleKey("Bitfinex", "BTCUSD", CandleInterval.D1), key));
     }
 
     [Fact]
@@ -108,9 +109,9 @@ public class SimilarDaysServiceTests
             isClosed: true, receivedAtUtc: today);
         AddBinanceClose(today, 205m);
         _clock.UtcNow = _clock.UtcNow.AddDays(1);
-        var r = await CreateService().GetAsync("BTCUSDT", 1, CancellationToken.None);
+        var result = await CreateService().GetAsync("BTCUSDT", 1, CancellationToken.None);
 
-        Assert.Equal(today, r!.AsOfDayUtc);
+        Assert.Equal(today, result!.AsOfDayUtc);
         Assert.Equal(2, _store.FullHistoryReads);
         Assert.Equal(1, _cache.Count);
     }
