@@ -12,6 +12,7 @@ import {
   type RuleTriggerType,
   type TriggerCondition,
 } from '../../api/client';
+import { columnFilter } from '../../components/tableFilters';
 import { formatVn } from '../../time';
 import { fmtPrice, fmtUsdt } from '../futures/format';
 
@@ -21,6 +22,8 @@ const statusTag: Record<AutoRule['status'], { text: string; color: string }> = {
   Rejected: { text: 'Bị từ chối', color: 'error' },
   Cancelled: { text: 'Đã hủy', color: 'default' },
 };
+
+const STATUSES = Object.entries(statusTag).map(([value, { text }]) => ({ text, value }));
 
 const condText = (c: TriggerCondition | null) => (c === 'AtOrBelow' ? '≤' : '≥');
 
@@ -269,6 +272,10 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
           {
             title: 'Quy tắc',
             key: 'rule',
+            ...columnFilter<AutoRule>((r) => r.side, [
+              { text: 'Long', value: 'Long' },
+              { text: 'Short', value: 'Short' },
+            ]),
             render: (_, r) => (
               <span>
                 {r.triggerType === 'Indicator' ? (
@@ -291,6 +298,7 @@ export function AutoOrdersCard({ symbol, account }: { symbol: string; account: F
           {
             title: 'Trạng thái',
             key: 'status',
+            ...columnFilter<AutoRule>((r) => r.status, STATUSES),
             render: (_, r) => (
               <Space orientation="vertical" size={0}>
                 <Tag color={statusTag[r.status].color}>{statusTag[r.status].text}</Tag>
