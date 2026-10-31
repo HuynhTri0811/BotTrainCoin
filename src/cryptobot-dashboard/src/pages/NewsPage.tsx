@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Alert, Button, Card, Segmented, Space, Spin, Typography, message } from 'antd';
+import { Alert, Button, Card, Input, Segmented, Select, Space, Spin, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { newsApi } from '../api/client';
 import { NewsList } from '../features/news/NewsList';
 
 const ALL = 'Tất cả';
 
-/** Tin tức crypto lấy từ RSS công khai (NewsWorker, mặc định mỗi 5 giờ), lọc theo coin. */
+/** Tin tức crypto lấy từ RSS công khai (NewsWorker, mặc định mỗi 5 giờ), lọc theo coin, nguồn và từ khóa. */
 export function NewsPage() {
   const [coin, setCoin] = useState(ALL);
+  const [source, setSource] = useState<string | undefined>();
+  const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
   const q = useQuery({
     queryKey: ['news', coin],
@@ -25,6 +27,14 @@ export function NewsPage() {
     onError: (e) => message.error(e.message),
   });
   const d = q.data;
+
+  // Nguồn và từ khóa lọc trên 100 tin đã tải về, coin thì lọc từ backend.
+  const keyword = search.trim().toLowerCase();
+  const articles = (d?.articles ?? []).filter(
+    (a) =>
+      (source === undefined || a.source === source) &&
+      (keyword === '' || a.title.toLowerCase().includes(keyword) || a.summary.toLowerCase().includes(keyword)),
+  );
 
   return (
     <Card
@@ -50,12 +60,36 @@ export function NewsPage() {
         </Space>
       }
     >
+      <Space wrap style={{ marginBottom: 12 }}>
+        <Input.Search
+          size="small"
+          allowClear
+          placeholder="Tìm trong tiêu đề, tóm tắt"
+          style={{ width: 260 }}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <Select<string>
+          size="small"
+          allowClear
+          placeholder="Mọi nguồn"
+          style={{ minWidth: 140 }}
+          value={source}
+          onChange={setSource}
+          options={(d?.sources ?? []).map((s) => ({ value: s, label: s }))}
+        />
+        {d && (
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            {articles.length}/{d.articles.length} tin
+          </Typography.Text>
+        )}
+      </Space>
       {q.isPending ? (
         <Spin />
       ) : q.isError ? (
         <Alert type="error" showIcon title={`Không tải được tin: ${q.error.message}`} />
       ) : (
-        <NewsList articles={d?.articles ?? []} />
+        <NewsList articles={articles} />
       )}
       <Typography.Paragraph type="secondary" style={{ margin: '12px 0 0', fontSize: 12 }}>
         Chỉ lưu tiêu đề, tóm tắt ngắn và link tới bài gốc. Coin được gắn theo từ khóa trong tiêu đề/tóm tắt (bitcoin,
