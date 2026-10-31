@@ -36,10 +36,10 @@ public static class Ema
 
         (decimal alpha, decimal keep) = Weights(period);
         // Từ giá thứ period trở đi, mỗi giá mới cập nhật EMA một lần.
-        for (int i = period; i < span.Length; i++)
+        for (int index = period; index < span.Length; index++)
         {
-            ema = Step(ema, span[i], alpha, keep);
-            result[i] = ema;
+            ema = Step(ema, span[index], alpha, keep);
+            result[index] = ema;
         }
 
         return result;
@@ -60,11 +60,11 @@ public static class Ema
         decimal ema = Seed(values, period);
         decimal prev = ema;
         (decimal alpha, decimal keep) = Weights(period);
-        for (int i = period; i < values.Length; i++)
+        for (int index = period; index < values.Length; index++)
         {
             // Giữ lại giá trị trước khi cập nhật: khi vòng lặp kết thúc, prev là EMA của nến trước.
             prev = ema;
-            ema = Step(ema, values[i], alpha, keep);
+            ema = Step(ema, values[index], alpha, keep);
         }
 
         return (prev, ema);
@@ -74,8 +74,8 @@ public static class Ema
     private static decimal Seed(ReadOnlySpan<decimal> values, int period)
     {
         decimal sum = 0m;
-        for (int i = 0; i < period; i++)
-            sum += values[i];
+        for (int index = 0; index < period; index++)
+            sum += values[index];
         return sum / period;
     }
 
