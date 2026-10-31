@@ -89,6 +89,15 @@ public interface IStrategyInstanceStore
     Task SaveAsync(CancellationToken ct);
 }
 
+/// <summary>Điều kiện lọc tín hiệu; trường null là không lọc. Thời gian tính theo giờ mở nến, gồm cả hai đầu.</summary>
+public sealed record SignalFilter(
+    int? StrategyInstanceId = null,
+    int? ConfigVersion = null,
+    SignalAction? Action = null,
+    bool? IsBackfill = null,
+    DateTime? FromUtc = null,
+    DateTime? ToUtc = null);
+
 public interface ISignalStore
 {
     Task<TradingSignal?> GetLastAsync(int strategyInstanceId, int configVersion, CancellationToken ct);
@@ -98,8 +107,7 @@ public interface ISignalStore
     /// </summary>
     Task SaveEvaluationAsync(StrategyInstance instance, IReadOnlyList<TradingSignal> newSignals, CancellationToken ct);
 
-    Task<IReadOnlyList<TradingSignal>> QueryAsync(int? strategyInstanceId, int? configVersion,
-        DateTime? fromUtc, DateTime? toUtc, int limit, CancellationToken ct);
+    Task<IReadOnlyList<TradingSignal>> QueryAsync(SignalFilter filter, int limit, CancellationToken ct);
 }
 
 /// <summary>Sàn tạm thời không phục vụ dữ liệu (rate limit, lỗi mạng, 5xx).</summary>

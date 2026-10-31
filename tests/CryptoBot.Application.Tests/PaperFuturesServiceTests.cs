@@ -19,7 +19,7 @@ internal sealed class InMemoryPaperFuturesStore : IPaperFuturesStore
     public Task<FuturesPosition?> FindByOpenCommandAsync(Guid commandId, CancellationToken ct) =>
         Task.FromResult(Positions.FirstOrDefault(p => p.OpenCommandId == commandId));
 
-    public Task<IReadOnlyList<FuturesPosition>> GetClosedAsync(int limit, CancellationToken ct) =>
+    public Task<IReadOnlyList<FuturesPosition>> GetClosedAsync(ClosedPositionFilter filter, int limit, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<FuturesPosition>>(Positions.Where(p => p.Status != PositionStatus.Open).ToList());
 
     public Task<IReadOnlyList<PaperLedgerEntry>> GetLedgerAsync(CancellationToken ct) =>

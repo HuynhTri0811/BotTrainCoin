@@ -55,12 +55,20 @@ public sealed class PaperFuturesLock
     public SemaphoreSlim Semaphore { get; } = new(1, 1);
 }
 
+/// <summary>Điều kiện lọc vị thế đã đóng; trường null là không lọc. Thời gian tính theo giờ đóng, [FromUtc, ToUtc).</summary>
+public sealed record ClosedPositionFilter(
+    string? Symbol = null,
+    PositionSide? Side = null,
+    CloseReason? CloseReason = null,
+    DateTime? FromUtc = null,
+    DateTime? ToUtc = null);
+
 public interface IPaperFuturesStore
 {
     Task<IReadOnlyList<FuturesPosition>> GetOpenPositionsAsync(CancellationToken ct);
     Task<FuturesPosition?> GetAsync(long id, CancellationToken ct);
     Task<FuturesPosition?> FindByOpenCommandAsync(Guid commandId, CancellationToken ct);
-    Task<IReadOnlyList<FuturesPosition>> GetClosedAsync(int limit, CancellationToken ct);
+    Task<IReadOnlyList<FuturesPosition>> GetClosedAsync(ClosedPositionFilter filter, int limit, CancellationToken ct);
     Task<IReadOnlyList<PaperLedgerEntry>> GetLedgerAsync(CancellationToken ct);
     void AddPosition(FuturesPosition position);
     void AddLedger(PaperLedgerEntry entry);

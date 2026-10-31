@@ -1,15 +1,19 @@
+import { useState } from 'react';
 import { Card, Table, Tag } from 'antd';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api, type Signal, type Strategy } from '../api/client';
+import { picked, serverFilter } from '../components/tableFilters';
 import { formatVn } from '../time';
 
 const priceFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 8 });
 
 /** Tín hiệu Buy/Sell gần đây của chiến lược EMA đang chọn. */
 export function SignalsPage({ strategy }: { strategy: Strategy }) {
+  const [filter, setFilter] = useState<{ action?: string; isBackfill?: string }>({});
   const signals = useQuery({
-    queryKey: ['signals', strategy.id],
-    queryFn: () => api.signals(strategy.id, 50),
+    queryKey: ['signals', strategy.id, filter],
+    queryFn: () => api.signals(strategy.id, filter),
+    placeholderData: keepPreviousData,
     refetchInterval: 15_000,
   });
 
@@ -25,10 +29,15 @@ export function SignalsPage({ strategy }: { strategy: Strategy }) {
         dataSource={signals.data ?? []}
         pagination={{ pageSize: 10, hideOnSinglePage: true }}
         scroll={{ x: true }}
+        onChange={(_, f) => setFilter({ action: picked(f.action), isBackfill: picked(f.isBackfill) })}
         columns={[
           {
             title: 'Hành động',
             dataIndex: 'action',
+            ...serverFilter([
+              { text: 'BUY', value: 'Buy' },
+              { text: 'SELL', value: 'Sell' },
+            ]),
             render: (a: Signal['action']) => <Tag color={a === 'Buy' ? 'green' : 'red'}>{a.toUpperCase()}</Tag>,
           },
           { title: 'Nến (mở)', dataIndex: 'candleOpenTimeUtc', render: formatVn },
@@ -43,6 +52,10 @@ export function SignalsPage({ strategy }: { strategy: Strategy }) {
           {
             title: 'Loại',
             dataIndex: 'isBackfill',
+            ...serverFilter([
+              { text: 'Mới', value: 'false' },
+              { text: 'Backfill', value: 'true' },
+            ]),
             render: (b: boolean) =>
               b ? <Tag>Backfill</Tag> : <Tag color="processing">Mới</Tag>,
           },

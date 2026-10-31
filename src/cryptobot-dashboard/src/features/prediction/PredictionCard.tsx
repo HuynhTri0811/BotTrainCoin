@@ -2,10 +2,16 @@ import { useState } from 'react';
 import { Alert, Card, Col, Row, Segmented, Statistic, Table, Tag, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { predictionApi, type PredictionHistory, type PriceDirection } from '../../api/client';
+import { columnFilter } from '../../components/tableFilters';
 import { fmtPrice2 as fmtPrice } from '../futures/format';
 import { formatVnUnix } from '../../time';
 
 const HISTORY = 300;
+
+const DIRECTIONS = [
+  { text: '▲ Lên', value: 'Up' },
+  { text: '▼ Xuống', value: 'Down' },
+];
 
 function DirectionTag({ d, big }: { d: PriceDirection | null; big?: boolean }) {
   if (d == null) return <Tag>Đứng giá</Tag>;
@@ -109,8 +115,21 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
             scroll={{ x: 'max-content' }}
             columns={[
               { title: day ? 'Ngày (mở lúc)' : 'Nến (mở lúc)', dataIndex: 'time', render: formatVnUnix },
-              { title: 'Đoán', dataIndex: 'predicted', render: (d: PriceDirection) => <DirectionTag d={d} /> },
-              { title: 'Thực tế', dataIndex: 'actual', render: (d: PriceDirection | null) => <DirectionTag d={d} /> },
+              {
+                title: 'Đoán',
+                dataIndex: 'predicted',
+                ...columnFilter<PredictionHistory>((r) => r.predicted, DIRECTIONS),
+                render: (d: PriceDirection) => <DirectionTag d={d} />,
+              },
+              {
+                title: 'Thực tế',
+                dataIndex: 'actual',
+                ...columnFilter<PredictionHistory>((r) => r.actual ?? 'Flat', [
+                  ...DIRECTIONS,
+                  { text: 'Đứng giá', value: 'Flat' },
+                ]),
+                render: (d: PriceDirection | null) => <DirectionTag d={d} />,
+              },
               {
                 title: 'Giá đóng',
                 key: 'close',
@@ -132,6 +151,13 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
               {
                 title: 'Kết quả',
                 key: 'hit',
+                ...columnFilter<PredictionHistory>(
+                  (r) => (r.actual == null ? 'None' : r.actual === r.predicted ? 'Hit' : 'Miss'),
+                  [
+                    { text: 'Đúng', value: 'Hit' },
+                    { text: 'Sai', value: 'Miss' },
+                  ],
+                ),
                 render: (_, r) =>
                   r.actual == null ? '—' : r.actual === r.predicted ? <Tag color="green">Đúng</Tag> : <Tag color="red">Sai</Tag>,
               },

@@ -36,8 +36,8 @@ public sealed class ChartQueryService(IStrategyInstanceStore instances, ICandleS
             closedOnly: true, ct);
         var points = BuildPoints(strategy, history, visible);
 
-        var sigs = await signals.QueryAsync(instance.Id, instance.Version, visible[0].OpenTimeUtc, null,
-            MaxLimit, ct);
+        var sigs = await signals.QueryAsync(
+            new SignalFilter(instance.Id, instance.Version, FromUtc: visible[0].OpenTimeUtc), MaxLimit, ct);
         return new ChartData(instance, parameters, points, sigs);
     }
 

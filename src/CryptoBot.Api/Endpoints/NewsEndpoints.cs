@@ -9,9 +9,9 @@ public static class NewsEndpoints
     {
         var api = app.MapGroup("/api/news");
 
-        // Tin đã đồng bộ (NewsWorker), mới → cũ; lọc theo coin và khoảng giờ đăng [fromUtc, toUtc).
-        api.MapGet("", async (string? coin, DateTimeOffset? fromUtc, DateTimeOffset? toUtc, int? limit,
-            INewsStore store, NewsOptions options, CancellationToken ct) =>
+        // Tin đã đồng bộ (NewsWorker), mới → cũ; lọc theo coin, nguồn, từ khóa và khoảng giờ đăng [fromUtc, toUtc).
+        api.MapGet("", async (string? coin, string? source, string? search, DateTimeOffset? fromUtc,
+            DateTimeOffset? toUtc, int? limit, INewsStore store, NewsOptions options, CancellationToken ct) =>
         {
             var picked = coin is null
                 ? null
@@ -19,8 +19,10 @@ public static class NewsEndpoints
             if (coin is not null && picked is null)
                 return Results.BadRequest(new { error = $"Coin không hỗ trợ: {coin}. Chọn {string.Join(", ", NewsText.Coins)}." });
 
-            var articles = await store.QueryAsync(picked, fromUtc?.UtcDateTime, toUtc?.UtcDateTime,
-                Math.Clamp(limit ?? 50, 1, 200), ct);
+            var keyword = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+            var filter = new NewsFilter(picked, string.IsNullOrWhiteSpace(source) ? null : source.Trim(), keyword,
+                fromUtc?.UtcDateTime, toUtc?.UtcDateTime);
+            var articles = await store.QueryAsync(filter, Math.Clamp(limit ?? 50, 1, 200), ct);
             return Results.Ok(new NewsListDto(NewsText.Coins, options.Feeds.Select(f => f.Name).ToList(),
                 options.PollInterval.TotalHours, articles.Select(ToDto).ToList()));
         });

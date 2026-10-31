@@ -144,17 +144,20 @@ public sealed class SignalStore(BotDbContext db) : ISignalStore
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<IReadOnlyList<TradingSignal>> QueryAsync(int? strategyInstanceId, int? configVersion,
-        DateTime? fromUtc, DateTime? toUtc, int limit, CancellationToken ct)
+    public async Task<IReadOnlyList<TradingSignal>> QueryAsync(SignalFilter filter, int limit, CancellationToken ct)
     {
         var q = db.Signals.AsNoTracking();
-        if (strategyInstanceId is { } id)
+        if (filter.StrategyInstanceId is { } id)
             q = q.Where(s => s.StrategyInstanceId == id);
-        if (configVersion is { } v)
+        if (filter.ConfigVersion is { } v)
             q = q.Where(s => s.ConfigVersion == v);
-        if (fromUtc is { } from)
+        if (filter.Action is { } action)
+            q = q.Where(s => s.Action == action);
+        if (filter.IsBackfill is { } backfill)
+            q = q.Where(s => s.IsBackfill == backfill);
+        if (filter.FromUtc is { } from)
             q = q.Where(s => s.CandleOpenTimeUtc >= from);
-        if (toUtc is { } to)
+        if (filter.ToUtc is { } to)
             q = q.Where(s => s.CandleOpenTimeUtc <= to);
 
         var list = await q.OrderByDescending(s => s.CandleOpenTimeUtc).ThenByDescending(s => s.Id)
@@ -179,10 +182,23 @@ public sealed class PaperFuturesStore(BotDbContext db) : IPaperFuturesStore
     public Task<FuturesPosition?> FindByOpenCommandAsync(Guid commandId, CancellationToken ct) =>
         db.FuturesPositions.FirstOrDefaultAsync(p => p.Environment == Env && p.OpenCommandId == commandId, ct);
 
-    public async Task<IReadOnlyList<FuturesPosition>> GetClosedAsync(int limit, CancellationToken ct) =>
-        await db.FuturesPositions.AsNoTracking()
-            .Where(p => p.Environment == Env && p.Status != PositionStatus.Open)
-            .OrderByDescending(p => p.Id).Take(limit).ToListAsync(ct);
+    public async Task<IReadOnlyList<FuturesPosition>> GetClosedAsync(ClosedPositionFilter filter, int limit,
+        CancellationToken ct)
+    {
+        var q = db.FuturesPositions.AsNoTracking()
+            .Where(p => p.Environment == Env && p.Status != PositionStatus.Open);
+        if (filter.Symbol is { } symbol)
+            q = q.Where(p => p.Symbol == symbol);
+        if (filter.Side is { } side)
+            q = q.Where(p => p.Side == side);
+        if (filter.CloseReason is { } reason)
+            q = q.Where(p => p.CloseReason == reason);
+        if (filter.FromUtc is { } from)
+            q = q.Where(p => p.ClosedAtUtc >= from);
+        if (filter.ToUtc is { } to)
+            q = q.Where(p => p.ClosedAtUtc < to);
+        return await q.OrderByDescending(p => p.Id).Take(limit).ToListAsync(ct);
+    }
 
     public async Task<IReadOnlyList<PaperLedgerEntry>> GetLedgerAsync(CancellationToken ct)
     {
@@ -252,17 +268,25 @@ public sealed class NewsStore(BotDbContext db) : INewsStore
             .Where(a => a.Source == source && externalIds.Contains(a.ExternalId))
             .Select(a => a.ExternalId).ToListAsync(ct)).ToHashSet();
 
-    public async Task<IReadOnlyList<NewsArticle>> QueryAsync(string? coin, DateTime? fromUtc, DateTime? toUtc, int limit,
-        CancellationToken ct)
+    public async Task<IReadOnlyList<NewsArticle>> QueryAsync(NewsFilter filter, int limit, CancellationToken ct)
     {
         var query = db.NewsArticles.AsNoTracking();
         // Coins là "BTC,ETH": mã coin không trùng một phần với nhau nên tìm chuỗi con là đủ.
-        if (coin is not null)
+        if (filter.Coin is { } coin)
             query = query.Where(a => a.Coins.Contains(coin));
-        if (fromUtc is not null)
-            query = query.Where(a => a.PublishedAtUtc >= fromUtc);
-        if (toUtc is not null)
-            query = query.Where(a => a.PublishedAtUtc < toUtc);
+        if (filter.Source is { } source)
+            query = query.Where(a => a.Source == source);
+        if (filter.Search is { } search)
+        {
+            // Giữ nguyên %, _ người dùng gõ. LIKE của SQLite chỉ không phân biệt hoa thường với ký tự ASCII.
+            var pattern = $"%{search.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_")}%";
+            query = query.Where(a => EF.Functions.Like(a.Title, pattern, @"\") ||
+                                     EF.Functions.Like(a.Summary, pattern, @"\"));
+        }
+        if (filter.FromUtc is { } from)
+            query = query.Where(a => a.PublishedAtUtc >= from);
+        if (filter.ToUtc is { } to)
+            query = query.Where(a => a.PublishedAtUtc < to);
         return await query.OrderByDescending(a => a.PublishedAtUtc).ThenByDescending(a => a.Id)
             .Take(limit).ToListAsync(ct);
     }

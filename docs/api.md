@@ -27,7 +27,7 @@ OpenAPI (môi trường Development): `GET /openapi/v1.json`.
 | GET | `/api/status` | — | `decisionMode`, `environment`, `liveLocked`, `serverTimeUtc`, `feeds[]` (trạng thái đồng bộ từng cặp của chiến lược), `strategies[]` |
 | GET | `/api/strategies` | — | Danh sách strategy instance (kèm `version`, `parameters`, checkpoint) |
 | GET | `/api/strategies/{id}/chart` | `limit` (300, 1–1000) | `strategy`, `candles[]` (OHLCV, `fastEma`, `slowEma`, `pressure`), `signals[]` |
-| GET | `/api/signals` | `strategyId?`, `limit` (100, 1–1000) | Tín hiệu BUY/SELL, cũ → mới, có `isBackfill` |
+| GET | `/api/signals` | `strategyId?`, `action?` (`Buy`/`Sell`), `isBackfill?`, `fromUtc?`, `toUtc?` (ISO 8601, giờ mở nến trong [from, to]), `limit` (100, 1–1000) | Tín hiệu BUY/SELL, mới → cũ, có `isBackfill`. Giá trị `action` sai trả 400 |
 | GET | `/api/market/candles` | `symbol`, `interval`, `limit` (300, 1–1000) | Nến Binance (gồm nến đang chạy) |
 | GET | `/health/live` | — | `{ "status": "live" }` |
 | GET | `/health/ready` | — | `{ "status": "ready" }` hoặc 503 |
@@ -45,7 +45,7 @@ Tiền tố `/api/paper/futures`.
 | POST | `/quote` | `OpenRequest` | Báo giá: `accepted`, `errors[]`, giá khớp, khối lượng, notional, margin, phí mở, giá thanh lý, lỗ tại SL, lãi tại TP |
 | POST | `/orders` | `OpenRequest` (bắt buộc `commandId`) | 200 `{ accepted, duplicate, errors, position }` hoặc 422 với `errors` |
 | POST | `/positions/{id}/close` | `{ "commandId": "guid" }` | 200 vị thế đã đóng, hoặc 422 `{ error }` |
-| GET | `/positions/history` | `limit` (50, 1–500) | Vị thế đã đóng/thanh lý, kèm `netPnl` |
+| GET | `/positions/history` | `symbol?`, `side?` (`Long`/`Short`), `closeReason?` (`Manual`/`StopLoss`/`TakeProfit`/`Liquidation`/`Signal`), `fromUtc?`, `toUtc?` (ISO 8601, giờ đóng trong [from, to)), `limit` (50, 1–500) | Vị thế đã đóng/thanh lý, mới → cũ, kèm `netPnl`. Giá trị enum sai trả 400. Chưa lọc được theo lời/lỗ vì `decimal` lưu TEXT và `netPnl` không lưu trong DB |
 
 `OpenRequest`:
 
@@ -129,7 +129,7 @@ Mỗi báo cáo: `symbol`, `interval`, `createdAtUtc`, `report` gồm `fromUtc`,
 
 | Method | Đường dẫn | Tham số | Trả về |
 | --- | --- | --- | --- |
-| GET | `/api/news` | `coin?` (`BTC`/`ETH`/`ETC`), `fromUtc?`, `toUtc?` (ISO 8601, lọc giờ đăng trong [from, to)), `limit` (50, 1–200) | `coins[]`, `sources[]`, `pollIntervalHours`, `articles[]` mới → cũ: `id`, `source`, `title`, `url`, `summary`, `coins[]`, `publishedAtUtc` |
+| GET | `/api/news` | `coin?` (`BTC`/`ETH`/`ETC`), `source?` (tên nguồn), `search?` (tìm trong tiêu đề và tóm tắt, không phân biệt hoa thường với chữ không dấu), `fromUtc?`, `toUtc?` (ISO 8601, lọc giờ đăng trong [from, to)), `limit` (50, 1–200) | `coins[]`, `sources[]`, `pollIntervalHours`, `articles[]` mới → cũ: `id`, `source`, `title`, `url`, `summary`, `coins[]`, `publishedAtUtc` |
 | POST | `/api/news/sync` | — | Đồng bộ ngay: `added`, `errors[]` (lỗi theo nguồn) |
 
 ## Thêm endpoint mới

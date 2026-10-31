@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Button, Card, Popconfirm, Table, Tabs, Tag, Typography, message } from 'antd';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ApiError, futuresApi, type FuturesAccount, type FuturesPosition } from '../../api/client';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiError, api, futuresApi, type FuturesAccount, type FuturesPosition } from '../../api/client';
+import { columnFilter, optionsFrom, picked, serverFilter } from '../../components/tableFilters';
 import { formatVn } from '../../time';
 import { fmtPrice, fmtSigned, fmtUsdt, pnlColor } from './format';
 
@@ -18,13 +20,22 @@ const reasonLabel: Record<string, { text: string; color: string }> = {
   Signal: { text: 'Chỉ báo đảo chiều', color: 'purple' },
 };
 
+const SIDES = [
+  { text: 'Long', value: 'Long' },
+  { text: 'Short', value: 'Short' },
+];
+
 export function PositionsCard({ account }: { account: FuturesAccount | undefined }) {
   const queryClient = useQueryClient();
+  const [filter, setFilter] = useState<{ symbol?: string; side?: string; closeReason?: string }>({});
   const history = useQuery({
-    queryKey: ['futures-history'],
-    queryFn: () => futuresApi.history(50),
+    queryKey: ['futures-history', filter],
+    queryFn: () => futuresApi.history(filter),
+    placeholderData: keepPreviousData,
     refetchInterval: 5_000,
   });
+  // Lấy symbol từ chiến lược: nếu lấy từ lịch sử thì lọc xong danh sách chỉ còn đúng symbol đang chọn.
+  const status = useQuery({ queryKey: ['status'], queryFn: api.status });
 
   const close = useMutation({
     mutationFn: (id: number) => futuresApi.close(id, crypto.randomUUID()),
@@ -37,6 +48,7 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
   });
 
   const open = account?.openPositions ?? [];
+  const closed = history.data ?? [];
 
   return (
     <Card size="small">
@@ -113,16 +125,29 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
                 rowKey="id"
                 size="small"
                 loading={history.isPending}
-                dataSource={history.data ?? []}
+                dataSource={closed}
                 pagination={{ pageSize: 10, hideOnSinglePage: true }}
                 scroll={{ x: true }}
+                onChange={(_, f) =>
+                  setFilter({ symbol: picked(f.symbol), side: picked(f.side), closeReason: picked(f.closeReason) })
+                }
                 columns={[
                   { title: 'Đóng lúc', dataIndex: 'closedAtUtc', render: formatVn },
-                  { title: 'Symbol', dataIndex: 'symbol' },
-                  { title: 'Hướng', key: 'side', render: (_, p) => sideTag(p) },
+                  {
+                    title: 'Symbol',
+                    dataIndex: 'symbol',
+                    ...serverFilter(optionsFrom(status.data?.strategies ?? [], (s) => s.symbol)),
+                  },
+                  {
+                    title: 'Hướng',
+                    key: 'side',
+                    ...serverFilter(SIDES),
+                    render: (_, p) => sideTag(p),
+                  },
                   {
                     title: 'Lý do',
                     dataIndex: 'closeReason',
+                    ...serverFilter(Object.entries(reasonLabel).map(([value, { text }]) => ({ text, value }))),
                     render: (r: string) => <Tag color={reasonLabel[r]?.color}>{reasonLabel[r]?.text ?? r}</Tag>,
                   },
                   { title: 'Giá vào', dataIndex: 'entryPrice', align: 'right', render: fmtPrice },
@@ -142,6 +167,10 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
                   {
                     title: 'PnL ròng',
                     dataIndex: 'netPnl',
+                    ...columnFilter<FuturesPosition>((p) => ((p.netPnl ?? 0) >= 0 ? 'Win' : 'Loss'), [
+                      { text: 'Lời', value: 'Win' },
+                      { text: 'Lỗ', value: 'Loss' },
+                    ]),
                     align: 'right',
                     render: (v: number) => (
                       <Typography.Text strong style={{ color: pnlColor(v) }}>

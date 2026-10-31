@@ -1,4 +1,6 @@
 using CryptoBot.Application.Abstractions;
+using CryptoBot.Application.Futures;
+using CryptoBot.Application.News;
 using CryptoBot.Domain.Futures;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.News;
@@ -243,14 +245,108 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
         {
             var store = new NewsStore(db);
             Assert.Equal(["a"], await store.GetExistingIdsAsync("CoinDesk", ["a", "z"], default));
-            Assert.Equal(["b", "a"], (await store.QueryAsync("ETH", null, null, 10, default)).Select(a => a.ExternalId));
-            Assert.Equal(["Decrypt"], (await store.QueryAsync("ETC", null, null, 10, default)).Select(a => a.Source));
-            Assert.Equal(["b", "a"],
-                (await store.QueryAsync(null, T0.AddHours(1), T0.AddHours(3), 10, default)).Select(a => a.ExternalId));
-            Assert.Equal(["c"], (await store.QueryAsync(null, null, null, 1, default)).Select(a => a.ExternalId));
+            Assert.Equal(["b", "a"], (await store.QueryAsync(new NewsFilter("ETH"), 10, default)).Select(a => a.ExternalId));
+            Assert.Equal(["Decrypt"], (await store.QueryAsync(new NewsFilter("ETC"), 10, default)).Select(a => a.Source));
+            Assert.Equal(["b", "a"], (await store.QueryAsync(
+                new NewsFilter(FromUtc: T0.AddHours(1), ToUtc: T0.AddHours(3)), 10, default)).Select(a => a.ExternalId));
+            Assert.Equal(["c"], (await store.QueryAsync(new NewsFilter(), 1, default)).Select(a => a.ExternalId));
 
             db.NewsArticles.Add(Article("CoinDesk", "a", [], 5));
             await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        }
+    }
+
+    [Fact]
+    public async Task News_is_filtered_by_source_and_keyword()
+    {
+        NewsArticle Article(string source, string id, string title, string summary = "") =>
+            new(source, id, title, $"https://news.test/{id}", summary, [], T0, T0);
+
+        await using (var db = NewContext())
+        {
+            db.NewsArticles.AddRange(
+                Article("CoinDesk", "a", "Binance hack shakes market"),
+                Article("Decrypt", "b", "Market recap", "A hack at BINANCE"),
+                Article("Decrypt", "c", "Fees fall 100% this week"),
+                Article("Decrypt", "d", "Fees fall 100 percent"));
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = NewContext())
+        {
+            var store = new NewsStore(db);
+            async Task<IEnumerable<string>> Ids(NewsFilter filter) =>
+                (await store.QueryAsync(filter, 10, default)).Select(a => a.ExternalId).Order();
+
+            Assert.Equal(["b", "c", "d"], await Ids(new NewsFilter(Source: "Decrypt")));
+            Assert.Equal(["a", "b"], await Ids(new NewsFilter(Search: "binance")));
+            Assert.Equal(["b"], await Ids(new NewsFilter(Source: "Decrypt", Search: "binance")));
+            Assert.Equal(["c"], await Ids(new NewsFilter(Search: "100%")));
+        }
+    }
+
+    [Fact]
+    public async Task Signals_are_filtered_by_action_and_backfill()
+    {
+        var instanceId = 0;
+        TradingSignal Make(int hour, SignalAction action, bool backfill) =>
+            new(instanceId, 1, "BTCUSDT", "1h", T0.AddHours(hour), action, "test", 100m, 101m, 100m, T0, backfill);
+
+        await using (var db = NewContext())
+        {
+            var instance = new StrategyInstance("s", "EmaCross", "{}", "Binance", "BTCUSDT", "1h", true);
+            db.StrategyInstances.Add(instance);
+            await db.SaveChangesAsync();
+            instanceId = instance.Id;
+            db.Signals.AddRange(Make(1, SignalAction.Buy, true), Make(2, SignalAction.Sell, true),
+                Make(3, SignalAction.Buy, false));
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = NewContext())
+        {
+            var store = new SignalStore(db);
+            async Task<IEnumerable<int>> Hours(SignalFilter filter) =>
+                (await store.QueryAsync(filter, 10, default)).Select(s => s.CandleOpenTimeUtc.Hour);
+
+            Assert.Equal([1, 3], await Hours(new SignalFilter(Action: SignalAction.Buy)));
+            Assert.Equal([3], await Hours(new SignalFilter(IsBackfill: false)));
+            Assert.Equal([1], await Hours(new SignalFilter(Action: SignalAction.Buy, IsBackfill: true)));
+            Assert.Equal([2, 3], await Hours(new SignalFilter(FromUtc: T0.AddHours(2))));
+        }
+    }
+
+    [Fact]
+    public async Task Closed_positions_are_filtered_by_symbol_side_reason_and_time()
+    {
+        FuturesPosition Closed(string symbol, PositionSide side, CloseReason reason, int hour)
+        {
+            var p = new FuturesPosition(Guid.NewGuid(), symbol, side, 10, 1m, 100m, 10m, 90m, 95m, null, 0.1m, T0);
+            p.Close(reason, 101m, 0.1m, Guid.NewGuid(), T0.AddHours(hour));
+            return p;
+        }
+
+        await using (var db = NewContext())
+        {
+            db.FuturesPositions.AddRange(
+                Closed("BTCUSDT", PositionSide.Long, CloseReason.Manual, 1),
+                Closed("BTCUSDT", PositionSide.Short, CloseReason.StopLoss, 2),
+                Closed("ETHUSDT", PositionSide.Long, CloseReason.StopLoss, 3),
+                new FuturesPosition(Guid.NewGuid(), "BTCUSDT", PositionSide.Long, 10, 1m, 100m, 10m, 90m, 95m, null, 0.1m, T0));
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = NewContext())
+        {
+            var store = new PaperFuturesStore(db);
+            async Task<IEnumerable<int>> Hours(ClosedPositionFilter filter) =>
+                (await store.GetClosedAsync(filter, 10, default)).Select(p => p.ClosedAtUtc!.Value.Hour);
+
+            Assert.Equal([3, 2, 1], await Hours(new ClosedPositionFilter()));
+            Assert.Equal([2, 1], await Hours(new ClosedPositionFilter("BTCUSDT")));
+            Assert.Equal([3, 1], await Hours(new ClosedPositionFilter(Side: PositionSide.Long)));
+            Assert.Equal([3, 2], await Hours(new ClosedPositionFilter(CloseReason: CloseReason.StopLoss)));
+            Assert.Equal([2], await Hours(new ClosedPositionFilter(FromUtc: T0.AddHours(2), ToUtc: T0.AddHours(3))));
         }
     }
 
