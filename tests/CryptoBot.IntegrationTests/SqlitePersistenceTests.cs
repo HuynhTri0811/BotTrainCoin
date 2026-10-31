@@ -284,6 +284,37 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task Signals_are_filtered_by_action_and_backfill()
+    {
+        var instanceId = 0;
+        TradingSignal Make(int hour, SignalAction action, bool backfill) =>
+            new(instanceId, 1, "BTCUSDT", "1h", T0.AddHours(hour), action, "test", 100m, 101m, 100m, T0, backfill);
+
+        await using (var db = NewContext())
+        {
+            var instance = new StrategyInstance("s", "EmaCross", "{}", "Binance", "BTCUSDT", "1h", true);
+            db.StrategyInstances.Add(instance);
+            await db.SaveChangesAsync();
+            instanceId = instance.Id;
+            db.Signals.AddRange(Make(1, SignalAction.Buy, true), Make(2, SignalAction.Sell, true),
+                Make(3, SignalAction.Buy, false));
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = NewContext())
+        {
+            var store = new SignalStore(db);
+            async Task<IEnumerable<int>> Hours(SignalFilter filter) =>
+                (await store.QueryAsync(filter, 10, default)).Select(s => s.CandleOpenTimeUtc.Hour);
+
+            Assert.Equal([1, 3], await Hours(new SignalFilter(Action: SignalAction.Buy)));
+            Assert.Equal([3], await Hours(new SignalFilter(IsBackfill: false)));
+            Assert.Equal([1], await Hours(new SignalFilter(Action: SignalAction.Buy, IsBackfill: true)));
+            Assert.Equal([2, 3], await Hours(new SignalFilter(FromUtc: T0.AddHours(2))));
+        }
+    }
+
     private static TradingSignal Signal(int instanceId) =>
         new(instanceId, 1, "BTCUSDT", "1h", T0, SignalAction.Buy, "test", 100.5m, 101m, 100m, T0, isBackfill: true);
 }

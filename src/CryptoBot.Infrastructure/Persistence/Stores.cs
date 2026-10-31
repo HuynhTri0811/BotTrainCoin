@@ -144,17 +144,20 @@ public sealed class SignalStore(BotDbContext db) : ISignalStore
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<IReadOnlyList<TradingSignal>> QueryAsync(int? strategyInstanceId, int? configVersion,
-        DateTime? fromUtc, DateTime? toUtc, int limit, CancellationToken ct)
+    public async Task<IReadOnlyList<TradingSignal>> QueryAsync(SignalFilter filter, int limit, CancellationToken ct)
     {
         var q = db.Signals.AsNoTracking();
-        if (strategyInstanceId is { } id)
+        if (filter.StrategyInstanceId is { } id)
             q = q.Where(s => s.StrategyInstanceId == id);
-        if (configVersion is { } v)
+        if (filter.ConfigVersion is { } v)
             q = q.Where(s => s.ConfigVersion == v);
-        if (fromUtc is { } from)
+        if (filter.Action is { } action)
+            q = q.Where(s => s.Action == action);
+        if (filter.IsBackfill is { } backfill)
+            q = q.Where(s => s.IsBackfill == backfill);
+        if (filter.FromUtc is { } from)
             q = q.Where(s => s.CandleOpenTimeUtc >= from);
-        if (toUtc is { } to)
+        if (filter.ToUtc is { } to)
             q = q.Where(s => s.CandleOpenTimeUtc <= to);
 
         var list = await q.OrderByDescending(s => s.CandleOpenTimeUtc).ThenByDescending(s => s.Id)

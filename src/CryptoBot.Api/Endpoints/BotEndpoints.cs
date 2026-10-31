@@ -52,9 +52,17 @@ public static class BotEndpoints
                 data.Signals.Select(ToDto).ToList()));
         });
 
-        api.MapGet("/signals", async (int? strategyId, int? limit, ISignalStore signals, CancellationToken ct) =>
-            (await signals.QueryAsync(strategyId, null, null, null, Math.Clamp(limit ?? 100, 1, 1000), ct))
-            .Select(ToDto).Reverse());
+        // Mới → cũ; lọc theo hành động, tín hiệu backfill và khoảng giờ mở nến [fromUtc, toUtc].
+        api.MapGet("/signals", async (int? strategyId, string? action, bool? isBackfill, DateTimeOffset? fromUtc,
+            DateTimeOffset? toUtc, int? limit, ISignalStore signals, CancellationToken ct) =>
+        {
+            if (!QueryEnum.TryParse<SignalAction>(action, out var picked))
+                return Results.BadRequest(new { error = QueryEnum.Error<SignalAction>(action!) });
+
+            var filter = new SignalFilter(strategyId, null, picked, isBackfill, fromUtc?.UtcDateTime, toUtc?.UtcDateTime);
+            var found = await signals.QueryAsync(filter, Math.Clamp(limit ?? 100, 1, 1000), ct);
+            return Results.Ok(found.Select(ToDto).Reverse());
+        });
 
         api.MapGet("/market/candles", async (string symbol, string interval, int? limit, ICandleStore candles,
             MarketDataOptions options, CancellationToken ct) =>

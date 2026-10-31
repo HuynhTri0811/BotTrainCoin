@@ -110,8 +110,7 @@ internal sealed class InMemorySignalStore : ISignalStore
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<TradingSignal>> QueryAsync(int? strategyInstanceId, int? configVersion,
-        DateTime? fromUtc, DateTime? toUtc, int limit, CancellationToken ct) =>
+    public Task<IReadOnlyList<TradingSignal>> QueryAsync(SignalFilter filter, int limit, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<TradingSignal>>(Signals.ToList());
 }
 
