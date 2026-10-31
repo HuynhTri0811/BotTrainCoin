@@ -34,7 +34,7 @@ public sealed class TemplateIndicator : ICustomIndicator
         // TODO: công thức của bạn. closedCandles[^1] là nến vừa đóng; mỗi nến có Open/High/Low/Close/Volume.
         Candle current = closedCandles[^1];
         List<Candle> previous = closedCandles.Skip(closedCandles.Count - 1 - Period).Take(Period).ToList();
-        decimal highest = previous.Max(c => c.High);
+        decimal highest = previous.Max(candle => candle.High);
 
         Dictionary<string, decimal?> values = new Dictionary<string, decimal?> { ["high"] = highest };
         if (current.Close > highest)
