@@ -632,9 +632,13 @@ export interface NewsList {
 }
 
 export const newsApi = {
-  list: (opts: { coin?: string; fromUtc?: string; toUtc?: string; limit?: number } = {}) => {
+  list: (
+    opts: { coin?: string; source?: string; search?: string; fromUtc?: string; toUtc?: string; limit?: number } = {},
+  ) => {
     const q = new URLSearchParams();
     if (opts.coin) q.set('coin', opts.coin);
+    if (opts.source) q.set('source', opts.source);
+    if (opts.search) q.set('search', opts.search);
     if (opts.fromUtc) q.set('fromUtc', opts.fromUtc);
     if (opts.toUtc) q.set('toUtc', opts.toUtc);
     q.set('limit', String(opts.limit ?? 50));
