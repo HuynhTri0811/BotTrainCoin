@@ -11,11 +11,13 @@ public static class Crossover
 {
     /// <summary>Đường A cắt lên đường B: trước đó A ≤ B, bây giờ A &gt; B.</summary>
     /// <example>EMA9 nến trước 100 ≤ EMA21 101, nến này EMA9 103 &gt; EMA21 102 → true.</example>
-    public static bool Up(decimal aPrev, decimal bPrev, decimal a, decimal b) => aPrev <= bPrev && a > b;
+    public static bool Up(decimal firstPrevious, decimal secondPrevious, decimal first,
+        decimal second) => firstPrevious <= secondPrevious && first > second;
 
     /// <summary>Đường A cắt xuống đường B: trước đó A ≥ B, bây giờ A &lt; B.</summary>
     /// <example>EMA9 nến trước 103 ≥ EMA21 102, nến này EMA9 100 &lt; EMA21 101 → true.</example>
-    public static bool Down(decimal aPrev, decimal bPrev, decimal a, decimal b) => aPrev >= bPrev && a < b;
+    public static bool Down(decimal firstPrevious, decimal secondPrevious, decimal first,
+        decimal second) => firstPrevious >= secondPrevious && first < second;
 
     /// <summary>Giá trị cắt lên qua một mức cố định (ví dụ RSI vượt lên 30).</summary>
     /// <remarks>Mức cố định coi như một đường nằm ngang, nên dùng lại <see cref="Up"/> với B = mức.</remarks>

@@ -96,8 +96,8 @@ public sealed class EmaCrossStrategy : IStrategy
         if (closes.Length < _p.LookbackCandles)
             return null;
         // closes[^N..] = N phần tử cuối của mảng (cú pháp "từ cuối đếm ngược" của C#).
-        IndicatorValues v = ComputeLast(closes[^_p.LookbackCandles..]);
-        return (v.Fast, v.Slow);
+        IndicatorValues values = ComputeLast(closes[^_p.LookbackCandles..]);
+        return (values.Fast, values.Slow);
     }
 
     // ── Các bước nhỏ ───────────────────────────────────────────────────────────
@@ -110,8 +110,8 @@ public sealed class EmaCrossStrategy : IStrategy
 
         // Nến đang chạy thì giá đóng cửa còn thay đổi; dùng nó để quyết định là "nhìn trước tương lai".
         // Đây là lỗi lập trình ở nơi gọi, nên ném lỗi thay vì lặng lẽ bỏ qua.
-        for (int i = 0; i < candles.Count; i++)
-            if (!candles[i].IsClosed)
+        for (int index = 0; index < candles.Count; index++)
+            if (!candles[index].IsClosed)
                 throw new ArgumentException("Chiến lược chỉ nhận nến đã đóng.", nameof(candles));
 
         // Chưa đủ 300 nến thì EMA chưa ổn định theo quy tắc cửa sổ cố định → chưa quyết định.
@@ -128,8 +128,8 @@ public sealed class EmaCrossStrategy : IStrategy
         decimal[] closes = new decimal[_p.LookbackCandles];
         // Nếu được đưa nhiều hơn 300 nến thì bỏ phần đầu, chỉ lấy 300 nến mới nhất.
         int offset = candles.Count - _p.LookbackCandles;
-        for (int i = 0; i < closes.Length; i++)
-            closes[i] = candles[offset + i].Close;
+        for (int index = 0; index < closes.Length; index++)
+            closes[index] = candles[offset + index].Close;
         return closes;
     }
 
@@ -143,29 +143,29 @@ public sealed class EmaCrossStrategy : IStrategy
     }
 
     /// <summary>Xem hai đường EMA vừa cắt lên, cắt xuống hay không cắt.</summary>
-    private StrategyDecision Decide(IndicatorValues v, StrategyContext context)
+    private StrategyDecision Decide(IndicatorValues values, StrategyContext context)
     {
         // Cắt lên: nến trước EMA nhanh ≤ EMA chậm, nến này EMA nhanh > EMA chậm.
-        if (Crossover.Up(v.FastPrev, v.SlowPrev, v.Fast, v.Slow))
-            return OnCrossUp(v, context);
+        if (Crossover.Up(values.FastPrev, values.SlowPrev, values.Fast, values.Slow))
+            return OnCrossUp(values, context);
         // Cắt xuống: nến trước EMA nhanh ≥ EMA chậm, nến này EMA nhanh < EMA chậm.
-        if (Crossover.Down(v.FastPrev, v.SlowPrev, v.Fast, v.Slow))
-            return OnCrossDown(v, context);
+        if (Crossover.Down(values.FastPrev, values.SlowPrev, values.Fast, values.Slow))
+            return OnCrossDown(values, context);
         // Hai đường vẫn giữ vị trí như nến trước → không có gì mới, giữ nguyên.
-        return StrategyDecision.Hold("Không có giao cắt.", v);
+        return StrategyDecision.Hold("Không có giao cắt.", values);
     }
 
     /// <summary>Giao cắt lên → BUY, trừ khi đã có vị thế hoặc lệnh vào đang chờ.</summary>
     /// <remarks>Không mua chồng: đã giữ hoặc đang chờ khớp lệnh mua thì bỏ qua tín hiệu mua mới.</remarks>
-    private StrategyDecision OnCrossUp(IndicatorValues v, StrategyContext context) =>
+    private StrategyDecision OnCrossUp(IndicatorValues values, StrategyContext context) =>
         context.HasPosition || context.HasPendingEntry
-            ? StrategyDecision.Hold("Giao cắt lên nhưng đã có vị thế/pending entry.", v)
-            : new StrategyDecision(SignalAction.Buy, $"EMA{_p.FastPeriod} cắt lên EMA{_p.SlowPeriod}.", v);
+            ? StrategyDecision.Hold("Giao cắt lên nhưng đã có vị thế/pending entry.", values)
+            : new StrategyDecision(SignalAction.Buy, $"EMA{_p.FastPeriod} cắt lên EMA{_p.SlowPeriod}.", values);
 
     /// <summary>Giao cắt xuống → SELL, chỉ khi đang giữ vị thế (long-only).</summary>
     /// <remarks>Long-only nghĩa là không bán khống: chưa mua thì không có gì để bán, nên chỉ Hold.</remarks>
-    private StrategyDecision OnCrossDown(IndicatorValues v, StrategyContext context) =>
+    private StrategyDecision OnCrossDown(IndicatorValues values, StrategyContext context) =>
         context.HasPosition
-            ? new StrategyDecision(SignalAction.Sell, $"EMA{_p.FastPeriod} cắt xuống EMA{_p.SlowPeriod}.", v)
-            : StrategyDecision.Hold("Giao cắt xuống nhưng không có vị thế để bán.", v);
+            ? new StrategyDecision(SignalAction.Sell, $"EMA{_p.FastPeriod} cắt xuống EMA{_p.SlowPeriod}.", values)
+            : StrategyDecision.Hold("Giao cắt xuống nhưng không có vị thế để bán.", values);
 }
