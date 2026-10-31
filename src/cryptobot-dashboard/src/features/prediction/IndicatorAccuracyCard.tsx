@@ -1,6 +1,7 @@
 import { Card, Empty, Space, Table, Tag, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { predictionApi, type HorizonAccuracy, type IndicatorAccuracy, type IndicatorSignalOutcome } from '../../api/client';
+import { columnFilter } from '../../components/tableFilters';
 import { fmtPrice2 as fmtPrice } from '../futures/format';
 import { formatVnUnix } from '../../time';
 
@@ -88,6 +89,10 @@ function IndicatorBlock({ a, interval }: { a: IndicatorAccuracy; interval: strin
             {
               title: 'Hướng',
               dataIndex: 'direction',
+              ...columnFilter<IndicatorSignalOutcome>((o) => o.direction, [
+                { text: '▲ Long', value: 'Up' },
+                { text: '▼ Short', value: 'Down' },
+              ]),
               render: (d: string) => (d === 'Up' ? <Tag color="green">▲ Long</Tag> : <Tag color="red">▼ Short</Tag>),
             },
             { title: 'Giá đóng', dataIndex: 'close', align: 'right', render: fmtPrice },
