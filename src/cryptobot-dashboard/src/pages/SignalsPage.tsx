@@ -9,6 +9,18 @@ import { excelVnDate, formatVn } from '../time';
 
 const priceFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 8 });
 
+/** Cột file Excel; tên cột EMA theo tham số của chiến lược (`EMA9`, `EMA21`). */
+const excelColumns = (fastLabel: string, slowLabel: string): ExcelColumn<Signal>[] => [
+  { header: 'Hành động', value: (signal) => signal.action.toUpperCase() },
+  { header: 'Nến (mở)', value: (signal) => excelVnDate(signal.candleOpenTimeUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
+  { header: 'Close', value: (signal) => signal.candleClose, format: EXCEL_FORMAT.price, width: 12 },
+  { header: fastLabel, value: (signal) => signal.fastEma, format: EXCEL_FORMAT.price, width: 12 },
+  { header: slowLabel, value: (signal) => signal.slowEma, format: EXCEL_FORMAT.price, width: 12 },
+  { header: 'Lý do', value: (signal) => signal.reason, width: 60 },
+  { header: 'Loại', value: (signal) => (signal.isBackfill ? 'Backfill' : 'Mới') },
+  { header: 'Tạo lúc', value: (signal) => excelVnDate(signal.createdAtUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
+];
+
 /** Tín hiệu Buy/Sell gần đây của chiến lược EMA đang chọn. */
 export function SignalsPage({ strategy }: { strategy: Strategy }) {
   const [filter, setFilter] = useState<{ action?: string; isBackfill?: string }>({});
@@ -24,19 +36,10 @@ export function SignalsPage({ strategy }: { strategy: Strategy }) {
 
   // Tải lại với giới hạn lớn nhất của API (bảng chỉ tải 50 tín hiệu gần nhất), cùng bộ lọc đang chọn.
   const exportSignals = async () => {
-    const columns: ExcelColumn<Signal>[] = [
-      { header: 'Hành động', value: (signal) => signal.action.toUpperCase() },
-      { header: 'Nến (mở)', value: (signal) => excelVnDate(signal.candleOpenTimeUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
-      { header: 'Close', value: (signal) => signal.candleClose, format: EXCEL_FORMAT.price, width: 12 },
-      { header: fastLabel, value: (signal) => signal.fastEma, format: EXCEL_FORMAT.price, width: 12 },
-      { header: slowLabel, value: (signal) => signal.slowEma, format: EXCEL_FORMAT.price, width: 12 },
-      { header: 'Lý do', value: (signal) => signal.reason, width: 60 },
-      { header: 'Loại', value: (signal) => (signal.isBackfill ? 'Backfill' : 'Mới') },
-      { header: 'Tạo lúc', value: (signal) => excelVnDate(signal.createdAtUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
-    ];
     const rows = await api.signals(strategy.id, filter, API_MAX_LIMIT.signals);
     return {
-      count: await downloadExcel(`tin-hieu-${strategy.symbol}-${strategy.interval}`, 'Tín hiệu', rows, columns),
+      count: await downloadExcel(`tin-hieu-${strategy.symbol}-${strategy.interval}`, 'Tín hiệu', rows,
+        excelColumns(fastLabel, slowLabel)),
       truncatedAt: truncatedAt(rows.length, API_MAX_LIMIT.signals),
     };
   };
