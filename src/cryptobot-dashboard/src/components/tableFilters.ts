@@ -1,4 +1,4 @@
-import type { FilterValue } from 'antd/es/table/interface';
+import type { ColumnsType, FilterValue } from 'antd/es/table/interface';
 
 export interface FilterOption {
   text: string;
@@ -26,4 +26,19 @@ export const picked = (selected: FilterValue | null | undefined) => selected?.[0
 /** Lựa chọn lấy từ chính dữ liệu, dùng cho cột không có danh sách cố định như symbol. */
 export function optionsFrom<T>(rows: T[], value: (row: T) => string): FilterOption[] {
   return [...new Set(rows.map(value))].sort().map((value) => ({ text: value, value: value }));
+}
+
+export type TableFilters = Record<string, FilterValue | null>;
+
+/**
+ * Các dòng còn lại sau bộ lọc `columnFilter` đang chọn, đúng như Table hiển thị (lấy `filters` từ `onChange` của
+ * Table). Cột lọc phía API (`serverFilter`) không có `onFilter` nên bỏ qua. Cột có bộ lọc cần `key` hoặc `dataIndex`.
+ */
+export function applyColumnFilters<T>(rows: T[], columns: ColumnsType<T>, filters: TableFilters): T[] {
+  const active = columns.flatMap((column) => {
+    const key = column.key ?? ('dataIndex' in column ? column.dataIndex : undefined);
+    const selected = key == null ? null : filters[String(key)];
+    return column.onFilter && selected?.length ? [{ onFilter: column.onFilter, selected }] : [];
+  });
+  return rows.filter((row) => active.every(({ onFilter, selected }) => selected.some((value) => onFilter(value, row))));
 }
