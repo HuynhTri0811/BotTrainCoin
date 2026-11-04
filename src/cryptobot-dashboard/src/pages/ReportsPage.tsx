@@ -2,11 +2,36 @@ import { useState } from 'react';
 import { Alert, Button, Card, Empty, Segmented, Space, Spin, Table, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { reportApi, type SavedDailyReport } from '../api/client';
+import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../components/excel';
+import { ExportExcelButton } from '../components/ExportExcelButton';
 import { columnFilter } from '../components/tableFilters';
 import { DailyReportCard, fmtPct2, pctColor } from '../features/reports/DailyReportCard';
-import { formatVn } from '../time';
+import { excelVnDate, formatVn } from '../time';
 
 const colored = (value: number) => <span style={{ color: pctColor(value) }}>{fmtPct2(value)}</span>;
+
+/** API trả tối đa 100 báo cáo mỗi lần (ReportEndpoints). */
+const EXPORT_LIMIT = 100;
+
+const EXCEL_COLUMNS: ExcelColumn<SavedDailyReport>[] = [
+  { header: 'Từ', value: (saved) => excelVnDate(saved.report.fromUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
+  { header: 'Đến', value: (saved) => excelVnDate(saved.report.toUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
+  { header: 'Giá mở', value: (saved) => saved.report.open, format: EXCEL_FORMAT.price, width: 12 },
+  { header: 'Giá đóng', value: (saved) => saved.report.close, format: EXCEL_FORMAT.price, width: 12 },
+  { header: 'Thay đổi', value: (saved) => saved.report.changePercent, format: EXCEL_FORMAT.signedPercent },
+  { header: 'Cao nhất', value: (saved) => saved.report.high, format: EXCEL_FORMAT.price, width: 12 },
+  { header: 'Cao nhất lúc', value: (saved) => excelVnDate(saved.report.highTimeUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
+  { header: 'Thấp nhất', value: (saved) => saved.report.low, format: EXCEL_FORMAT.price, width: 12 },
+  { header: 'Thấp nhất lúc', value: (saved) => excelVnDate(saved.report.lowTimeUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
+  { header: 'Biên độ', value: (saved) => saved.report.rangePercent, format: EXCEL_FORMAT.percent },
+  { header: 'Giảm sâu nhất', value: (saved) => saved.report.maxDrawdownPercent, format: EXCEL_FORMAT.signedPercent, width: 13 },
+  { header: 'Hồi mạnh nhất', value: (saved) => saved.report.maxRallyPercent, format: EXCEL_FORMAT.signedPercent, width: 13 },
+  { header: 'Khối lượng (coin)', value: (saved) => saved.report.volume, format: EXCEL_FORMAT.amount, width: 14 },
+  { header: 'Mua chủ động', value: (saved) => saved.report.buyPercent, format: EXCEL_FORMAT.percent, width: 13 },
+  { header: 'Giờ khối lượng bất thường', value: (saved) => saved.report.volumeSpikes.length, width: 24 },
+  { header: 'Số nến', value: (saved) => saved.report.candleCount },
+  { header: 'Lập lúc', value: (saved) => excelVnDate(saved.createdAtUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
+];
 
 /** Báo cáo biến động lập mỗi ngày (DailyReportWorker): báo cáo mới nhất đầy đủ, các ngày trước dạng bảng. */
 export function ReportsPage() {
@@ -31,6 +56,12 @@ export function ReportsPage() {
   const data = query.data;
   const [latest, ...older] = data?.reports ?? [];
 
+  // Mọi báo cáo đã lưu của symbol đang chọn (kể cả báo cáo mới nhất), mỗi ngày một dòng.
+  const exportReports = async () => {
+    const list = await reportApi.daily(symbol, EXPORT_LIMIT);
+    return downloadExcel(`bao-cao-ngay-${symbol}`, 'Báo cáo ngày', list.reports, EXCEL_COLUMNS);
+  };
+
   return (
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
@@ -48,6 +79,7 @@ export function ReportsPage() {
           <Button loading={run.isPending} onClick={() => run.mutate()}>
             Tạo ngay
           </Button>
+          <ExportExcelButton size="middle" onExport={exportReports} disabled={!latest} />
         </Space>
       </Space>
 
