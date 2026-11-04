@@ -3,6 +3,12 @@
 Những gì đã làm, theo PR đã merge vào `develop`, mới nhất ở trên. Số trong ngoặc là issue.
 Chi tiết từng tính năng: [features.md](features.md).
 
+## 2026-11-04
+
+- **#89 Xuất Excel cho các bảng trên dashboard**. Nút "Xuất Excel" (.xlsx) ở Lịch sử vị thế, Tín hiệu, Báo cáo ngày
+  và Dự đoán; file giữ bộ lọc đang chọn, số là số, giờ theo giờ Việt Nam. Thêm `write-excel-file` (tải khi bấm nút),
+  `components/excel.ts`, `ExportExcelButton`, `applyColumnFilters`. Không đổi backend.
+
 ## 2026-10-29
 
 - **#59 Thêm unit test cho entity Domain và các service Application**. Không đổi code chạy.
