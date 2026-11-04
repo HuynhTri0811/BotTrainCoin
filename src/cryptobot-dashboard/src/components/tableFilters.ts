@@ -1,4 +1,4 @@
-import type { Key } from 'react';
+import { type Key, useState } from 'react';
 import type { ColumnsType, FilterValue } from 'antd/es/table/interface';
 
 export interface FilterOption {
@@ -64,3 +64,11 @@ export function applyColumnFilters<T>(rows: T[], columns: ColumnsType<T>, filter
   return rows.filter((row) => active.every(({ onFilter, selected }) => selected.some((value) => onFilter(value, row))));
 }
 
+/**
+ * Bộ lọc đang chọn của một Table, gắn với `scope` (symbol, khung nến…). Đổi `scope` thì bộ lọc về rỗng; đặt
+ * `key={scope}` cho Table để Table cũng bỏ bộ lọc cũ, nhờ vậy file xuất luôn khớp bảng.
+ */
+export function useTableFilters(scope: string): [TableFilters, (filters: TableFilters) => void] {
+  const [state, setState] = useState<{ scope: string; filters: TableFilters }>({ scope, filters: {} });
+  return [state.scope === scope ? state.filters : {}, (filters) => setState({ scope, filters })];
+}
