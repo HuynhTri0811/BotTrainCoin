@@ -152,7 +152,8 @@ Lý do cho Domain: đây là nơi người đọc học công thức, kiểu tư
 
 ### Công cụ
 
-React 19, TypeScript 5.9 (strict qua `tsconfig.json`), Vite 8, Ant Design 6, TanStack Query 5, Lightweight Charts 5.
+React 19, TypeScript 5.9 (strict qua `tsconfig.json`), Vite 8, Ant Design 6, TanStack Query 5, Lightweight Charts 5,
+write-excel-file 4 (xuất `.xlsx`).
 Phiên bản trong `package.json` **cố định**, không `^`/`~`. Kiểm tra trước khi commit:
 `npm --prefix src/cryptobot-dashboard run typecheck` (hoặc `run build`).
 

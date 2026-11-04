@@ -276,6 +276,11 @@ UI: trang **Lịch sử theo tháng** ([`HistoryPage.tsx`](../src/cryptobot-dash
 - Lọc trên tiêu đề cột (`components/tableFilters.ts`) ở các bảng Tín hiệu, Lịch sử vị thế, Quy tắc tự động, Dự đoán,
   Tín hiệu chỉ báo và Các ngày trước. Trang Tin tức có thêm ô tìm kiếm và chọn nguồn. Tín hiệu, Lịch sử vị thế (trừ
   lời/lỗ) và Tin tức lọc qua API nên tìm trên toàn bộ dữ liệu; các bộ lọc còn lại chạy trên dữ liệu đã tải về.
+- Nút **Xuất Excel** (`.xlsx`, `components/excel.ts`) ở Lịch sử vị thế, Tín hiệu, Báo cáo ngày và Dự đoán. File giữ
+  bộ lọc đang chọn trên bảng; số vẫn là số và giờ là ô ngày giờ theo giờ Việt Nam, nên tính toán/lọc tiếp được trong
+  Excel. Lịch sử vị thế và Tín hiệu tải lại với giới hạn lớn nhất của API (500 lệnh, 1000 tín hiệu) thay vì chỉ các dòng
+  bảng đã tải; Báo cáo ngày xuất tới 100 báo cáo gần nhất của symbol đang chọn, mỗi ngày một dòng; Dự đoán xuất các
+  lần đoán gần nhất đang có trên bảng. Thư viện `write-excel-file` chỉ tải khi bấm nút.
 - Thanh trạng thái: chế độ, môi trường, feed nào stale, lỗi đồng bộ.
 - Thời gian hiển thị theo giờ Việt Nam (`Asia/Ho_Chi_Minh`); backend luôn trả UTC.
 - Giao diện tiếng Việt (`antd/locale/vi_VN`).

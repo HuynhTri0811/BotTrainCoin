@@ -42,3 +42,18 @@ const withSeconds = new Intl.DateTimeFormat('vi-VN', {
 });
 
 export const formatVnSeconds = (iso: string) => withSeconds.format(new Date(iso));
+
+// Việt Nam không có giờ mùa hè nên lệch UTC cố định +7 giờ.
+const VN_OFFSET_MS = 7 * 3600 * 1000;
+
+/**
+ * Ô ngày giờ Excel không có múi giờ và thư viện ghi theo UTC: dời sẵn sang giờ Việt Nam để file hiện đúng giờ
+ * như trên dashboard.
+ */
+export const excelVnDate = (iso: string | null | undefined) => (iso ? new Date(Date.parse(iso) + VN_OFFSET_MS) : null);
+export const excelVnDateUnix = (seconds: number) => new Date(seconds * 1000 + VN_OFFSET_MS);
+
+const fileDate = new Intl.DateTimeFormat('sv-SE', { timeZone: VN_TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
+
+/** Ngày hôm nay theo giờ Việt Nam dạng `2026-11-04`, dùng trong tên file xuất. */
+export const todayVn = () => fileDate.format(new Date());
