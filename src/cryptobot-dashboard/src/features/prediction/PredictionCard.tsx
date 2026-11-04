@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { predictionApi, type PredictionHistory, type PriceDirection } from '../../api/client';
 import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
-import { applyColumnFilters, columnFilter, type TableFilters } from '../../components/tableFilters';
+import { applyColumnFilters, columnFilter, useTableFilters } from '../../components/tableFilters';
 import { fmtPrice2 as fmtPrice } from '../futures/format';
 import { excelVnDateUnix, formatVnUnix } from '../../time';
 
@@ -32,10 +32,41 @@ function DirectionTag({ direction, big }: { direction: PriceDirection | null; bi
 
 type Mode = 'candle' | 'day';
 
+/**
+ * Lần đoán đúng hay sai. `null` khi nến đứng giá (`actual` null): không tính vào đúng/sai. Mọi nến trong `recent` đã
+ * đóng, nên `null` không có nghĩa là "chưa biết".
+ */
+type Outcome = 'Hit' | 'Miss' | null;
+const outcomeOf = (entry: PredictionHistory): Outcome =>
+  entry.actual == null ? null : entry.actual === entry.predicted ? 'Hit' : 'Miss';
+
 const directionText = (direction: PriceDirection | null) =>
   direction == null ? 'Đứng giá' : direction === 'Up' ? 'Lên' : 'Xuống';
-const hitText = (entry: PredictionHistory) =>
-  entry.actual == null ? null : entry.actual === entry.predicted ? 'Đúng' : 'Sai';
+const OUTCOME_TEXT = { Hit: 'Đúng', Miss: 'Sai' } as const;
+
+/** Cột file Excel; `day` đổi tên cột thời gian giống bảng. */
+const excelColumns = (day: boolean): ExcelColumn<PredictionHistory>[] => [
+  {
+    header: day ? 'Ngày (mở lúc)' : 'Nến (mở lúc)',
+    value: (entry) => excelVnDateUnix(entry.time),
+    format: EXCEL_FORMAT.dateTime,
+    width: 17,
+  },
+  { header: 'Đoán', value: (entry) => directionText(entry.predicted) },
+  { header: 'Điểm', value: (entry) => entry.score, format: '0.0000' },
+  { header: 'Thực tế', value: (entry) => directionText(entry.actual) },
+  { header: 'Giá đóng trước', value: (entry) => entry.previousClose, format: EXCEL_FORMAT.price, width: 14 },
+  { header: 'Giá đóng', value: (entry) => entry.close, format: EXCEL_FORMAT.price, width: 12 },
+  { header: 'Tăng/giảm', value: (entry) => entry.change, format: EXCEL_FORMAT.signedAmount, width: 12 },
+  { header: 'Tăng/giảm (%)', value: (entry) => entry.changePercent, format: EXCEL_FORMAT.signedPercent, width: 13 },
+  {
+    header: 'Kết quả',
+    value: (entry) => {
+      const outcome = outcomeOf(entry);
+      return outcome == null ? null : OUTCOME_TEXT[outcome];
+    },
+  },
+];
 
 /**
  * Kết quả hàm core PriceDirectionPredictor: nến kế tiếp (hoặc ngày hiện tại) lên hay xuống, tỷ lệ đúng khi chạy thử
@@ -43,10 +74,12 @@ const hitText = (entry: PredictionHistory) =>
  */
 export function PredictionCard({ symbol, interval }: { symbol: string; interval: string }) {
   const [mode, setMode] = useState<Mode>('candle');
-  const [tableFilters, setTableFilters] = useState<TableFilters>({});
   const day = mode === 'day';
   // 1 ngày: cùng hàm dự đoán nhưng chạy trên nến ngày (1d), nến được đoán là ngày đang chạy.
   const queryInterval = day ? '1d' : interval;
+  // Đổi symbol/khung thì bảng (key) và bộ lọc dùng khi xuất cùng về rỗng.
+  const tableScope = `${symbol}-${queryInterval}`;
+  const [tableFilters, setTableFilters] = useTableFilters(tableScope);
   const unit = day ? 'ngày' : 'nến';
   const query = useQuery({
     queryKey: ['prediction', symbol, queryInterval],
@@ -54,8 +87,8 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
     refetchInterval: day ? 60_000 : 15_000,
   });
   const prediction = query.data;
-  const recentHits = prediction?.recent.filter((entry) => entry.actual != null && entry.actual === entry.predicted).length ?? 0;
-  const recentCounted = prediction?.recent.filter((entry) => entry.actual != null).length ?? 0;
+  const recentHits = prediction?.recent.filter((entry) => outcomeOf(entry) === 'Hit').length ?? 0;
+  const recentCounted = prediction?.recent.filter((entry) => outcomeOf(entry) != null).length ?? 0;
 
   const columns: ColumnsType<PredictionHistory> = [
     { title: day ? 'Ngày (mở lúc)' : 'Nến (mở lúc)', dataIndex: 'time', render: formatVnUnix },
@@ -96,37 +129,23 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
       title: 'Kết quả',
       key: 'hit',
       ...columnFilter<PredictionHistory>(
-        (entry) => (entry.actual == null ? 'None' : entry.actual === entry.predicted ? 'Hit' : 'Miss'),
+        (entry) => outcomeOf(entry) ?? 'None',
         [
           { text: 'Đúng', value: 'Hit' },
           { text: 'Sai', value: 'Miss' },
         ],
       ),
-      render: (_, entry) =>
-        entry.actual == null ? '—' : entry.actual === entry.predicted ? <Tag color="green">Đúng</Tag> : <Tag color="red">Sai</Tag>,
+      render: (_, entry) => {
+        const outcome = outcomeOf(entry);
+        return outcome == null ? '—' : <Tag color={outcome === 'Hit' ? 'green' : 'red'}>{OUTCOME_TEXT[outcome]}</Tag>;
+      },
     },
   ];
 
   // Đúng các dòng bảng đang hiển thị (sau bộ lọc Đoán / Thực tế / Kết quả), mọi trang.
   const exportHistory = async () => {
-    const excelColumns: ExcelColumn<PredictionHistory>[] = [
-      {
-        header: day ? 'Ngày (mở lúc)' : 'Nến (mở lúc)',
-        value: (entry) => excelVnDateUnix(entry.time),
-        format: EXCEL_FORMAT.dateTime,
-        width: 17,
-      },
-      { header: 'Đoán', value: (entry) => directionText(entry.predicted) },
-      { header: 'Điểm', value: (entry) => entry.score, format: '0.0000' },
-      { header: 'Thực tế', value: (entry) => directionText(entry.actual) },
-      { header: 'Giá đóng trước', value: (entry) => entry.previousClose, format: EXCEL_FORMAT.price, width: 14 },
-      { header: 'Giá đóng', value: (entry) => entry.close, format: EXCEL_FORMAT.price, width: 12 },
-      { header: 'Tăng/giảm', value: (entry) => entry.change, format: EXCEL_FORMAT.signedAmount, width: 12 },
-      { header: 'Tăng/giảm (%)', value: (entry) => entry.changePercent, format: EXCEL_FORMAT.signedPercent, width: 13 },
-      { header: 'Kết quả', value: hitText },
-    ];
     const rows = applyColumnFilters(prediction?.recent ?? [], columns, tableFilters);
-    return downloadExcel(`du-doan-${symbol}-${queryInterval}`, 'Dự đoán', rows, excelColumns);
+    return { count: await downloadExcel(`du-doan-${symbol}-${queryInterval}`, 'Dự đoán', rows, excelColumns(day)) };
   };
 
   return (
@@ -191,6 +210,7 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
           </Typography.Paragraph>
 
           <Table<PredictionHistory>
+            key={tableScope}
             rowKey="time"
             size="small"
             style={{ marginTop: 12 }}

@@ -280,7 +280,9 @@ UI: trang **Lịch sử theo tháng** ([`HistoryPage.tsx`](../src/cryptobot-dash
   bộ lọc đang chọn trên bảng; số vẫn là số và giờ là ô ngày giờ theo giờ Việt Nam, nên tính toán/lọc tiếp được trong
   Excel. Lịch sử vị thế và Tín hiệu tải lại với giới hạn lớn nhất của API (500 lệnh, 1000 tín hiệu) thay vì chỉ các dòng
   bảng đã tải; Báo cáo ngày xuất tới 100 báo cáo gần nhất của symbol đang chọn, mỗi ngày một dòng; Dự đoán xuất các
-  lần đoán gần nhất đang có trên bảng. Thư viện `write-excel-file` chỉ tải khi bấm nút.
+  lần đoán gần nhất đang có trên bảng. Lấy đủ giới hạn API (`API_MAX_LIMIT` trong `client.ts`) thì nút cảnh báo file có
+  thể thiếu dòng cũ hơn: API chưa có phân trang. Đổi symbol/khung nến thì bộ lọc của bảng (và của file xuất) về rỗng.
+  Thư viện `write-excel-file` chỉ tải khi bấm nút.
 - Thanh trạng thái: chế độ, môi trường, feed nào stale, lỗi đồng bộ.
 - Thời gian hiển thị theo giờ Việt Nam (`Asia/Ho_Chi_Minh`); backend luôn trả UTC.
 - Giao diện tiếng Việt (`antd/locale/vi_VN`).

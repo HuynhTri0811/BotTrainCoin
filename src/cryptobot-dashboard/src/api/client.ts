@@ -94,6 +94,19 @@ export interface ChartData {
   signals: Signal[];
 }
 
+/**
+ * `limit` lớn nhất mỗi endpoint chấp nhận (`Math.Clamp` ở backend; sửa cùng lúc với endpoint). Lấy đủ số dòng này
+ * nghĩa là có thể còn dòng cũ hơn chưa lấy được.
+ */
+export const API_MAX_LIMIT = {
+  /** PaperFuturesEndpoints `/positions/history`. */
+  positionHistory: 500,
+  /** BotEndpoints `/signals`. */
+  signals: 1000,
+  /** ReportEndpoints `/reports/daily`. */
+  dailyReports: 100,
+} as const;
+
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${url}`);

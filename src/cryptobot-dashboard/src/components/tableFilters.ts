@@ -1,3 +1,4 @@
+import { type Key, useState } from 'react';
 import type { ColumnsType, FilterValue } from 'antd/es/table/interface';
 
 export interface FilterOption {
@@ -31,14 +32,43 @@ export function optionsFrom<T>(rows: T[], value: (row: T) => string): FilterOpti
 export type TableFilters = Record<string, FilterValue | null>;
 
 /**
+ * Key antd dùng cho bộ lọc của cột (giống `getColumnKey` của antd): `key`, rồi `dataIndex` (mảng nối bằng `.`), rồi vị
+ * trí cột (`0`, `1-0` cho cột con).
+ */
+function filterKey<T>(column: ColumnsType<T>[number], position: string): string {
+  if (column.key != null) return String(column.key);
+  if ('dataIndex' in column && column.dataIndex != null && column.dataIndex !== '') {
+    return Array.isArray(column.dataIndex) ? column.dataIndex.join('.') : String(column.dataIndex);
+  }
+  return position;
+}
+
+type ActiveFilter<T> = { onFilter: (value: boolean | Key, row: T) => boolean; selected: FilterValue };
+
+function activeFilters<T>(columns: ColumnsType<T>, filters: TableFilters, parent?: string): ActiveFilter<T>[] {
+  return columns.flatMap((column, index) => {
+    const position = parent == null ? String(index) : `${parent}-${index}`;
+    const children = 'children' in column ? activeFilters(column.children, filters, position) : [];
+    const selected = filters[filterKey(column, position)];
+    return column.onFilter && selected?.length ? [{ onFilter: column.onFilter, selected }, ...children] : children;
+  });
+}
+
+/**
  * Các dòng còn lại sau bộ lọc `columnFilter` đang chọn, đúng như Table hiển thị (lấy `filters` từ `onChange` của
- * Table). Cột lọc phía API (`serverFilter`) không có `onFilter` nên bỏ qua. Cột có bộ lọc cần `key` hoặc `dataIndex`.
+ * Table). Cột lọc phía API (`serverFilter`) không có `onFilter` nên bỏ qua. Trong một cột: khớp một lựa chọn là đủ;
+ * giữa các cột: phải khớp tất cả (như antd).
  */
 export function applyColumnFilters<T>(rows: T[], columns: ColumnsType<T>, filters: TableFilters): T[] {
-  const active = columns.flatMap((column) => {
-    const key = column.key ?? ('dataIndex' in column ? column.dataIndex : undefined);
-    const selected = key == null ? null : filters[String(key)];
-    return column.onFilter && selected?.length ? [{ onFilter: column.onFilter, selected }] : [];
-  });
+  const active = activeFilters(columns, filters);
   return rows.filter((row) => active.every(({ onFilter, selected }) => selected.some((value) => onFilter(value, row))));
+}
+
+/**
+ * Bộ lọc đang chọn của một Table, gắn với `scope` (symbol, khung nến…). Đổi `scope` thì bộ lọc về rỗng; đặt
+ * `key={scope}` cho Table để Table cũng bỏ bộ lọc cũ, nhờ vậy file xuất luôn khớp bảng.
+ */
+export function useTableFilters(scope: string): [TableFilters, (filters: TableFilters) => void] {
+  const [state, setState] = useState<{ scope: string; filters: TableFilters }>({ scope, filters: {} });
+  return [state.scope === scope ? state.filters : {}, (filters) => setState({ scope, filters })];
 }

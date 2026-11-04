@@ -1,5 +1,14 @@
 import { todayVn } from '../time';
 
+/** Kết quả xuất: số dòng đã ghi và, khi dữ liệu có thể bị cắt ở giới hạn API, giới hạn đó. */
+export interface ExportResult {
+  count: number;
+  truncatedAt?: number;
+}
+
+/** `fetched` dòng lấy từ API với `limit`: đủ `limit` thì có thể còn dòng cũ hơn chưa lấy được. */
+export const truncatedAt = (fetched: number, limit: number) => (fetched >= limit ? limit : undefined);
+
 export type ExcelValue = string | number | boolean | Date | null | undefined;
 
 /** Một cột của file Excel: tiêu đề, cách lấy giá trị từ một dòng, định dạng số/ngày và độ rộng (ký tự). */

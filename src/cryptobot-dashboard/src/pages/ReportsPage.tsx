@@ -1,17 +1,15 @@
 import { useState } from 'react';
 import { Alert, Button, Card, Empty, Segmented, Space, Spin, Table, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { reportApi, type SavedDailyReport } from '../api/client';
-import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../components/excel';
+import type { ColumnsType } from 'antd/es/table';
+import { API_MAX_LIMIT, reportApi, type SavedDailyReport } from '../api/client';
+import { EXCEL_FORMAT, downloadExcel, truncatedAt, type ExcelColumn } from '../components/excel';
 import { ExportExcelButton } from '../components/ExportExcelButton';
-import { columnFilter } from '../components/tableFilters';
+import { applyColumnFilters, columnFilter, useTableFilters } from '../components/tableFilters';
 import { DailyReportCard, fmtPct2, pctColor } from '../features/reports/DailyReportCard';
 import { excelVnDate, formatVn } from '../time';
 
 const colored = (value: number) => <span style={{ color: pctColor(value) }}>{fmtPct2(value)}</span>;
-
-/** API trả tối đa 100 báo cáo mỗi lần (ReportEndpoints). */
-const EXPORT_LIMIT = 100;
 
 const EXCEL_COLUMNS: ExcelColumn<SavedDailyReport>[] = [
   { header: 'Từ', value: (saved) => excelVnDate(saved.report.fromUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
@@ -33,9 +31,40 @@ const EXCEL_COLUMNS: ExcelColumn<SavedDailyReport>[] = [
   { header: 'Lập lúc', value: (saved) => excelVnDate(saved.createdAtUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
 ];
 
+/** Cột bảng "Các ngày trước"; bộ lọc của bảng cũng dùng khi xuất Excel. */
+const OLDER_COLUMNS: ColumnsType<SavedDailyReport> = [
+  { title: 'Đến', render: (_, saved) => formatVn(saved.report.toUtc) },
+  {
+    title: 'Thay đổi',
+    key: 'change',
+    ...columnFilter<SavedDailyReport>((saved) => (saved.report.changePercent >= 0 ? 'Up' : 'Down'), [
+      { text: 'Tăng', value: 'Up' },
+      { text: 'Giảm', value: 'Down' },
+    ]),
+    render: (_, saved) => colored(saved.report.changePercent),
+  },
+  { title: 'Biên độ', render: (_, saved) => `${saved.report.rangePercent.toFixed(2)}%` },
+  { title: 'Giảm sâu nhất', render: (_, saved) => colored(saved.report.maxDrawdownPercent) },
+  { title: 'Hồi mạnh nhất', render: (_, saved) => colored(saved.report.maxRallyPercent) },
+  {
+    title: 'Mua chủ động',
+    render: (_, saved) => (saved.report.buyPercent == null ? '—' : `${saved.report.buyPercent.toFixed(1)}%`),
+  },
+  {
+    title: 'Giờ khối lượng bất thường',
+    key: 'spikes',
+    ...columnFilter<SavedDailyReport>((saved) => (saved.report.volumeSpikes.length > 0 ? 'Yes' : 'No'), [
+      { text: 'Có', value: 'Yes' },
+      { text: 'Không', value: 'No' },
+    ]),
+    render: (_, saved) => saved.report.volumeSpikes.length,
+  },
+];
+
 /** Báo cáo biến động lập mỗi ngày (DailyReportWorker): báo cáo mới nhất đầy đủ, các ngày trước dạng bảng. */
 export function ReportsPage() {
   const [symbol, setSymbol] = useState('BTCUSDT');
+  const [tableFilters, setTableFilters] = useTableFilters(symbol);
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ['daily-reports', symbol],
@@ -56,10 +85,15 @@ export function ReportsPage() {
   const data = query.data;
   const [latest, ...older] = data?.reports ?? [];
 
-  // Mọi báo cáo đã lưu của symbol đang chọn (kể cả báo cáo mới nhất), mỗi ngày một dòng.
+  // Các báo cáo gần nhất của symbol đang chọn, mỗi ngày một dòng, gồm cả báo cáo mới nhất hiển thị phía trên. Bộ lọc
+  // đang chọn ở bảng "Các ngày trước" áp cho mọi dòng.
   const exportReports = async () => {
-    const list = await reportApi.daily(symbol, EXPORT_LIMIT);
-    return downloadExcel(`bao-cao-ngay-${symbol}`, 'Báo cáo ngày', list.reports, EXCEL_COLUMNS);
+    const list = await reportApi.daily(symbol, API_MAX_LIMIT.dailyReports);
+    const rows = applyColumnFilters(list.reports, OLDER_COLUMNS, tableFilters);
+    return {
+      count: await downloadExcel(`bao-cao-ngay-${symbol}`, 'Báo cáo ngày', rows, EXCEL_COLUMNS),
+      truncatedAt: truncatedAt(list.reports.length, API_MAX_LIMIT.dailyReports),
+    };
   };
 
   return (
@@ -97,36 +131,13 @@ export function ReportsPage() {
           {older.length > 0 && (
             <Card size="small" title="Các ngày trước">
               <Table<SavedDailyReport>
+                key={symbol}
                 size="small"
                 rowKey={(saved) => saved.report.toUtc}
                 pagination={false}
                 dataSource={older}
-                columns={[
-                  { title: 'Đến', render: (_, saved) => formatVn(saved.report.toUtc) },
-                  {
-                    title: 'Thay đổi',
-                    ...columnFilter<SavedDailyReport>((saved) => (saved.report.changePercent >= 0 ? 'Up' : 'Down'), [
-                      { text: 'Tăng', value: 'Up' },
-                      { text: 'Giảm', value: 'Down' },
-                    ]),
-                    render: (_, saved) => colored(saved.report.changePercent),
-                  },
-                  { title: 'Biên độ', render: (_, saved) => `${saved.report.rangePercent.toFixed(2)}%` },
-                  { title: 'Giảm sâu nhất', render: (_, saved) => colored(saved.report.maxDrawdownPercent) },
-                  { title: 'Hồi mạnh nhất', render: (_, saved) => colored(saved.report.maxRallyPercent) },
-                  {
-                    title: 'Mua chủ động',
-                    render: (_, saved) => (saved.report.buyPercent == null ? '—' : `${saved.report.buyPercent.toFixed(1)}%`),
-                  },
-                  {
-                    title: 'Giờ khối lượng bất thường',
-                    ...columnFilter<SavedDailyReport>((saved) => (saved.report.volumeSpikes.length > 0 ? 'Yes' : 'No'), [
-                      { text: 'Có', value: 'Yes' },
-                      { text: 'Không', value: 'No' },
-                    ]),
-                    render: (_, saved) => saved.report.volumeSpikes.length,
-                  },
-                ]}
+                onChange={(_, filters) => setTableFilters(filters)}
+                columns={OLDER_COLUMNS}
               />
             </Card>
           )}

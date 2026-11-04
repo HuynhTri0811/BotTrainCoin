@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Button, Card, Popconfirm, Table, Tabs, Tag, Typography, message } from 'antd';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ColumnsType } from 'antd/es/table';
-import { ApiError, api, futuresApi, type FuturesAccount, type FuturesPosition } from '../../api/client';
-import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
+import { API_MAX_LIMIT, ApiError, api, futuresApi, type FuturesAccount, type FuturesPosition } from '../../api/client';
+import { EXCEL_FORMAT, downloadExcel, truncatedAt, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
 import {
   applyColumnFilters,
@@ -34,9 +34,6 @@ const SIDES = [
   { text: 'Long', value: 'Long' },
   { text: 'Short', value: 'Short' },
 ];
-
-/** API trả tối đa 500 lệnh đã đóng mỗi lần (PaperFuturesEndpoints). */
-const EXPORT_LIMIT = 500;
 
 const EXCEL_COLUMNS: ExcelColumn<FuturesPosition>[] = [
   { header: 'Mở lúc', value: (position) => excelVnDate(position.openedAtUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
@@ -136,10 +133,15 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
     },
   ];
 
-  // Tải lại với giới hạn lớn nhất của API (bảng chỉ tải 50 lệnh gần nhất), cùng bộ lọc đang chọn trên bảng.
+  // Tải lại với giới hạn lớn nhất của API (bảng chỉ tải 50 lệnh gần nhất), cùng bộ lọc đang chọn trên bảng. Lọc lời/lỗ
+  // chạy sau khi tải nên nếu bị cắt ở giới hạn API thì cũng chỉ lọc trên các lệnh mới nhất đó: nút sẽ cảnh báo.
   const exportHistory = async () => {
-    const rows = applyColumnFilters(await futuresApi.history(filter, EXPORT_LIMIT), historyColumns, tableFilters);
-    return downloadExcel('lich-su-lenh', 'Lịch sử lệnh', rows, EXCEL_COLUMNS);
+    const fetched = await futuresApi.history(filter, API_MAX_LIMIT.positionHistory);
+    const rows = applyColumnFilters(fetched, historyColumns, tableFilters);
+    return {
+      count: await downloadExcel('lich-su-lenh', 'Lịch sử lệnh', rows, EXCEL_COLUMNS),
+      truncatedAt: truncatedAt(fetched.length, API_MAX_LIMIT.positionHistory),
+    };
   };
 
   return (
