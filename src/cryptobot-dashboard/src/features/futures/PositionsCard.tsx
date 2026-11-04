@@ -1,9 +1,19 @@
 import { useState } from 'react';
 import { Button, Card, Popconfirm, Table, Tabs, Tag, Typography, message } from 'antd';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ColumnsType } from 'antd/es/table';
 import { ApiError, api, futuresApi, type FuturesAccount, type FuturesPosition } from '../../api/client';
-import { columnFilter, optionsFrom, picked, serverFilter } from '../../components/tableFilters';
-import { formatVn } from '../../time';
+import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
+import { ExportExcelButton } from '../../components/ExportExcelButton';
+import {
+  applyColumnFilters,
+  columnFilter,
+  optionsFrom,
+  picked,
+  serverFilter,
+  type TableFilters,
+} from '../../components/tableFilters';
+import { excelVnDate, formatVn } from '../../time';
 import { fmtPrice, fmtSigned, fmtUsdt, pnlColor } from './format';
 
 const sideTag = (position: FuturesPosition) => (
@@ -25,9 +35,36 @@ const SIDES = [
   { text: 'Short', value: 'Short' },
 ];
 
+/** API trả tối đa 500 lệnh đã đóng mỗi lần (PaperFuturesEndpoints). */
+const EXPORT_LIMIT = 500;
+
+const EXCEL_COLUMNS: ExcelColumn<FuturesPosition>[] = [
+  { header: 'Mở lúc', value: (position) => excelVnDate(position.openedAtUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
+  { header: 'Đóng lúc', value: (position) => excelVnDate(position.closedAtUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
+  { header: 'Symbol', value: (position) => position.symbol, width: 11 },
+  { header: 'Hướng', value: (position) => position.side },
+  { header: 'Đòn bẩy', value: (position) => position.leverage },
+  { header: 'Khối lượng', value: (position) => position.quantity, width: 12 },
+  { header: 'Giá vào', value: (position) => position.entryPrice, format: EXCEL_FORMAT.price, width: 12 },
+  { header: 'Giá ra', value: (position) => position.exitPrice, format: EXCEL_FORMAT.price, width: 12 },
+  { header: 'Stop loss', value: (position) => position.stopLoss, format: EXCEL_FORMAT.price, width: 12 },
+  { header: 'Take profit', value: (position) => position.takeProfit, format: EXCEL_FORMAT.price, width: 12 },
+  { header: 'Margin (USDT)', value: (position) => position.margin, format: EXCEL_FORMAT.amount, width: 13 },
+  { header: 'Phí (USDT)', value: (position) => position.openFee + position.closeFee, format: EXCEL_FORMAT.amount, width: 11 },
+  { header: 'PnL giá (USDT)', value: (position) => position.realizedPnl, format: EXCEL_FORMAT.signedAmount, width: 14 },
+  { header: 'PnL ròng (USDT)', value: (position) => position.netPnl, format: EXCEL_FORMAT.signedAmount, width: 15 },
+  {
+    header: 'Lý do đóng',
+    value: (position) => (position.closeReason ? (reasonLabel[position.closeReason]?.text ?? position.closeReason) : null),
+    width: 17,
+  },
+];
+
 export function PositionsCard({ account }: { account: FuturesAccount | undefined }) {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<{ symbol?: string; side?: string; closeReason?: string }>({});
+  const [tableFilters, setTableFilters] = useState<TableFilters>({});
+  const [tab, setTab] = useState('open');
   const history = useQuery({
     queryKey: ['futures-history', filter],
     queryFn: () => futuresApi.history(filter),
@@ -50,10 +87,68 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
   const open = account?.openPositions ?? [];
   const closed = history.data ?? [];
 
+  const historyColumns: ColumnsType<FuturesPosition> = [
+    { title: 'Đóng lúc', dataIndex: 'closedAtUtc', render: formatVn },
+    {
+      title: 'Symbol',
+      dataIndex: 'symbol',
+      ...serverFilter(optionsFrom(status.data?.strategies ?? [], (strategy) => strategy.symbol)),
+    },
+    {
+      title: 'Hướng',
+      key: 'side',
+      ...serverFilter(SIDES),
+      render: (_, position) => sideTag(position),
+    },
+    {
+      title: 'Lý do',
+      dataIndex: 'closeReason',
+      ...serverFilter(Object.entries(reasonLabel).map(([value, { text }]) => ({ text, value }))),
+      render: (reason: string) => <Tag color={reasonLabel[reason]?.color}>{reasonLabel[reason]?.text ?? reason}</Tag>,
+    },
+    { title: 'Giá vào', dataIndex: 'entryPrice', align: 'right', render: fmtPrice },
+    { title: 'Giá ra', dataIndex: 'exitPrice', align: 'right', render: fmtPrice },
+    {
+      title: 'PnL giá',
+      dataIndex: 'realizedPnl',
+      align: 'right',
+      render: (value: number) => <span style={{ color: pnlColor(value) }}>{fmtSigned(value)}</span>,
+    },
+    {
+      title: 'Phí',
+      key: 'fees',
+      align: 'right',
+      render: (_, position) => fmtSigned(-(position.openFee + position.closeFee)),
+    },
+    {
+      title: 'PnL ròng',
+      dataIndex: 'netPnl',
+      ...columnFilter<FuturesPosition>((position) => ((position.netPnl ?? 0) >= 0 ? 'Win' : 'Loss'), [
+        { text: 'Lời', value: 'Win' },
+        { text: 'Lỗ', value: 'Loss' },
+      ]),
+      align: 'right',
+      render: (value: number) => (
+        <Typography.Text strong style={{ color: pnlColor(value) }}>
+          {fmtSigned(value)}
+        </Typography.Text>
+      ),
+    },
+  ];
+
+  // Tải lại với giới hạn lớn nhất của API (bảng chỉ tải 50 lệnh gần nhất), cùng bộ lọc đang chọn trên bảng.
+  const exportHistory = async () => {
+    const rows = applyColumnFilters(await futuresApi.history(filter, EXPORT_LIMIT), historyColumns, tableFilters);
+    return downloadExcel('lich-su-lenh', 'Lịch sử lệnh', rows, EXCEL_COLUMNS);
+  };
+
   return (
     <Card size="small">
       <Tabs
         size="small"
+        activeKey={tab}
+        onChange={setTab}
+        tabBarExtraContent={tab === 'history' && <ExportExcelButton onExport={exportHistory} />}
         items={[
           {
             key: 'open',
@@ -128,57 +223,11 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
                 dataSource={closed}
                 pagination={{ pageSize: 10, hideOnSinglePage: true }}
                 scroll={{ x: true }}
-                onChange={(_, filters) =>
-                  setFilter({ symbol: picked(filters.symbol), side: picked(filters.side), closeReason: picked(filters.closeReason) })
-                }
-                columns={[
-                  { title: 'Đóng lúc', dataIndex: 'closedAtUtc', render: formatVn },
-                  {
-                    title: 'Symbol',
-                    dataIndex: 'symbol',
-                    ...serverFilter(optionsFrom(status.data?.strategies ?? [], (strategy) => strategy.symbol)),
-                  },
-                  {
-                    title: 'Hướng',
-                    key: 'side',
-                    ...serverFilter(SIDES),
-                    render: (_, position) => sideTag(position),
-                  },
-                  {
-                    title: 'Lý do',
-                    dataIndex: 'closeReason',
-                    ...serverFilter(Object.entries(reasonLabel).map(([value, { text }]) => ({ text, value }))),
-                    render: (reason: string) => <Tag color={reasonLabel[reason]?.color}>{reasonLabel[reason]?.text ?? reason}</Tag>,
-                  },
-                  { title: 'Giá vào', dataIndex: 'entryPrice', align: 'right', render: fmtPrice },
-                  { title: 'Giá ra', dataIndex: 'exitPrice', align: 'right', render: fmtPrice },
-                  {
-                    title: 'PnL giá',
-                    dataIndex: 'realizedPnl',
-                    align: 'right',
-                    render: (value: number) => <span style={{ color: pnlColor(value) }}>{fmtSigned(value)}</span>,
-                  },
-                  {
-                    title: 'Phí',
-                    key: 'fees',
-                    align: 'right',
-                    render: (_, position) => fmtSigned(-(position.openFee + position.closeFee)),
-                  },
-                  {
-                    title: 'PnL ròng',
-                    dataIndex: 'netPnl',
-                    ...columnFilter<FuturesPosition>((position) => ((position.netPnl ?? 0) >= 0 ? 'Win' : 'Loss'), [
-                      { text: 'Lời', value: 'Win' },
-                      { text: 'Lỗ', value: 'Loss' },
-                    ]),
-                    align: 'right',
-                    render: (value: number) => (
-                      <Typography.Text strong style={{ color: pnlColor(value) }}>
-                        {fmtSigned(value)}
-                      </Typography.Text>
-                    ),
-                  },
-                ]}
+                onChange={(_, filters) => {
+                  setFilter({ symbol: picked(filters.symbol), side: picked(filters.side), closeReason: picked(filters.closeReason) });
+                  setTableFilters(filters);
+                }}
+                columns={historyColumns}
               />
             ),
           },
