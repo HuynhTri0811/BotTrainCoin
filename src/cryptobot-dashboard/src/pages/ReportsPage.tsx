@@ -1,17 +1,14 @@
 import { useState } from 'react';
 import { Alert, Button, Card, Empty, Segmented, Space, Spin, Table, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { reportApi, type SavedDailyReport } from '../api/client';
-import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../components/excel';
+import { API_MAX_LIMIT, reportApi, type SavedDailyReport } from '../api/client';
+import { EXCEL_FORMAT, downloadExcel, truncatedAt, type ExcelColumn } from '../components/excel';
 import { ExportExcelButton } from '../components/ExportExcelButton';
 import { columnFilter } from '../components/tableFilters';
 import { DailyReportCard, fmtPct2, pctColor } from '../features/reports/DailyReportCard';
 import { excelVnDate, formatVn } from '../time';
 
 const colored = (value: number) => <span style={{ color: pctColor(value) }}>{fmtPct2(value)}</span>;
-
-/** API trả tối đa 100 báo cáo mỗi lần (ReportEndpoints). */
-const EXPORT_LIMIT = 100;
 
 const EXCEL_COLUMNS: ExcelColumn<SavedDailyReport>[] = [
   { header: 'Từ', value: (saved) => excelVnDate(saved.report.fromUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
@@ -56,10 +53,13 @@ export function ReportsPage() {
   const data = query.data;
   const [latest, ...older] = data?.reports ?? [];
 
-  // Mọi báo cáo đã lưu của symbol đang chọn (kể cả báo cáo mới nhất), mỗi ngày một dòng.
+  // Các báo cáo gần nhất của symbol đang chọn, mỗi ngày một dòng, gồm cả báo cáo mới nhất hiển thị phía trên.
   const exportReports = async () => {
-    const list = await reportApi.daily(symbol, EXPORT_LIMIT);
-    return downloadExcel(`bao-cao-ngay-${symbol}`, 'Báo cáo ngày', list.reports, EXCEL_COLUMNS);
+    const list = await reportApi.daily(symbol, API_MAX_LIMIT.dailyReports);
+    return {
+      count: await downloadExcel(`bao-cao-ngay-${symbol}`, 'Báo cáo ngày', list.reports, EXCEL_COLUMNS),
+      truncatedAt: truncatedAt(list.reports.length, API_MAX_LIMIT.dailyReports),
+    };
   };
 
   return (

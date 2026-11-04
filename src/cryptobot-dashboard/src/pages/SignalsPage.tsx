@@ -1,16 +1,13 @@
 import { useState } from 'react';
 import { Card, Table, Tag } from 'antd';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { api, type Signal, type Strategy } from '../api/client';
-import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../components/excel';
+import { API_MAX_LIMIT, api, type Signal, type Strategy } from '../api/client';
+import { EXCEL_FORMAT, downloadExcel, truncatedAt, type ExcelColumn } from '../components/excel';
 import { ExportExcelButton } from '../components/ExportExcelButton';
 import { picked, serverFilter } from '../components/tableFilters';
 import { excelVnDate, formatVn } from '../time';
 
 const priceFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 8 });
-
-/** API trả tối đa 1000 tín hiệu mỗi lần (BotEndpoints). */
-const EXPORT_LIMIT = 1000;
 
 /** Tín hiệu Buy/Sell gần đây của chiến lược EMA đang chọn. */
 export function SignalsPage({ strategy }: { strategy: Strategy }) {
@@ -37,8 +34,11 @@ export function SignalsPage({ strategy }: { strategy: Strategy }) {
       { header: 'Loại', value: (signal) => (signal.isBackfill ? 'Backfill' : 'Mới') },
       { header: 'Tạo lúc', value: (signal) => excelVnDate(signal.createdAtUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
     ];
-    const rows = await api.signals(strategy.id, filter, EXPORT_LIMIT);
-    return downloadExcel(`tin-hieu-${strategy.symbol}-${strategy.interval}`, 'Tín hiệu', rows, columns);
+    const rows = await api.signals(strategy.id, filter, API_MAX_LIMIT.signals);
+    return {
+      count: await downloadExcel(`tin-hieu-${strategy.symbol}-${strategy.interval}`, 'Tín hiệu', rows, columns),
+      truncatedAt: truncatedAt(rows.length, API_MAX_LIMIT.signals),
+    };
   };
 
   return (

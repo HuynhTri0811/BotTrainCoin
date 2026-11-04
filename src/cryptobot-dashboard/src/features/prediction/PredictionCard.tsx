@@ -128,7 +128,7 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
       { header: 'Kết quả', value: hitText },
     ];
     const rows = applyColumnFilters(prediction?.recent ?? [], columns, tableFilters);
-    return downloadExcel(`du-doan-${symbol}-${queryInterval}`, 'Dự đoán', rows, excelColumns);
+    return { count: await downloadExcel(`du-doan-${symbol}-${queryInterval}`, 'Dự đoán', rows, excelColumns) };
   };
 
   return (
