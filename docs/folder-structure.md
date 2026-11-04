@@ -215,11 +215,14 @@ cryptobot-dashboard/
 └── src/
     ├── main.tsx                  # QueryClient, ConfigProvider vi_VN
     ├── App.tsx                   # Layout, menu 7 trang (#hash), chọn chiến lược
-    ├── time.ts                   # Định dạng giờ Việt Nam (formatVn, formatVnUnix, ago…)
+    ├── time.ts                   # Định dạng giờ Việt Nam (formatVn, formatVnUnix, ago…), ngày giờ cho Excel
     ├── api/
     │   └── client.ts             # MỌI kiểu dữ liệu REST + các object gọi API (api, futuresApi, autoApi…)
     ├── components/
-    │   └── StatusBar.tsx         # Component dùng ở nhiều trang
+    │   ├── StatusBar.tsx         # Component dùng ở nhiều trang
+    │   ├── tableFilters.ts       # Bộ lọc trên tiêu đề cột Table, lọc lại khi xuất Excel
+    │   ├── excel.ts              # downloadExcel: ghi .xlsx từ danh sách cột (write-excel-file)
+    │   └── ExportExcelButton.tsx # Nút "Xuất Excel" dùng chung
     ├── pages/                    # Mỗi trang một file, chỉ ghép các card
     │   ├── MarketPage.tsx  TradingPage.tsx  PredictionPage.tsx  SignalsPage.tsx  HistoryPage.tsx  ReportsPage.tsx
     │   │   NewsPage.tsx
