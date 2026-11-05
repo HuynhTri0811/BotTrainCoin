@@ -5,7 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { API_MAX_LIMIT, reportApi, type SavedDailyReport } from '../api/client';
 import { EXCEL_FORMAT, downloadExcel, limitIfTruncated, type ExcelColumn } from '../components/excel';
 import { ExportExcelButton } from '../components/ExportExcelButton';
-import { applyColumnFilters, columnFilter, withFilteredValues, type TableFilters } from '../components/tableFilters';
+import { applyColumnFilters, columnFilter, useScopedFilters, withFilteredValues } from '../components/tableFilters';
 import { DailyReportCard, fmtPct2, pctColor } from '../features/reports/DailyReportCard';
 import { excelVnDate, formatVn } from '../time';
 
@@ -64,8 +64,8 @@ const OLDER_COLUMNS: ColumnsType<SavedDailyReport> = [
 /** Báo cáo biến động lập mỗi ngày (DailyReportWorker): báo cáo mới nhất đầy đủ, các ngày trước dạng bảng. */
 export function ReportsPage() {
   const [symbol, setSymbol] = useState('BTCUSDT');
-  // Bộ lọc controlled: Table mount lại (đổi symbol, đang tải, lỗi) vẫn hiện đúng bộ lọc mà file xuất dùng.
-  const [tableFilters, setTableFilters] = useState<TableFilters>({});
+  // Bộ lọc controlled: Table mount lại (đang tải, lỗi) vẫn hiện đúng bộ lọc mà file xuất dùng; đổi symbol thì về rỗng.
+  const [tableFilters, setTableFilters] = useScopedFilters(symbol);
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ['daily-reports', symbol],
@@ -85,12 +85,14 @@ export function ReportsPage() {
 
   const data = query.data;
   const [latest, ...older] = data?.reports ?? [];
+  // Chỉ dùng bộ lọc khi bảng đang hiện, để người dùng luôn thấy và bỏ được bộ lọc áp vào file.
+  const visibleFilters = older.length > 0 ? tableFilters : {};
 
   // Các báo cáo gần nhất của symbol đang chọn, mỗi ngày một dòng, gồm cả báo cáo mới nhất hiển thị phía trên. Bộ lọc
   // đang chọn ở bảng "Các ngày trước" áp cho mọi dòng.
   const exportReports = async () => {
     const list = await reportApi.daily(symbol, API_MAX_LIMIT.dailyReports);
-    const rows = applyColumnFilters(list.reports, OLDER_COLUMNS, tableFilters);
+    const rows = applyColumnFilters(list.reports, OLDER_COLUMNS, visibleFilters);
     return {
       count: await downloadExcel(`bao-cao-ngay-${symbol}`, 'Báo cáo ngày', rows, EXCEL_COLUMNS),
       truncatedAt: limitIfTruncated(list.reports.length, API_MAX_LIMIT.dailyReports),
