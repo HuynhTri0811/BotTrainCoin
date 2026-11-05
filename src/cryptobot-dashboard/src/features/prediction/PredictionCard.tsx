@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { predictionApi, type PredictionHistory, type PriceDirection } from '../../api/client';
 import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
-import { applyColumnFilters, columnFilter, withFilteredValues, type TableFilters } from '../../components/tableFilters';
+import { applyColumnFilters, columnFilter, useScopedFilters, withFilteredValues } from '../../components/tableFilters';
 import { fmtPrice2 as fmtPrice } from '../futures/format';
 import { excelVnDateUnix, formatVnUnix } from '../../time';
 
@@ -74,11 +74,12 @@ const excelColumns = (day: boolean): ExcelColumn<PredictionHistory>[] => [
  */
 export function PredictionCard({ symbol, interval }: { symbol: string; interval: string }) {
   const [mode, setMode] = useState<Mode>('candle');
-  // Bộ lọc controlled: bảng và file xuất cùng đọc state này (giữ nguyên khi đổi chế độ/symbol).
-  const [tableFilters, setTableFilters] = useState<TableFilters>({});
   const day = mode === 'day';
   // 1 ngày: cùng hàm dự đoán nhưng chạy trên nến ngày (1d), nến được đoán là ngày đang chạy.
   const queryInterval = day ? '1d' : interval;
+  // Bộ lọc controlled: bảng và file xuất cùng đọc state này, về rỗng khi đổi symbol/khung/chế độ.
+  const tableScope = `${symbol}-${queryInterval}`;
+  const [tableFilters, setTableFilters] = useScopedFilters(tableScope);
   const unit = day ? 'ngày' : 'nến';
   const query = useQuery({
     queryKey: ['prediction', symbol, queryInterval],

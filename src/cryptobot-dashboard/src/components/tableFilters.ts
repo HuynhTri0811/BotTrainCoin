@@ -1,4 +1,4 @@
-import type { Key } from 'react';
+import { useCallback, useState, type Key } from 'react';
 import type { ColumnsType, FilterValue } from 'antd/es/table/interface';
 
 export interface FilterOption {
@@ -30,6 +30,8 @@ export function optionsFrom<T>(rows: T[], value: (row: T) => string): FilterOpti
 }
 
 export type TableFilters = Record<string, FilterValue | null>;
+
+const NO_FILTERS: TableFilters = {};
 
 /**
  * Key antd dùng cho bộ lọc của cột (giống `getColumnKey` của antd): `key`, rồi `dataIndex` (mảng nối bằng `.`), rồi vị
@@ -96,4 +98,17 @@ export function withFilteredValues<T>(columns: ColumnsType<T>, filters: TableFil
     const filterable = Boolean(column.filters) || column.filterDropdown !== undefined || 'onFilter' in column;
     return filterable ? { ...column, filteredValue: filters[key] ?? null } : column;
   });
+}
+
+/**
+ * State bộ lọc controlled của một bảng, về rỗng khi `scope` đổi (symbol, khung, chế độ...): bộ lọc chọn trên dữ liệu
+ * này không âm thầm áp vào dữ liệu khác, cả trên bảng lẫn file xuất.
+ */
+export function useScopedFilters(scope: string) {
+  const [state, setState] = useState({ scope, filters: NO_FILTERS });
+  // Đặt lại ngay trong lúc render (không đợi effect) để không có lần render nào dùng bộ lọc của scope cũ.
+  if (state.scope !== scope) setState({ scope, filters: NO_FILTERS });
+  const filters = state.scope === scope ? state.filters : NO_FILTERS;
+  const setFilters = useCallback((filters: TableFilters) => setState({ scope, filters }), [scope]);
+  return [filters, setFilters] as const;
 }
