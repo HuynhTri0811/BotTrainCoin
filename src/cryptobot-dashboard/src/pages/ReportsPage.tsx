@@ -5,7 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { API_MAX_LIMIT, reportApi, type SavedDailyReport } from '../api/client';
 import { EXCEL_FORMAT, downloadExcel, limitIfTruncated, type ExcelColumn } from '../components/excel';
 import { ExportExcelButton } from '../components/ExportExcelButton';
-import { applyColumnFilters, columnFilter, useTableFilters } from '../components/tableFilters';
+import { applyColumnFilters, columnFilter, withFilteredValues, type TableFilters } from '../components/tableFilters';
 import { DailyReportCard, fmtPct2, pctColor } from '../features/reports/DailyReportCard';
 import { excelVnDate, formatVn } from '../time';
 
@@ -64,7 +64,8 @@ const OLDER_COLUMNS: ColumnsType<SavedDailyReport> = [
 /** Báo cáo biến động lập mỗi ngày (DailyReportWorker): báo cáo mới nhất đầy đủ, các ngày trước dạng bảng. */
 export function ReportsPage() {
   const [symbol, setSymbol] = useState('BTCUSDT');
-  const [tableFilters, setTableFilters] = useTableFilters(symbol);
+  // Bộ lọc controlled: Table mount lại (đổi symbol, đang tải, lỗi) vẫn hiện đúng bộ lọc mà file xuất dùng.
+  const [tableFilters, setTableFilters] = useState<TableFilters>({});
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ['daily-reports', symbol],
@@ -131,13 +132,12 @@ export function ReportsPage() {
           {older.length > 0 && (
             <Card size="small" title="Các ngày trước">
               <Table<SavedDailyReport>
-                key={symbol}
                 size="small"
                 rowKey={(saved) => saved.report.toUtc}
                 pagination={false}
                 dataSource={older}
                 onChange={(_, filters) => setTableFilters(filters)}
-                columns={OLDER_COLUMNS}
+                columns={withFilteredValues(OLDER_COLUMNS, tableFilters)}
               />
             </Card>
           )}
