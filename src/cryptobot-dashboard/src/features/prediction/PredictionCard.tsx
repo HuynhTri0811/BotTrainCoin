@@ -209,7 +209,9 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
             <code>CryptoBot.Domain/Prediction/PriceDirectionPredictor.cs</code> rồi restart API.
           </Typography.Paragraph>
 
+          {/* Mount lại khi đổi symbol/khung/chế độ để phân trang về trang 1 (trang mới nhất). */}
           <Table<PredictionHistory>
+            key={tableScope}
             rowKey="time"
             size="small"
             style={{ marginTop: 12 }}
