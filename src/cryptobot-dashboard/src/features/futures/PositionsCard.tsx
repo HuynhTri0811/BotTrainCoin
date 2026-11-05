@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button, Card, Popconfirm, Table, Tabs, Tag, Typography, message } from 'antd';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ColumnsType } from 'antd/es/table';
@@ -62,11 +62,14 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
   const queryClient = useQueryClient();
   // Một state cho mọi bộ lọc của bảng lịch sử (controlled): bộ lọc API lấy ra từ đây, lọc lời/lỗ chạy trên trình duyệt.
   const [tableFilters, setTableFilters] = useState<TableFilters>({});
-  const filter = {
-    symbol: picked(tableFilters.symbol),
-    side: picked(tableFilters.side),
-    closeReason: picked(tableFilters.closeReason),
-  };
+  const filter = useMemo(
+    () => ({
+      symbol: picked(tableFilters.symbol),
+      side: picked(tableFilters.side),
+      closeReason: picked(tableFilters.closeReason),
+    }),
+    [tableFilters],
+  );
   const [tab, setTab] = useState('open');
   const history = useQuery({
     queryKey: ['futures-history', filter],
