@@ -92,7 +92,8 @@ export function applyColumnFilters<T>(rows: T[], columns: ColumnsType<T>, filter
  */
 export function withFilteredValues<T>(columns: ColumnsType<T>, filters: TableFilters): ColumnsType<T> {
   return mapColumns(columns, (column, key) => {
-    const filterable = column.filters != null || column.filterDropdown != null || column.onFilter != null;
+    // Cùng điều kiện với `collectFilterStates` của antd: lệch nhau thì antd thấy lẫn cột controlled và uncontrolled.
+    const filterable = Boolean(column.filters) || column.filterDropdown !== undefined || 'onFilter' in column;
     return filterable ? { ...column, filteredValue: filters[key] ?? null } : column;
   });
 }
