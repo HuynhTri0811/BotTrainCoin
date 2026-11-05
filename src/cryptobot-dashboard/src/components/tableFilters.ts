@@ -73,3 +73,18 @@ export function useTableFilters(scope: string): [TableFilters, (filters: TableFi
   const [state, setState] = useState<{ scope: string; filters: TableFilters }>({ scope, filters: {} });
   return [state.scope === scope ? state.filters : {}, (filters) => setState({ scope, filters })];
 }
+
+/**
+ * Gắn `filteredValue` lấy từ `filters` cho mọi cột có bộ lọc (antd đòi tất cả cùng controlled). Table khi đó hiển thị
+ * đúng bộ lọc đang lưu, kể cả sau khi mount lại (đổi symbol, đang tải, lỗi), nên bảng và file xuất dùng chung một
+ * state: lưu `filters` từ `onChange` của Table rồi truyền vào đây và vào `applyColumnFilters`.
+ */
+export function withFilteredValues<T>(columns: ColumnsType<T>, filters: TableFilters, parent?: string): ColumnsType<T> {
+  return columns.map((column, index) => {
+    const position = parent == null ? String(index) : `${parent}-${index}`;
+    const withChildren =
+      'children' in column ? { ...column, children: withFilteredValues(column.children, filters, position) } : column;
+    const filterable = column.filters != null || column.filterDropdown != null || column.onFilter != null;
+    return filterable ? { ...withChildren, filteredValue: filters[filterKey(column, position)] ?? null } : withChildren;
+  });
+}
