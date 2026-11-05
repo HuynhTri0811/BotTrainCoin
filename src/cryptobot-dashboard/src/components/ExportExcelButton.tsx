@@ -21,7 +21,12 @@ export function ExportExcelButton({
     setBusy(true);
     try {
       const { count, truncatedAt } = await onExport();
-      if (count === 0) message.info('Không có dòng nào để xuất.');
+      if (count === 0 && truncatedAt != null)
+        message.warning(
+          `Không có dòng nào khớp trong ${truncatedAt} dòng mới nhất API trả; dòng cũ hơn có thể khớp nhưng chưa lấy được.`,
+          8,
+        );
+      else if (count === 0) message.info('Không có dòng nào để xuất.');
       else if (truncatedAt != null)
         message.warning(
           `Đã xuất ${count} dòng. API trả tối đa ${truncatedAt} dòng mới nhất mỗi lần nên file có thể thiếu dòng cũ hơn.`,
