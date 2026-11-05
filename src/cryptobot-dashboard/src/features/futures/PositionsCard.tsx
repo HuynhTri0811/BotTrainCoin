@@ -3,7 +3,7 @@ import { Button, Card, Popconfirm, Table, Tabs, Tag, Typography, message } from 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ColumnsType } from 'antd/es/table';
 import { API_MAX_LIMIT, ApiError, api, futuresApi, type FuturesAccount, type FuturesPosition } from '../../api/client';
-import { EXCEL_FORMAT, downloadExcel, truncatedAt, type ExcelColumn } from '../../components/excel';
+import { EXCEL_FORMAT, downloadExcel, limitIfTruncated, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
 import {
   applyColumnFilters,
@@ -12,6 +12,7 @@ import {
   picked,
   serverFilter,
   type TableFilters,
+  withFilteredValues,
 } from '../../components/tableFilters';
 import { excelVnDate, formatVn } from '../../time';
 import { fmtPrice, fmtSigned, fmtUsdt, pnlColor } from './format';
@@ -59,8 +60,13 @@ const EXCEL_COLUMNS: ExcelColumn<FuturesPosition>[] = [
 
 export function PositionsCard({ account }: { account: FuturesAccount | undefined }) {
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState<{ symbol?: string; side?: string; closeReason?: string }>({});
+  // Một state cho mọi bộ lọc của bảng lịch sử (controlled): bộ lọc API lấy ra từ đây, lọc lời/lỗ chạy trên trình duyệt.
   const [tableFilters, setTableFilters] = useState<TableFilters>({});
+  const filter = {
+    symbol: picked(tableFilters.symbol),
+    side: picked(tableFilters.side),
+    closeReason: picked(tableFilters.closeReason),
+  };
   const [tab, setTab] = useState('open');
   const history = useQuery({
     queryKey: ['futures-history', filter],
@@ -140,7 +146,7 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
     const rows = applyColumnFilters(fetched, historyColumns, tableFilters);
     return {
       count: await downloadExcel('lich-su-lenh', 'Lịch sử lệnh', rows, EXCEL_COLUMNS),
-      truncatedAt: truncatedAt(fetched.length, API_MAX_LIMIT.positionHistory),
+      truncatedAt: limitIfTruncated(fetched.length, API_MAX_LIMIT.positionHistory),
     };
   };
 
@@ -225,11 +231,8 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
                 dataSource={closed}
                 pagination={{ pageSize: 10, hideOnSinglePage: true }}
                 scroll={{ x: true }}
-                onChange={(_, filters) => {
-                  setFilter({ symbol: picked(filters.symbol), side: picked(filters.side), closeReason: picked(filters.closeReason) });
-                  setTableFilters(filters);
-                }}
-                columns={historyColumns}
+                onChange={(_, filters) => setTableFilters(filters)}
+                columns={withFilteredValues(historyColumns, tableFilters)}
               />
             ),
           },

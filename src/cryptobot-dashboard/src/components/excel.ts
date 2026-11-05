@@ -6,8 +6,8 @@ export interface ExportResult {
   truncatedAt?: number;
 }
 
-/** `fetched` dòng lấy từ API với `limit`: đủ `limit` thì có thể còn dòng cũ hơn chưa lấy được. */
-export const truncatedAt = (fetched: number, limit: number) => (fetched >= limit ? limit : undefined);
+/** `limit` khi lấy về đủ `limit` dòng (có thể còn dòng cũ hơn chưa lấy được), ngược lại `undefined`. */
+export const limitIfTruncated = (fetched: number, limit: number) => (fetched >= limit ? limit : undefined);
 
 export type ExcelValue = string | number | boolean | Date | null | undefined;
 

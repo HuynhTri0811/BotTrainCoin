@@ -1,4 +1,4 @@
-import { type Key, useState } from 'react';
+import type { Key } from 'react';
 import type { ColumnsType, FilterValue } from 'antd/es/table/interface';
 
 export interface FilterOption {
@@ -37,7 +37,8 @@ export type TableFilters = Record<string, FilterValue | null>;
  */
 function filterKey<T>(column: ColumnsType<T>[number], position: string): string {
   if (column.key != null) return String(column.key);
-  if ('dataIndex' in column && column.dataIndex != null && column.dataIndex !== '') {
+  // antd chỉ dùng dataIndex khi nó truthy: `dataIndex: 0` hay `''` rơi về key theo vị trí.
+  if ('dataIndex' in column && column.dataIndex) {
     return Array.isArray(column.dataIndex) ? column.dataIndex.join('.') : String(column.dataIndex);
   }
   return position;
@@ -65,10 +66,16 @@ export function applyColumnFilters<T>(rows: T[], columns: ColumnsType<T>, filter
 }
 
 /**
- * Bộ lọc đang chọn của một Table, gắn với `scope` (symbol, khung nến…). Đổi `scope` thì bộ lọc về rỗng; đặt
- * `key={scope}` cho Table để Table cũng bỏ bộ lọc cũ, nhờ vậy file xuất luôn khớp bảng.
+ * Gắn `filteredValue` lấy từ `filters` cho mọi cột có bộ lọc (antd đòi tất cả cùng controlled). Table khi đó hiển thị
+ * đúng bộ lọc đang lưu, kể cả sau khi mount lại (đổi symbol, đang tải, lỗi), nên bảng và file xuất dùng chung một
+ * state: lưu `filters` từ `onChange` của Table rồi truyền vào đây và vào `applyColumnFilters`.
  */
-export function useTableFilters(scope: string): [TableFilters, (filters: TableFilters) => void] {
-  const [state, setState] = useState<{ scope: string; filters: TableFilters }>({ scope, filters: {} });
-  return [state.scope === scope ? state.filters : {}, (filters) => setState({ scope, filters })];
+export function withFilteredValues<T>(columns: ColumnsType<T>, filters: TableFilters, parent?: string): ColumnsType<T> {
+  return columns.map((column, index) => {
+    const position = parent == null ? String(index) : `${parent}-${index}`;
+    const withChildren =
+      'children' in column ? { ...column, children: withFilteredValues(column.children, filters, position) } : column;
+    const filterable = column.filters != null || column.filterDropdown != null || column.onFilter != null;
+    return filterable ? { ...withChildren, filteredValue: filters[filterKey(column, position)] ?? null } : withChildren;
+  });
 }

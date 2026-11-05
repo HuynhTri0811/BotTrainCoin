@@ -3,6 +3,14 @@
 Những gì đã làm, theo PR đã merge vào `develop`, mới nhất ở trên. Số trong ngoặc là issue.
 Chi tiết từng tính năng: [features.md](features.md).
 
+## 2026-11-05
+
+- **#108 Bộ lọc controlled cho các bảng xuất Excel** (#101–#107, review #100). Lịch sử vị thế, Dự đoán và Các ngày
+  trước nhận bộ lọc qua `filteredValue` (`withFilteredValues`): bảng và file xuất đọc chung một state nên không còn lệch
+  khi đổi symbol/chế độ hay khi bảng mount lại; bỏ `useTableFilters`. Đổi symbol/chế độ giờ **giữ** bộ lọc. Cảnh báo
+  khi xuất 0 dòng mà dữ liệu bị cắt ở giới hạn API; `filterKey` xử lý `dataIndex` falsy giống antd; đổi tên
+  `truncatedAt` → `limitIfTruncated`.
+
 ## 2026-11-04
 
 - **#100 Sửa các lỗi review của xuất Excel** (#91–#99, review #89). Bộ lọc của bảng Dự đoán và Các ngày trước về rỗng khi đổi
