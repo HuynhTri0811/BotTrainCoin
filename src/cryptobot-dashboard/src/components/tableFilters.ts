@@ -37,7 +37,8 @@ export type TableFilters = Record<string, FilterValue | null>;
  */
 function filterKey<T>(column: ColumnsType<T>[number], position: string): string {
   if (column.key != null) return String(column.key);
-  if ('dataIndex' in column && column.dataIndex != null && column.dataIndex !== '') {
+  // antd chỉ dùng dataIndex khi nó truthy: `dataIndex: 0` hay `''` rơi về key theo vị trí.
+  if ('dataIndex' in column && column.dataIndex) {
     return Array.isArray(column.dataIndex) ? column.dataIndex.join('.') : String(column.dataIndex);
   }
   return position;
