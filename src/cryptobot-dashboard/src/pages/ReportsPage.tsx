@@ -88,11 +88,12 @@ export function ReportsPage() {
   // Chỉ dùng bộ lọc khi bảng đang hiện, để người dùng luôn thấy và bỏ được bộ lọc áp vào file.
   const visibleFilters = older.length > 0 ? tableFilters : {};
 
-  // Các báo cáo gần nhất của symbol đang chọn, mỗi ngày một dòng, gồm cả báo cáo mới nhất hiển thị phía trên. Bộ lọc
-  // đang chọn ở bảng "Các ngày trước" áp cho mọi dòng.
+  // Các báo cáo gần nhất của symbol đang chọn, mỗi ngày một dòng, giống màn hình: báo cáo mới nhất (hiện riêng phía
+  // trên) luôn có, bộ lọc của bảng "Các ngày trước" chỉ áp cho các ngày trước.
   const exportReports = async () => {
     const list = await reportApi.daily(symbol, API_MAX_LIMIT.dailyReports);
-    const rows = applyColumnFilters(list.reports, OLDER_COLUMNS, visibleFilters);
+    const [newest, ...previous] = list.reports;
+    const rows = newest ? [newest, ...applyColumnFilters(previous, OLDER_COLUMNS, visibleFilters)] : [];
     return {
       count: await downloadExcel(`bao-cao-ngay-${symbol}`, 'Báo cáo ngày', rows, EXCEL_COLUMNS),
       truncatedAt: limitIfTruncated(list.reports.length, API_MAX_LIMIT.dailyReports),
