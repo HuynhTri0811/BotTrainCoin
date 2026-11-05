@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Button, Card, Empty, Segmented, Space, Spin, Table, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ColumnsType } from 'antd/es/table';
@@ -66,6 +66,7 @@ export function ReportsPage() {
   const [symbol, setSymbol] = useState('BTCUSDT');
   // Bộ lọc controlled: Table mount lại (đang tải, lỗi) vẫn hiện đúng bộ lọc mà file xuất dùng; đổi symbol thì về rỗng.
   const [tableFilters, setTableFilters] = useScopedFilters(symbol);
+  const tableColumns = useMemo(() => withFilteredValues(OLDER_COLUMNS, tableFilters), [tableFilters]);
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ['daily-reports', symbol],
@@ -140,7 +141,7 @@ export function ReportsPage() {
                 pagination={false}
                 dataSource={older}
                 onChange={(_, filters) => setTableFilters(filters)}
-                columns={withFilteredValues(OLDER_COLUMNS, tableFilters)}
+                columns={tableColumns}
               />
             </Card>
           )}

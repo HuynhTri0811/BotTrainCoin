@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Card, Col, Row, Segmented, Space, Statistic, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useQuery } from '@tanstack/react-query';
@@ -68,6 +68,59 @@ const excelColumns = (day: boolean): ExcelColumn<PredictionHistory>[] => [
   },
 ];
 
+/** Cột bảng lịch sử dự đoán; bộ lọc của bảng cũng dùng khi xuất Excel. */
+const historyColumns = (day: boolean): ColumnsType<PredictionHistory> => [
+  { title: day ? 'Ngày (mở lúc)' : 'Nến (mở lúc)', dataIndex: 'time', render: formatVnUnix },
+  {
+    title: 'Đoán',
+    dataIndex: 'predicted',
+    ...columnFilter<PredictionHistory>((entry) => entry.predicted, DIRECTIONS),
+    render: (direction: PriceDirection) => <DirectionTag direction={direction} />,
+  },
+  {
+    title: 'Thực tế',
+    dataIndex: 'actual',
+    ...columnFilter<PredictionHistory>((entry) => entry.actual ?? 'Flat', [
+      ...DIRECTIONS,
+      { text: 'Đứng giá', value: 'Flat' },
+    ]),
+    render: (direction: PriceDirection | null) => <DirectionTag direction={direction} />,
+  },
+  {
+    title: 'Giá đóng',
+    key: 'close',
+    align: 'right',
+    render: (_, entry) => `${fmtPrice(entry.previousClose)} → ${fmtPrice(entry.close)}`,
+  },
+  {
+    title: 'Tăng/giảm',
+    key: 'change',
+    align: 'right',
+    render: (_, entry) => (
+      <span style={{ color: entry.change > 0 ? '#16a34a' : entry.change < 0 ? '#dc2626' : undefined, fontVariantNumeric: 'tabular-nums' }}>
+        {entry.change > 0 ? '+' : ''}
+        {fmtPrice(entry.change)} ({entry.changePercent > 0 ? '+' : ''}
+        {entry.changePercent.toFixed(2)}%)
+      </span>
+    ),
+  },
+  {
+    title: 'Kết quả',
+    key: 'hit',
+    ...columnFilter<PredictionHistory>(
+      (entry) => outcomeOf(entry) ?? 'None',
+      [
+        { text: 'Đúng', value: 'Hit' },
+        { text: 'Sai', value: 'Miss' },
+      ],
+    ),
+    render: (_, entry) => {
+      const outcome = outcomeOf(entry);
+      return outcome == null ? '—' : <Tag color={outcome === 'Hit' ? 'green' : 'red'}>{OUTCOME_TEXT[outcome]}</Tag>;
+    },
+  },
+];
+
 /**
  * Kết quả hàm core PriceDirectionPredictor: nến kế tiếp (hoặc ngày hiện tại) lên hay xuống, tỷ lệ đúng khi chạy thử
  * trên lịch sử, và các lần đoán gần nhất so với thực tế. Sửa hàm trong Domain rồi restart API để thấy kết quả mới.
@@ -90,57 +143,8 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
   const recentHits = prediction?.recent.filter((entry) => outcomeOf(entry) === 'Hit').length ?? 0;
   const recentCounted = prediction?.recent.filter((entry) => outcomeOf(entry) != null).length ?? 0;
 
-  const columns: ColumnsType<PredictionHistory> = [
-    { title: day ? 'Ngày (mở lúc)' : 'Nến (mở lúc)', dataIndex: 'time', render: formatVnUnix },
-    {
-      title: 'Đoán',
-      dataIndex: 'predicted',
-      ...columnFilter<PredictionHistory>((entry) => entry.predicted, DIRECTIONS),
-      render: (direction: PriceDirection) => <DirectionTag direction={direction} />,
-    },
-    {
-      title: 'Thực tế',
-      dataIndex: 'actual',
-      ...columnFilter<PredictionHistory>((entry) => entry.actual ?? 'Flat', [
-        ...DIRECTIONS,
-        { text: 'Đứng giá', value: 'Flat' },
-      ]),
-      render: (direction: PriceDirection | null) => <DirectionTag direction={direction} />,
-    },
-    {
-      title: 'Giá đóng',
-      key: 'close',
-      align: 'right',
-      render: (_, entry) => `${fmtPrice(entry.previousClose)} → ${fmtPrice(entry.close)}`,
-    },
-    {
-      title: 'Tăng/giảm',
-      key: 'change',
-      align: 'right',
-      render: (_, entry) => (
-        <span style={{ color: entry.change > 0 ? '#16a34a' : entry.change < 0 ? '#dc2626' : undefined, fontVariantNumeric: 'tabular-nums' }}>
-          {entry.change > 0 ? '+' : ''}
-          {fmtPrice(entry.change)} ({entry.changePercent > 0 ? '+' : ''}
-          {entry.changePercent.toFixed(2)}%)
-        </span>
-      ),
-    },
-    {
-      title: 'Kết quả',
-      key: 'hit',
-      ...columnFilter<PredictionHistory>(
-        (entry) => outcomeOf(entry) ?? 'None',
-        [
-          { text: 'Đúng', value: 'Hit' },
-          { text: 'Sai', value: 'Miss' },
-        ],
-      ),
-      render: (_, entry) => {
-        const outcome = outcomeOf(entry);
-        return outcome == null ? '—' : <Tag color={outcome === 'Hit' ? 'green' : 'red'}>{OUTCOME_TEXT[outcome]}</Tag>;
-      },
-    },
-  ];
+  const columns = useMemo(() => historyColumns(day), [day]);
+  const tableColumns = useMemo(() => withFilteredValues(columns, tableFilters), [columns, tableFilters]);
 
   // Đúng các dòng bảng đang hiển thị (sau bộ lọc Đoán / Thực tế / Kết quả), mọi trang.
   const exportHistory = async () => {
@@ -219,7 +223,7 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
             pagination={{ pageSize: 10, hideOnSinglePage: true, size: 'small' }}
             scroll={{ x: 'max-content' }}
             onChange={(_, filters) => setTableFilters(filters)}
-            columns={withFilteredValues(columns, tableFilters)}
+            columns={tableColumns}
           />
         </>
       )}
