@@ -1,16 +1,25 @@
 import { useState } from 'react';
 import { Card, Table, Tag } from 'antd';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { api, type Signal, type Strategy } from '../api/client';
-import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../components/excel';
+import { API_MAX_LIMIT, api, type Signal, type Strategy } from '../api/client';
+import { EXCEL_FORMAT, downloadExcel, limitIfTruncated, type ExcelColumn } from '../components/excel';
 import { ExportExcelButton } from '../components/ExportExcelButton';
 import { picked, serverFilter } from '../components/tableFilters';
 import { excelVnDate, formatVn } from '../time';
 
 const priceFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 8 });
 
-/** API trả tối đa 1000 tín hiệu mỗi lần (BotEndpoints). */
-const EXPORT_LIMIT = 1000;
+/** Cột file Excel; tên cột EMA theo tham số của chiến lược (`EMA9`, `EMA21`). */
+const excelColumns = (fastLabel: string, slowLabel: string): ExcelColumn<Signal>[] => [
+  { header: 'Hành động', value: (signal) => signal.action.toUpperCase() },
+  { header: 'Nến (mở)', value: (signal) => excelVnDate(signal.candleOpenTimeUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
+  { header: 'Close', value: (signal) => signal.candleClose, format: EXCEL_FORMAT.price, width: 12 },
+  { header: fastLabel, value: (signal) => signal.fastEma, format: EXCEL_FORMAT.price, width: 12 },
+  { header: slowLabel, value: (signal) => signal.slowEma, format: EXCEL_FORMAT.price, width: 12 },
+  { header: 'Lý do', value: (signal) => signal.reason, width: 60 },
+  { header: 'Loại', value: (signal) => (signal.isBackfill ? 'Backfill' : 'Mới') },
+  { header: 'Tạo lúc', value: (signal) => excelVnDate(signal.createdAtUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
+];
 
 /** Tín hiệu Buy/Sell gần đây của chiến lược EMA đang chọn. */
 export function SignalsPage({ strategy }: { strategy: Strategy }) {
@@ -27,18 +36,12 @@ export function SignalsPage({ strategy }: { strategy: Strategy }) {
 
   // Tải lại với giới hạn lớn nhất của API (bảng chỉ tải 50 tín hiệu gần nhất), cùng bộ lọc đang chọn.
   const exportSignals = async () => {
-    const columns: ExcelColumn<Signal>[] = [
-      { header: 'Hành động', value: (signal) => signal.action.toUpperCase() },
-      { header: 'Nến (mở)', value: (signal) => excelVnDate(signal.candleOpenTimeUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
-      { header: 'Close', value: (signal) => signal.candleClose, format: EXCEL_FORMAT.price, width: 12 },
-      { header: fastLabel, value: (signal) => signal.fastEma, format: EXCEL_FORMAT.price, width: 12 },
-      { header: slowLabel, value: (signal) => signal.slowEma, format: EXCEL_FORMAT.price, width: 12 },
-      { header: 'Lý do', value: (signal) => signal.reason, width: 60 },
-      { header: 'Loại', value: (signal) => (signal.isBackfill ? 'Backfill' : 'Mới') },
-      { header: 'Tạo lúc', value: (signal) => excelVnDate(signal.createdAtUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
-    ];
-    const rows = await api.signals(strategy.id, filter, EXPORT_LIMIT);
-    return downloadExcel(`tin-hieu-${strategy.symbol}-${strategy.interval}`, 'Tín hiệu', rows, columns);
+    const rows = await api.signals(strategy.id, filter, API_MAX_LIMIT.signals);
+    return {
+      count: await downloadExcel(`tin-hieu-${strategy.symbol}-${strategy.interval}`, 'Tín hiệu', rows,
+        excelColumns(fastLabel, slowLabel)),
+      truncatedAt: limitIfTruncated(rows.length, API_MAX_LIMIT.signals),
+    };
   };
 
   return (

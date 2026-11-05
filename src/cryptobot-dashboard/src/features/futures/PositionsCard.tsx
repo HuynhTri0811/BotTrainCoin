@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Button, Card, Popconfirm, Table, Tabs, Tag, Typography, message } from 'antd';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ColumnsType } from 'antd/es/table';
-import { ApiError, api, futuresApi, type FuturesAccount, type FuturesPosition } from '../../api/client';
-import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
+import { API_MAX_LIMIT, ApiError, api, futuresApi, type FuturesAccount, type FuturesPosition } from '../../api/client';
+import { EXCEL_FORMAT, downloadExcel, limitIfTruncated, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
 import {
   applyColumnFilters,
@@ -12,6 +12,7 @@ import {
   picked,
   serverFilter,
   type TableFilters,
+  withFilteredValues,
 } from '../../components/tableFilters';
 import { excelVnDate, formatVn } from '../../time';
 import { fmtPrice, fmtSigned, fmtUsdt, pnlColor } from './format';
@@ -34,9 +35,6 @@ const SIDES = [
   { text: 'Long', value: 'Long' },
   { text: 'Short', value: 'Short' },
 ];
-
-/** API trả tối đa 500 lệnh đã đóng mỗi lần (PaperFuturesEndpoints). */
-const EXPORT_LIMIT = 500;
 
 const EXCEL_COLUMNS: ExcelColumn<FuturesPosition>[] = [
   { header: 'Mở lúc', value: (position) => excelVnDate(position.openedAtUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
@@ -62,8 +60,13 @@ const EXCEL_COLUMNS: ExcelColumn<FuturesPosition>[] = [
 
 export function PositionsCard({ account }: { account: FuturesAccount | undefined }) {
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState<{ symbol?: string; side?: string; closeReason?: string }>({});
+  // Một state cho mọi bộ lọc của bảng lịch sử (controlled): bộ lọc API lấy ra từ đây, lọc lời/lỗ chạy trên trình duyệt.
   const [tableFilters, setTableFilters] = useState<TableFilters>({});
+  const filter = {
+    symbol: picked(tableFilters.symbol),
+    side: picked(tableFilters.side),
+    closeReason: picked(tableFilters.closeReason),
+  };
   const [tab, setTab] = useState('open');
   const history = useQuery({
     queryKey: ['futures-history', filter],
@@ -136,10 +139,15 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
     },
   ];
 
-  // Tải lại với giới hạn lớn nhất của API (bảng chỉ tải 50 lệnh gần nhất), cùng bộ lọc đang chọn trên bảng.
+  // Tải lại với giới hạn lớn nhất của API (bảng chỉ tải 50 lệnh gần nhất), cùng bộ lọc đang chọn trên bảng. Lọc lời/lỗ
+  // chạy sau khi tải nên nếu bị cắt ở giới hạn API thì cũng chỉ lọc trên các lệnh mới nhất đó: nút sẽ cảnh báo.
   const exportHistory = async () => {
-    const rows = applyColumnFilters(await futuresApi.history(filter, EXPORT_LIMIT), historyColumns, tableFilters);
-    return downloadExcel('lich-su-lenh', 'Lịch sử lệnh', rows, EXCEL_COLUMNS);
+    const fetched = await futuresApi.history(filter, API_MAX_LIMIT.positionHistory);
+    const rows = applyColumnFilters(fetched, historyColumns, tableFilters);
+    return {
+      count: await downloadExcel('lich-su-lenh', 'Lịch sử lệnh', rows, EXCEL_COLUMNS),
+      truncatedAt: limitIfTruncated(fetched.length, API_MAX_LIMIT.positionHistory),
+    };
   };
 
   return (
@@ -223,11 +231,8 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
                 dataSource={closed}
                 pagination={{ pageSize: 10, hideOnSinglePage: true }}
                 scroll={{ x: true }}
-                onChange={(_, filters) => {
-                  setFilter({ symbol: picked(filters.symbol), side: picked(filters.side), closeReason: picked(filters.closeReason) });
-                  setTableFilters(filters);
-                }}
-                columns={historyColumns}
+                onChange={(_, filters) => setTableFilters(filters)}
+                columns={withFilteredValues(historyColumns, tableFilters)}
               />
             ),
           },

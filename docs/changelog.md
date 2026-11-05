@@ -3,8 +3,20 @@
 Những gì đã làm, theo PR đã merge vào `develop`, mới nhất ở trên. Số trong ngoặc là issue.
 Chi tiết từng tính năng: [features.md](features.md).
 
+## 2026-11-05
+
+- **#108 Bộ lọc controlled cho các bảng xuất Excel** (#101–#107, review #100). Lịch sử vị thế, Dự đoán và Các ngày
+  trước nhận bộ lọc qua `filteredValue` (`withFilteredValues`): bảng và file xuất đọc chung một state nên không còn lệch
+  khi đổi symbol/chế độ hay khi bảng mount lại; bỏ `useTableFilters`. Đổi symbol/chế độ giờ **giữ** bộ lọc. Cảnh báo
+  khi xuất 0 dòng mà dữ liệu bị cắt ở giới hạn API; `filterKey` xử lý `dataIndex` falsy giống antd; đổi tên
+  `truncatedAt` → `limitIfTruncated`.
+
 ## 2026-11-04
 
+- **#100 Sửa các lỗi review của xuất Excel** (#91–#99, review #89). Bộ lọc của bảng Dự đoán và Các ngày trước về rỗng khi đổi
+  symbol/khung (trước đó file xuất vẫn lọc theo bộ lọc cũ đã mất trên bảng); `applyColumnFilters` tìm key giống antd
+  (`dataIndex` mảng, vị trí cột, cột con); Báo cáo ngày xuất theo bộ lọc đang chọn; cảnh báo khi dữ liệu bị cắt ở giới
+  hạn API (`API_MAX_LIMIT`); gom cách tính đúng/sai của dự đoán vào `outcomeOf`; cột Excel khai báo ngoài component.
 - **#89 Xuất Excel cho các bảng trên dashboard**. Nút "Xuất Excel" (.xlsx) ở Lịch sử vị thế, Tín hiệu, Báo cáo ngày
   và Dự đoán; file giữ bộ lọc đang chọn, số là số, giờ theo giờ Việt Nam. Thêm `write-excel-file` (tải khi bấm nút),
   `components/excel.ts`, `ExportExcelButton`, `applyColumnFilters`. Không đổi backend.

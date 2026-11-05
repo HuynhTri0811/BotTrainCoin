@@ -1,3 +1,4 @@
+import type { Key } from 'react';
 import type { ColumnsType, FilterValue } from 'antd/es/table/interface';
 
 export interface FilterOption {
@@ -31,14 +32,50 @@ export function optionsFrom<T>(rows: T[], value: (row: T) => string): FilterOpti
 export type TableFilters = Record<string, FilterValue | null>;
 
 /**
+ * Key antd dùng cho bộ lọc của cột (giống `getColumnKey` của antd): `key`, rồi `dataIndex` (mảng nối bằng `.`), rồi vị
+ * trí cột (`0`, `1-0` cho cột con).
+ */
+function filterKey<T>(column: ColumnsType<T>[number], position: string): string {
+  if (column.key != null) return String(column.key);
+  // antd chỉ dùng dataIndex khi nó truthy: `dataIndex: 0` hay `''` rơi về key theo vị trí.
+  if ('dataIndex' in column && column.dataIndex) {
+    return Array.isArray(column.dataIndex) ? column.dataIndex.join('.') : String(column.dataIndex);
+  }
+  return position;
+}
+
+type ActiveFilter<T> = { onFilter: (value: boolean | Key, row: T) => boolean; selected: FilterValue };
+
+function activeFilters<T>(columns: ColumnsType<T>, filters: TableFilters, parent?: string): ActiveFilter<T>[] {
+  return columns.flatMap((column, index) => {
+    const position = parent == null ? String(index) : `${parent}-${index}`;
+    const children = 'children' in column ? activeFilters(column.children, filters, position) : [];
+    const selected = filters[filterKey(column, position)];
+    return column.onFilter && selected?.length ? [{ onFilter: column.onFilter, selected }, ...children] : children;
+  });
+}
+
+/**
  * Các dòng còn lại sau bộ lọc `columnFilter` đang chọn, đúng như Table hiển thị (lấy `filters` từ `onChange` của
- * Table). Cột lọc phía API (`serverFilter`) không có `onFilter` nên bỏ qua. Cột có bộ lọc cần `key` hoặc `dataIndex`.
+ * Table). Cột lọc phía API (`serverFilter`) không có `onFilter` nên bỏ qua. Trong một cột: khớp một lựa chọn là đủ;
+ * giữa các cột: phải khớp tất cả (như antd).
  */
 export function applyColumnFilters<T>(rows: T[], columns: ColumnsType<T>, filters: TableFilters): T[] {
-  const active = columns.flatMap((column) => {
-    const key = column.key ?? ('dataIndex' in column ? column.dataIndex : undefined);
-    const selected = key == null ? null : filters[String(key)];
-    return column.onFilter && selected?.length ? [{ onFilter: column.onFilter, selected }] : [];
-  });
+  const active = activeFilters(columns, filters);
   return rows.filter((row) => active.every(({ onFilter, selected }) => selected.some((value) => onFilter(value, row))));
+}
+
+/**
+ * Gắn `filteredValue` lấy từ `filters` cho mọi cột có bộ lọc (antd đòi tất cả cùng controlled). Table khi đó hiển thị
+ * đúng bộ lọc đang lưu, kể cả sau khi mount lại (đổi symbol, đang tải, lỗi), nên bảng và file xuất dùng chung một
+ * state: lưu `filters` từ `onChange` của Table rồi truyền vào đây và vào `applyColumnFilters`.
+ */
+export function withFilteredValues<T>(columns: ColumnsType<T>, filters: TableFilters, parent?: string): ColumnsType<T> {
+  return columns.map((column, index) => {
+    const position = parent == null ? String(index) : `${parent}-${index}`;
+    const withChildren =
+      'children' in column ? { ...column, children: withFilteredValues(column.children, filters, position) } : column;
+    const filterable = column.filters != null || column.filterDropdown != null || column.onFilter != null;
+    return filterable ? { ...withChildren, filteredValue: filters[filterKey(column, position)] ?? null } : withChildren;
+  });
 }
