@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { predictionApi, type PredictionHistory, type PriceDirection } from '../../api/client';
 import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
-import { applyColumnFilters, columnFilter, useTableFilters } from '../../components/tableFilters';
+import { applyColumnFilters, columnFilter, withFilteredValues, type TableFilters } from '../../components/tableFilters';
 import { fmtPrice2 as fmtPrice } from '../futures/format';
 import { excelVnDateUnix, formatVnUnix } from '../../time';
 
@@ -74,12 +74,11 @@ const excelColumns = (day: boolean): ExcelColumn<PredictionHistory>[] => [
  */
 export function PredictionCard({ symbol, interval }: { symbol: string; interval: string }) {
   const [mode, setMode] = useState<Mode>('candle');
+  // Bộ lọc controlled: bảng và file xuất cùng đọc state này (giữ nguyên khi đổi chế độ/symbol).
+  const [tableFilters, setTableFilters] = useState<TableFilters>({});
   const day = mode === 'day';
   // 1 ngày: cùng hàm dự đoán nhưng chạy trên nến ngày (1d), nến được đoán là ngày đang chạy.
   const queryInterval = day ? '1d' : interval;
-  // Đổi symbol/khung thì bảng (key) và bộ lọc dùng khi xuất cùng về rỗng.
-  const tableScope = `${symbol}-${queryInterval}`;
-  const [tableFilters, setTableFilters] = useTableFilters(tableScope);
   const unit = day ? 'ngày' : 'nến';
   const query = useQuery({
     queryKey: ['prediction', symbol, queryInterval],
@@ -210,7 +209,6 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
           </Typography.Paragraph>
 
           <Table<PredictionHistory>
-            key={tableScope}
             rowKey="time"
             size="small"
             style={{ marginTop: 12 }}
@@ -218,7 +216,7 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
             pagination={{ pageSize: 10, hideOnSinglePage: true, size: 'small' }}
             scroll={{ x: 'max-content' }}
             onChange={(_, filters) => setTableFilters(filters)}
-            columns={columns}
+            columns={withFilteredValues(columns, tableFilters)}
           />
         </>
       )}
