@@ -44,15 +44,35 @@ function filterKey<T>(column: ColumnsType<T>[number], position: string): string 
   return position;
 }
 
+type Column<T> = ColumnsType<T>[number];
+
+/**
+ * Dựng lại cây cột, gọi `visit` cho từng cột (cả cột con, sau khi đã đổi cột con) với key bộ lọc antd dùng cho cột đó.
+ * Mọi chỗ cần key bộ lọc đi qua đây để bảng và file xuất luôn tính key giống nhau.
+ */
+function mapColumns<T>(
+  columns: ColumnsType<T>,
+  visit: (column: Column<T>, key: string) => Column<T>,
+  parent?: string,
+): ColumnsType<T> {
+  return columns.map((column, index) => {
+    const position = parent == null ? String(index) : `${parent}-${index}`;
+    const withChildren =
+      'children' in column ? { ...column, children: mapColumns(column.children, visit, position) } : column;
+    return visit(withChildren, filterKey(column, position));
+  });
+}
+
 type ActiveFilter<T> = { onFilter: (value: boolean | Key, row: T) => boolean; selected: FilterValue };
 
-function activeFilters<T>(columns: ColumnsType<T>, filters: TableFilters, parent?: string): ActiveFilter<T>[] {
-  return columns.flatMap((column, index) => {
-    const position = parent == null ? String(index) : `${parent}-${index}`;
-    const children = 'children' in column ? activeFilters(column.children, filters, position) : [];
-    const selected = filters[filterKey(column, position)];
-    return column.onFilter && selected?.length ? [{ onFilter: column.onFilter, selected }, ...children] : children;
+function activeFilters<T>(columns: ColumnsType<T>, filters: TableFilters): ActiveFilter<T>[] {
+  const active: ActiveFilter<T>[] = [];
+  mapColumns(columns, (column, key) => {
+    const selected = filters[key];
+    if (column.onFilter && selected?.length) active.push({ onFilter: column.onFilter, selected });
+    return column;
   });
+  return active;
 }
 
 /**
@@ -70,12 +90,9 @@ export function applyColumnFilters<T>(rows: T[], columns: ColumnsType<T>, filter
  * đúng bộ lọc đang lưu, kể cả sau khi mount lại (đổi symbol, đang tải, lỗi), nên bảng và file xuất dùng chung một
  * state: lưu `filters` từ `onChange` của Table rồi truyền vào đây và vào `applyColumnFilters`.
  */
-export function withFilteredValues<T>(columns: ColumnsType<T>, filters: TableFilters, parent?: string): ColumnsType<T> {
-  return columns.map((column, index) => {
-    const position = parent == null ? String(index) : `${parent}-${index}`;
-    const withChildren =
-      'children' in column ? { ...column, children: withFilteredValues(column.children, filters, position) } : column;
+export function withFilteredValues<T>(columns: ColumnsType<T>, filters: TableFilters): ColumnsType<T> {
+  return mapColumns(columns, (column, key) => {
     const filterable = column.filters != null || column.filterDropdown != null || column.onFilter != null;
-    return filterable ? { ...withChildren, filteredValue: filters[filterKey(column, position)] ?? null } : withChildren;
+    return filterable ? { ...column, filteredValue: filters[key] ?? null } : column;
   });
 }
