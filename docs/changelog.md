@@ -5,6 +5,10 @@ Chi tiết từng tính năng: [features.md](features.md).
 
 ## 2026-11-05
 
+- **#118 Sửa các lỗi review của bộ lọc controlled** (#110–#117, review #108). Đổi symbol/khung/chế độ lại đưa bộ lọc
+  về rỗng (`useScopedFilters`, đặt lại ngay khi render) và bảng Dự đoán về trang 1; Báo cáo ngày không áp bộ lọc khi
+  bảng Các ngày trước không hiện, và file luôn có báo cáo mới nhất; `withFilteredValues` nhận diện cột lọc giống antd;
+  `activeFilters` và `withFilteredValues` dùng chung `mapColumns`; cột bảng và bộ lọc API được `useMemo`.
 - **#108 Bộ lọc controlled cho các bảng xuất Excel** (#101–#107, review #100). Lịch sử vị thế, Dự đoán và Các ngày
   trước nhận bộ lọc qua `filteredValue` (`withFilteredValues`): bảng và file xuất đọc chung một state nên không còn lệch
   khi đổi symbol/chế độ hay khi bảng mount lại; bỏ `useTableFilters`. Đổi symbol/chế độ giờ **giữ** bộ lọc. Cảnh báo

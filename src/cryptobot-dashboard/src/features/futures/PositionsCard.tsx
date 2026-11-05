@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button, Card, Popconfirm, Table, Tabs, Tag, Typography, message } from 'antd';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ColumnsType } from 'antd/es/table';
@@ -62,11 +62,14 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
   const queryClient = useQueryClient();
   // Một state cho mọi bộ lọc của bảng lịch sử (controlled): bộ lọc API lấy ra từ đây, lọc lời/lỗ chạy trên trình duyệt.
   const [tableFilters, setTableFilters] = useState<TableFilters>({});
-  const filter = {
-    symbol: picked(tableFilters.symbol),
-    side: picked(tableFilters.side),
-    closeReason: picked(tableFilters.closeReason),
-  };
+  const filter = useMemo(
+    () => ({
+      symbol: picked(tableFilters.symbol),
+      side: picked(tableFilters.side),
+      closeReason: picked(tableFilters.closeReason),
+    }),
+    [tableFilters],
+  );
   const [tab, setTab] = useState('open');
   const history = useQuery({
     queryKey: ['futures-history', filter],
@@ -90,54 +93,60 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
   const open = account?.openPositions ?? [];
   const closed = history.data ?? [];
 
-  const historyColumns: ColumnsType<FuturesPosition> = [
-    { title: 'Đóng lúc', dataIndex: 'closedAtUtc', render: formatVn },
-    {
-      title: 'Symbol',
-      dataIndex: 'symbol',
-      ...serverFilter(optionsFrom(status.data?.strategies ?? [], (strategy) => strategy.symbol)),
-    },
-    {
-      title: 'Hướng',
-      key: 'side',
-      ...serverFilter(SIDES),
-      render: (_, position) => sideTag(position),
-    },
-    {
-      title: 'Lý do',
-      dataIndex: 'closeReason',
-      ...serverFilter(Object.entries(reasonLabel).map(([value, { text }]) => ({ text, value }))),
-      render: (reason: string) => <Tag color={reasonLabel[reason]?.color}>{reasonLabel[reason]?.text ?? reason}</Tag>,
-    },
-    { title: 'Giá vào', dataIndex: 'entryPrice', align: 'right', render: fmtPrice },
-    { title: 'Giá ra', dataIndex: 'exitPrice', align: 'right', render: fmtPrice },
-    {
-      title: 'PnL giá',
-      dataIndex: 'realizedPnl',
-      align: 'right',
-      render: (value: number) => <span style={{ color: pnlColor(value) }}>{fmtSigned(value)}</span>,
-    },
-    {
-      title: 'Phí',
-      key: 'fees',
-      align: 'right',
-      render: (_, position) => fmtSigned(-(position.openFee + position.closeFee)),
-    },
-    {
-      title: 'PnL ròng',
-      dataIndex: 'netPnl',
-      ...columnFilter<FuturesPosition>((position) => ((position.netPnl ?? 0) >= 0 ? 'Win' : 'Loss'), [
-        { text: 'Lời', value: 'Win' },
-        { text: 'Lỗ', value: 'Loss' },
-      ]),
-      align: 'right',
-      render: (value: number) => (
-        <Typography.Text strong style={{ color: pnlColor(value) }}>
-          {fmtSigned(value)}
-        </Typography.Text>
-      ),
-    },
-  ];
+  // Dựng lại cột chỉ khi danh sách chiến lược hoặc bộ lọc đổi, không phải mỗi lần poll 5 giây.
+  const strategies = status.data?.strategies;
+  const historyColumns = useMemo<ColumnsType<FuturesPosition>>(
+    () => [
+      { title: 'Đóng lúc', dataIndex: 'closedAtUtc', render: formatVn },
+      {
+        title: 'Symbol',
+        dataIndex: 'symbol',
+        ...serverFilter(optionsFrom(strategies ?? [], (strategy) => strategy.symbol)),
+      },
+      {
+        title: 'Hướng',
+        key: 'side',
+        ...serverFilter(SIDES),
+        render: (_, position) => sideTag(position),
+      },
+      {
+        title: 'Lý do',
+        dataIndex: 'closeReason',
+        ...serverFilter(Object.entries(reasonLabel).map(([value, { text }]) => ({ text, value }))),
+        render: (reason: string) => <Tag color={reasonLabel[reason]?.color}>{reasonLabel[reason]?.text ?? reason}</Tag>,
+      },
+      { title: 'Giá vào', dataIndex: 'entryPrice', align: 'right', render: fmtPrice },
+      { title: 'Giá ra', dataIndex: 'exitPrice', align: 'right', render: fmtPrice },
+      {
+        title: 'PnL giá',
+        dataIndex: 'realizedPnl',
+        align: 'right',
+        render: (value: number) => <span style={{ color: pnlColor(value) }}>{fmtSigned(value)}</span>,
+      },
+      {
+        title: 'Phí',
+        key: 'fees',
+        align: 'right',
+        render: (_, position) => fmtSigned(-(position.openFee + position.closeFee)),
+      },
+      {
+        title: 'PnL ròng',
+        dataIndex: 'netPnl',
+        ...columnFilter<FuturesPosition>((position) => ((position.netPnl ?? 0) >= 0 ? 'Win' : 'Loss'), [
+          { text: 'Lời', value: 'Win' },
+          { text: 'Lỗ', value: 'Loss' },
+        ]),
+        align: 'right',
+        render: (value: number) => (
+          <Typography.Text strong style={{ color: pnlColor(value) }}>
+            {fmtSigned(value)}
+          </Typography.Text>
+        ),
+      },
+    ],
+    [strategies],
+  );
+  const tableColumns = useMemo(() => withFilteredValues(historyColumns, tableFilters), [historyColumns, tableFilters]);
 
   // Tải lại với giới hạn lớn nhất của API (bảng chỉ tải 50 lệnh gần nhất), cùng bộ lọc đang chọn trên bảng. Lọc lời/lỗ
   // chạy sau khi tải nên nếu bị cắt ở giới hạn API thì cũng chỉ lọc trên các lệnh mới nhất đó: nút sẽ cảnh báo.
@@ -232,7 +241,7 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
                 pagination={{ pageSize: 10, hideOnSinglePage: true }}
                 scroll={{ x: true }}
                 onChange={(_, filters) => setTableFilters(filters)}
-                columns={withFilteredValues(historyColumns, tableFilters)}
+                columns={tableColumns}
               />
             ),
           },
