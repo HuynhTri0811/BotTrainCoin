@@ -12,6 +12,7 @@ import {
   picked,
   serverFilter,
   type TableFilters,
+  withFilteredValues,
 } from '../../components/tableFilters';
 import { excelVnDate, formatVn } from '../../time';
 import { fmtPrice, fmtSigned, fmtUsdt, pnlColor } from './format';
@@ -59,8 +60,13 @@ const EXCEL_COLUMNS: ExcelColumn<FuturesPosition>[] = [
 
 export function PositionsCard({ account }: { account: FuturesAccount | undefined }) {
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState<{ symbol?: string; side?: string; closeReason?: string }>({});
+  // Một state cho mọi bộ lọc của bảng lịch sử (controlled): bộ lọc API lấy ra từ đây, lọc lời/lỗ chạy trên trình duyệt.
   const [tableFilters, setTableFilters] = useState<TableFilters>({});
+  const filter = {
+    symbol: picked(tableFilters.symbol),
+    side: picked(tableFilters.side),
+    closeReason: picked(tableFilters.closeReason),
+  };
   const [tab, setTab] = useState('open');
   const history = useQuery({
     queryKey: ['futures-history', filter],
@@ -225,11 +231,8 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
                 dataSource={closed}
                 pagination={{ pageSize: 10, hideOnSinglePage: true }}
                 scroll={{ x: true }}
-                onChange={(_, filters) => {
-                  setFilter({ symbol: picked(filters.symbol), side: picked(filters.side), closeReason: picked(filters.closeReason) });
-                  setTableFilters(filters);
-                }}
-                columns={historyColumns}
+                onChange={(_, filters) => setTableFilters(filters)}
+                columns={withFilteredValues(historyColumns, tableFilters)}
               />
             ),
           },
