@@ -3,7 +3,7 @@ import { Button, Card, Popconfirm, Table, Tabs, Tag, Typography, message } from 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ColumnsType } from 'antd/es/table';
 import { API_MAX_LIMIT, ApiError, api, futuresApi, type FuturesAccount, type FuturesPosition } from '../../api/client';
-import { EXCEL_FORMAT, downloadExcel, truncatedAt, type ExcelColumn } from '../../components/excel';
+import { EXCEL_FORMAT, downloadExcel, limitIfTruncated, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
 import {
   applyColumnFilters,
@@ -140,7 +140,7 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
     const rows = applyColumnFilters(fetched, historyColumns, tableFilters);
     return {
       count: await downloadExcel('lich-su-lenh', 'Lịch sử lệnh', rows, EXCEL_COLUMNS),
-      truncatedAt: truncatedAt(fetched.length, API_MAX_LIMIT.positionHistory),
+      truncatedAt: limitIfTruncated(fetched.length, API_MAX_LIMIT.positionHistory),
     };
   };
 

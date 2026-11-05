@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card, Table, Tag } from 'antd';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { API_MAX_LIMIT, api, type Signal, type Strategy } from '../api/client';
-import { EXCEL_FORMAT, downloadExcel, truncatedAt, type ExcelColumn } from '../components/excel';
+import { EXCEL_FORMAT, downloadExcel, limitIfTruncated, type ExcelColumn } from '../components/excel';
 import { ExportExcelButton } from '../components/ExportExcelButton';
 import { picked, serverFilter } from '../components/tableFilters';
 import { excelVnDate, formatVn } from '../time';
@@ -40,7 +40,7 @@ export function SignalsPage({ strategy }: { strategy: Strategy }) {
     return {
       count: await downloadExcel(`tin-hieu-${strategy.symbol}-${strategy.interval}`, 'Tín hiệu', rows,
         excelColumns(fastLabel, slowLabel)),
-      truncatedAt: truncatedAt(rows.length, API_MAX_LIMIT.signals),
+      truncatedAt: limitIfTruncated(rows.length, API_MAX_LIMIT.signals),
     };
   };
 

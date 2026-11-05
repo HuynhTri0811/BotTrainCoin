@@ -3,7 +3,7 @@ import { Alert, Button, Card, Empty, Segmented, Space, Spin, Table, Typography, 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ColumnsType } from 'antd/es/table';
 import { API_MAX_LIMIT, reportApi, type SavedDailyReport } from '../api/client';
-import { EXCEL_FORMAT, downloadExcel, truncatedAt, type ExcelColumn } from '../components/excel';
+import { EXCEL_FORMAT, downloadExcel, limitIfTruncated, type ExcelColumn } from '../components/excel';
 import { ExportExcelButton } from '../components/ExportExcelButton';
 import { applyColumnFilters, columnFilter, useTableFilters } from '../components/tableFilters';
 import { DailyReportCard, fmtPct2, pctColor } from '../features/reports/DailyReportCard';
@@ -92,7 +92,7 @@ export function ReportsPage() {
     const rows = applyColumnFilters(list.reports, OLDER_COLUMNS, tableFilters);
     return {
       count: await downloadExcel(`bao-cao-ngay-${symbol}`, 'Báo cáo ngày', rows, EXCEL_COLUMNS),
-      truncatedAt: truncatedAt(list.reports.length, API_MAX_LIMIT.dailyReports),
+      truncatedAt: limitIfTruncated(list.reports.length, API_MAX_LIMIT.dailyReports),
     };
   };
 
