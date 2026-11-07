@@ -61,15 +61,14 @@ const EXCEL_COLUMNS: ExcelColumn<FuturesPosition>[] = [
 export function PositionsCard({ account }: { account: FuturesAccount | undefined }) {
   const queryClient = useQueryClient();
   // Một state cho mọi bộ lọc của bảng lịch sử (controlled): bộ lọc API lấy ra từ đây, lọc lời/lỗ chạy trên trình duyệt.
+  // Không có scope nào làm bộ lọc mất hiệu lực (khác `useScopedFilters` ở Dự đoán và Báo cáo ngày), nên dùng useState.
   const [tableFilters, setTableFilters] = useState<TableFilters>({});
-  const filter = useMemo(
-    () => ({
-      symbol: picked(tableFilters.symbol),
-      side: picked(tableFilters.side),
-      closeReason: picked(tableFilters.closeReason),
-    }),
-    [tableFilters],
-  );
+  // Không memo: react-query so `queryKey` theo giá trị nên object mới mỗi lần render không gây tải lại.
+  const filter = {
+    symbol: picked(tableFilters.symbol),
+    side: picked(tableFilters.side),
+    closeReason: picked(tableFilters.closeReason),
+  };
   const [tab, setTab] = useState('open');
   const history = useQuery({
     queryKey: ['futures-history', filter],
@@ -93,15 +92,16 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
   const open = account?.openPositions ?? [];
   const closed = history.data ?? [];
 
-  // Dựng lại cột chỉ khi danh sách chiến lược hoặc bộ lọc đổi, không phải mỗi lần poll 5 giây.
-  const strategies = status.data?.strategies;
+  // Dựng lại cột chỉ khi danh sách symbol hoặc bộ lọc đổi. Khóa theo chuỗi symbol chứ không theo mảng chiến lược: mảng
+  // đó có đối tượng mới sau mỗi lần poll trạng thái (10 giây) và mỗi lần chiến lược chạy nến mới.
+  const symbolsKey = (status.data?.strategies ?? []).map((strategy) => strategy.symbol).join(',');
   const historyColumns = useMemo<ColumnsType<FuturesPosition>>(
     () => [
       { title: 'Đóng lúc', dataIndex: 'closedAtUtc', render: formatVn },
       {
         title: 'Symbol',
         dataIndex: 'symbol',
-        ...serverFilter(optionsFrom(strategies ?? [], (strategy) => strategy.symbol)),
+        ...serverFilter(optionsFrom(symbolsKey === '' ? [] : symbolsKey.split(','), (symbol) => symbol)),
       },
       {
         title: 'Hướng',
@@ -144,7 +144,7 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
         ),
       },
     ],
-    [strategies],
+    [symbolsKey],
   );
   const tableColumns = useMemo(() => withFilteredValues(historyColumns, tableFilters), [historyColumns, tableFilters]);
 
