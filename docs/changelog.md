@@ -3,6 +3,13 @@
 Những gì đã làm, theo PR đã merge vào `develop`, mới nhất ở trên. Số trong ngoặc là issue.
 Chi tiết từng tính năng: [features.md](features.md).
 
+## 2026-11-07
+
+- **#127 Sửa các lỗi review của bộ lọc controlled, lần 4** (#119–#126, review #118). Bảng Dự đoán đưa bộ lọc về rỗng
+  và về trang 1 cả khi chỉ đổi chế độ lúc khung là 1d; Báo cáo ngày đưa bộ lọc về rỗng khi bảng Các ngày trước bị ẩn
+  và file luôn giữ báo cáo đang hiện trên màn hình; cột Lịch sử vị thế chỉ dựng lại khi danh sách symbol đổi;
+  `activeFilters` duyệt cột bằng `forEachColumn` thay vì dựng lại cây; `useScopedFilters` gọn hơn.
+
 ## 2026-11-05
 
 - **#118 Sửa các lỗi review của bộ lọc controlled** (#110–#117, review #108). Đổi symbol/khung/chế độ lại đưa bộ lọc
