@@ -48,9 +48,13 @@ function filterKey<T>(column: ColumnsType<T>[number], position: string): string 
 
 type Column<T> = ColumnsType<T>[number];
 
+/** Vị trí cột như antd (`0`, `1-0` cho cột con): một chỗ tính cho mọi lần duyệt cây cột. */
+const columnPosition = (parent: string | undefined, index: number) => (parent == null ? String(index) : `${parent}-${index}`);
+
 /**
  * Dựng lại cây cột, gọi `visit` cho từng cột (cả cột con, sau khi đã đổi cột con) với key bộ lọc antd dùng cho cột đó.
- * Mọi chỗ cần key bộ lọc đi qua đây để bảng và file xuất luôn tính key giống nhau.
+ * Cùng `forEachColumn`, mọi chỗ cần key bộ lọc dùng chung `columnPosition` và `filterKey` để bảng và file xuất luôn tính
+ * key giống nhau.
  */
 function mapColumns<T>(
   columns: ColumnsType<T>,
@@ -58,7 +62,7 @@ function mapColumns<T>(
   parent?: string,
 ): ColumnsType<T> {
   return columns.map((column, index) => {
-    const position = parent == null ? String(index) : `${parent}-${index}`;
+    const position = columnPosition(parent, index);
     const withChildren =
       'children' in column ? { ...column, children: mapColumns(column.children, visit, position) } : column;
     return visit(withChildren, filterKey(column, position));
@@ -67,12 +71,20 @@ function mapColumns<T>(
 
 type ActiveFilter<T> = { onFilter: (value: boolean | Key, row: T) => boolean; selected: FilterValue };
 
+/** Duyệt cột (cả cột con) với key bộ lọc antd dùng, không dựng lại cây cột. */
+function forEachColumn<T>(columns: ColumnsType<T>, visit: (column: Column<T>, key: string) => void, parent?: string) {
+  columns.forEach((column, index) => {
+    const position = columnPosition(parent, index);
+    visit(column, filterKey(column, position));
+    if ('children' in column) forEachColumn(column.children, visit, position);
+  });
+}
+
 function activeFilters<T>(columns: ColumnsType<T>, filters: TableFilters): ActiveFilter<T>[] {
   const active: ActiveFilter<T>[] = [];
-  mapColumns(columns, (column, key) => {
+  forEachColumn(columns, (column, key) => {
     const selected = filters[key];
     if (column.onFilter && selected?.length) active.push({ onFilter: column.onFilter, selected });
-    return column;
   });
   return active;
 }
@@ -106,9 +118,9 @@ export function withFilteredValues<T>(columns: ColumnsType<T>, filters: TableFil
  */
 export function useScopedFilters(scope: string) {
   const [state, setState] = useState({ scope, filters: NO_FILTERS });
-  // Đặt lại ngay trong lúc render (không đợi effect) để không có lần render nào dùng bộ lọc của scope cũ.
-  if (state.scope !== scope) setState({ scope, filters: NO_FILTERS });
-  const filters = state.scope === scope ? state.filters : NO_FILTERS;
   const setFilters = useCallback((filters: TableFilters) => setState({ scope, filters }), [scope]);
-  return [filters, setFilters] as const;
+  // Đặt lại ngay trong lúc render (không đợi effect): React bỏ lần render này và render lại với state mới, nên không
+  // có lần render nào được commit với bộ lọc của scope cũ.
+  if (state.scope !== scope) setState({ scope, filters: NO_FILTERS });
+  return [state.filters, setFilters] as const;
 }
