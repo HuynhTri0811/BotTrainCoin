@@ -1,4 +1,4 @@
-import type { Key } from 'react';
+import { useCallback, useState, type Key } from 'react';
 import type { ColumnsType, FilterValue } from 'antd/es/table/interface';
 
 export interface FilterOption {
@@ -31,6 +31,8 @@ export function optionsFrom<T>(rows: T[], value: (row: T) => string): FilterOpti
 
 export type TableFilters = Record<string, FilterValue | null>;
 
+const NO_FILTERS: TableFilters = {};
+
 /**
  * Key antd dùng cho bộ lọc của cột (giống `getColumnKey` của antd): `key`, rồi `dataIndex` (mảng nối bằng `.`), rồi vị
  * trí cột (`0`, `1-0` cho cột con).
@@ -44,15 +46,47 @@ function filterKey<T>(column: ColumnsType<T>[number], position: string): string 
   return position;
 }
 
+type Column<T> = ColumnsType<T>[number];
+
+/** Vị trí cột như antd (`0`, `1-0` cho cột con): một chỗ tính cho mọi lần duyệt cây cột. */
+const columnPosition = (parent: string | undefined, index: number) => (parent == null ? String(index) : `${parent}-${index}`);
+
+/**
+ * Dựng lại cây cột, gọi `visit` cho từng cột (cả cột con, sau khi đã đổi cột con) với key bộ lọc antd dùng cho cột đó.
+ * Cùng `forEachColumn`, mọi chỗ cần key bộ lọc dùng chung `columnPosition` và `filterKey` để bảng và file xuất luôn tính
+ * key giống nhau.
+ */
+function mapColumns<T>(
+  columns: ColumnsType<T>,
+  visit: (column: Column<T>, key: string) => Column<T>,
+  parent?: string,
+): ColumnsType<T> {
+  return columns.map((column, index) => {
+    const position = columnPosition(parent, index);
+    const withChildren =
+      'children' in column ? { ...column, children: mapColumns(column.children, visit, position) } : column;
+    return visit(withChildren, filterKey(column, position));
+  });
+}
+
 type ActiveFilter<T> = { onFilter: (value: boolean | Key, row: T) => boolean; selected: FilterValue };
 
-function activeFilters<T>(columns: ColumnsType<T>, filters: TableFilters, parent?: string): ActiveFilter<T>[] {
-  return columns.flatMap((column, index) => {
-    const position = parent == null ? String(index) : `${parent}-${index}`;
-    const children = 'children' in column ? activeFilters(column.children, filters, position) : [];
-    const selected = filters[filterKey(column, position)];
-    return column.onFilter && selected?.length ? [{ onFilter: column.onFilter, selected }, ...children] : children;
+/** Duyệt cột (cả cột con) với key bộ lọc antd dùng, không dựng lại cây cột. */
+function forEachColumn<T>(columns: ColumnsType<T>, visit: (column: Column<T>, key: string) => void, parent?: string) {
+  columns.forEach((column, index) => {
+    const position = columnPosition(parent, index);
+    visit(column, filterKey(column, position));
+    if ('children' in column) forEachColumn(column.children, visit, position);
   });
+}
+
+function activeFilters<T>(columns: ColumnsType<T>, filters: TableFilters): ActiveFilter<T>[] {
+  const active: ActiveFilter<T>[] = [];
+  forEachColumn(columns, (column, key) => {
+    const selected = filters[key];
+    if (column.onFilter && selected?.length) active.push({ onFilter: column.onFilter, selected });
+  });
+  return active;
 }
 
 /**
@@ -70,12 +104,23 @@ export function applyColumnFilters<T>(rows: T[], columns: ColumnsType<T>, filter
  * đúng bộ lọc đang lưu, kể cả sau khi mount lại (đổi symbol, đang tải, lỗi), nên bảng và file xuất dùng chung một
  * state: lưu `filters` từ `onChange` của Table rồi truyền vào đây và vào `applyColumnFilters`.
  */
-export function withFilteredValues<T>(columns: ColumnsType<T>, filters: TableFilters, parent?: string): ColumnsType<T> {
-  return columns.map((column, index) => {
-    const position = parent == null ? String(index) : `${parent}-${index}`;
-    const withChildren =
-      'children' in column ? { ...column, children: withFilteredValues(column.children, filters, position) } : column;
-    const filterable = column.filters != null || column.filterDropdown != null || column.onFilter != null;
-    return filterable ? { ...withChildren, filteredValue: filters[filterKey(column, position)] ?? null } : withChildren;
+export function withFilteredValues<T>(columns: ColumnsType<T>, filters: TableFilters): ColumnsType<T> {
+  return mapColumns(columns, (column, key) => {
+    // Cùng điều kiện với `collectFilterStates` của antd: lệch nhau thì antd thấy lẫn cột controlled và uncontrolled.
+    const filterable = Boolean(column.filters) || column.filterDropdown !== undefined || 'onFilter' in column;
+    return filterable ? { ...column, filteredValue: filters[key] ?? null } : column;
   });
+}
+
+/**
+ * State bộ lọc controlled của một bảng, về rỗng khi `scope` đổi (symbol, khung, chế độ...): bộ lọc chọn trên dữ liệu
+ * này không âm thầm áp vào dữ liệu khác, cả trên bảng lẫn file xuất.
+ */
+export function useScopedFilters(scope: string) {
+  const [state, setState] = useState({ scope, filters: NO_FILTERS });
+  const setFilters = useCallback((filters: TableFilters) => setState({ scope, filters }), [scope]);
+  // Đặt lại ngay trong lúc render (không đợi effect): React bỏ lần render này và render lại với state mới, nên không
+  // có lần render nào được commit với bộ lọc của scope cũ.
+  if (state.scope !== scope) setState({ scope, filters: NO_FILTERS });
+  return [state.filters, setFilters] as const;
 }

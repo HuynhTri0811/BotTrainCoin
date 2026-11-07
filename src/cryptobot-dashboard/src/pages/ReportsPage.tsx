@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Button, Card, Empty, Segmented, Space, Spin, Table, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ColumnsType } from 'antd/es/table';
 import { API_MAX_LIMIT, reportApi, type SavedDailyReport } from '../api/client';
 import { EXCEL_FORMAT, downloadExcel, limitIfTruncated, type ExcelColumn } from '../components/excel';
 import { ExportExcelButton } from '../components/ExportExcelButton';
-import { applyColumnFilters, columnFilter, withFilteredValues, type TableFilters } from '../components/tableFilters';
+import { applyColumnFilters, columnFilter, useScopedFilters, withFilteredValues } from '../components/tableFilters';
 import { DailyReportCard, fmtPct2, pctColor } from '../features/reports/DailyReportCard';
 import { excelVnDate, formatVn } from '../time';
 
@@ -64,8 +64,6 @@ const OLDER_COLUMNS: ColumnsType<SavedDailyReport> = [
 /** Báo cáo biến động lập mỗi ngày (DailyReportWorker): báo cáo mới nhất đầy đủ, các ngày trước dạng bảng. */
 export function ReportsPage() {
   const [symbol, setSymbol] = useState('BTCUSDT');
-  // Bộ lọc controlled: Table mount lại (đổi symbol, đang tải, lỗi) vẫn hiện đúng bộ lọc mà file xuất dùng.
-  const [tableFilters, setTableFilters] = useState<TableFilters>({});
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ['daily-reports', symbol],
@@ -85,12 +83,20 @@ export function ReportsPage() {
 
   const data = query.data;
   const [latest, ...older] = data?.reports ?? [];
+  // Bộ lọc controlled: Table mount lại (đang tải, lỗi) vẫn hiện đúng bộ lọc mà file xuất dùng. Về rỗng khi đổi symbol
+  // hoặc khi bảng bị ẩn (không còn ngày trước): bộ lọc người dùng không còn thấy và bỏ được thì không được áp vào file,
+  // cũng không được hiện lại khi bảng quay lại.
+  const [tableFilters, setTableFilters] = useScopedFilters(`${symbol}-${older.length > 0}`);
+  const tableColumns = useMemo(() => withFilteredValues(OLDER_COLUMNS, tableFilters), [tableFilters]);
+  // Báo cáo mới nhất đang hiện riêng trên màn hình: luôn có trong file, dù có báo cáo mới hơn được lập sau đó.
+  const shownUtc = latest?.report.toUtc;
 
-  // Các báo cáo gần nhất của symbol đang chọn, mỗi ngày một dòng, gồm cả báo cáo mới nhất hiển thị phía trên. Bộ lọc
-  // đang chọn ở bảng "Các ngày trước" áp cho mọi dòng.
+  // Các báo cáo gần nhất của symbol đang chọn, mỗi ngày một dòng, giống màn hình: báo cáo đang hiện riêng phía trên
+  // luôn có, bộ lọc của bảng "Các ngày trước" chỉ áp cho các báo cáo còn lại.
   const exportReports = async () => {
     const list = await reportApi.daily(symbol, API_MAX_LIMIT.dailyReports);
-    const rows = applyColumnFilters(list.reports, OLDER_COLUMNS, tableFilters);
+    const passing = new Set(applyColumnFilters(list.reports, OLDER_COLUMNS, tableFilters));
+    const rows = list.reports.filter((saved) => saved.report.toUtc === shownUtc || passing.has(saved));
     return {
       count: await downloadExcel(`bao-cao-ngay-${symbol}`, 'Báo cáo ngày', rows, EXCEL_COLUMNS),
       truncatedAt: limitIfTruncated(list.reports.length, API_MAX_LIMIT.dailyReports),
@@ -137,7 +143,7 @@ export function ReportsPage() {
                 pagination={false}
                 dataSource={older}
                 onChange={(_, filters) => setTableFilters(filters)}
-                columns={withFilteredValues(OLDER_COLUMNS, tableFilters)}
+                columns={tableColumns}
               />
             </Card>
           )}

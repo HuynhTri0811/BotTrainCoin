@@ -282,8 +282,10 @@ UI: trang **Lịch sử theo tháng** ([`HistoryPage.tsx`](../src/cryptobot-dash
   bảng đã tải; Báo cáo ngày xuất tới 100 báo cáo gần nhất của symbol đang chọn, mỗi ngày một dòng; Dự đoán xuất các
   lần đoán gần nhất đang có trên bảng. Lấy đủ giới hạn API (`API_MAX_LIMIT` trong `client.ts`) thì nút cảnh báo file có
   thể thiếu dòng cũ hơn: API chưa có phân trang. Bộ lọc của Lịch sử vị thế, Dự đoán và Các ngày trước là controlled
-  (`withFilteredValues`): bảng và file xuất đọc chung một state, nên đổi symbol/khung nến hay bảng tải lại vẫn giữ và
-  hiện đúng bộ lọc đã chọn.
+  (`withFilteredValues`): bảng và file xuất đọc chung một state, nên bảng tải lại vẫn hiện đúng bộ lọc đã chọn. Đổi
+  symbol (Báo cáo ngày) hay symbol/khung/chế độ (Dự đoán) thì bộ lọc về rỗng (`useScopedFilters`) và bảng Dự đoán về
+  trang 1 (kể cả khi chỉ đổi chế độ lúc khung đã là 1d). File Báo cáo ngày luôn có báo cáo đang hiện riêng phía trên; bộ
+  lọc của bảng Các ngày trước chỉ áp cho các báo cáo còn lại và về rỗng khi bảng bị ẩn.
   Thư viện `write-excel-file` chỉ tải khi bấm nút.
 - Thanh trạng thái: chế độ, môi trường, feed nào stale, lỗi đồng bộ.
 - Thời gian hiển thị theo giờ Việt Nam (`Asia/Ho_Chi_Minh`); backend luôn trả UTC.

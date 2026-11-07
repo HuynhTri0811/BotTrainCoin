@@ -3,8 +3,19 @@
 Những gì đã làm, theo PR đã merge vào `develop`, mới nhất ở trên. Số trong ngoặc là issue.
 Chi tiết từng tính năng: [features.md](features.md).
 
+## 2026-11-07
+
+- **#127 Sửa các lỗi review của bộ lọc controlled, lần 4** (#119–#126, review #118). Bảng Dự đoán đưa bộ lọc về rỗng
+  và về trang 1 cả khi chỉ đổi chế độ lúc khung là 1d; Báo cáo ngày đưa bộ lọc về rỗng khi bảng Các ngày trước bị ẩn
+  và file luôn giữ báo cáo đang hiện trên màn hình; cột Lịch sử vị thế chỉ dựng lại khi danh sách symbol đổi;
+  `activeFilters` duyệt cột bằng `forEachColumn` thay vì dựng lại cây; `useScopedFilters` gọn hơn.
+
 ## 2026-11-05
 
+- **#118 Sửa các lỗi review của bộ lọc controlled** (#110–#117, review #108). Đổi symbol/khung/chế độ lại đưa bộ lọc
+  về rỗng (`useScopedFilters`, đặt lại ngay khi render) và bảng Dự đoán về trang 1; Báo cáo ngày không áp bộ lọc khi
+  bảng Các ngày trước không hiện, và file luôn có báo cáo mới nhất; `withFilteredValues` nhận diện cột lọc giống antd;
+  `activeFilters` và `withFilteredValues` dùng chung `mapColumns`; cột bảng và bộ lọc API được `useMemo`.
 - **#108 Bộ lọc controlled cho các bảng xuất Excel** (#101–#107, review #100). Lịch sử vị thế, Dự đoán và Các ngày
   trước nhận bộ lọc qua `filteredValue` (`withFilteredValues`): bảng và file xuất đọc chung một state nên không còn lệch
   khi đổi symbol/chế độ hay khi bảng mount lại; bỏ `useTableFilters`. Đổi symbol/chế độ giờ **giữ** bộ lọc. Cảnh báo
