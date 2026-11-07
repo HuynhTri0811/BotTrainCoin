@@ -131,7 +131,7 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
   // 1 ngày: cùng hàm dự đoán nhưng chạy trên nến ngày (1d), nến được đoán là ngày đang chạy.
   const queryInterval = day ? '1d' : interval;
   // Bộ lọc controlled: bảng và file xuất cùng đọc state này, về rỗng khi đổi symbol/khung/chế độ.
-  const tableScope = `${symbol}-${queryInterval}`;
+  const tableScope = `${symbol}-${queryInterval}-${mode}`;
   const [tableFilters, setTableFilters] = useScopedFilters(tableScope);
   const unit = day ? 'ngày' : 'nến';
   const query = useQuery({
