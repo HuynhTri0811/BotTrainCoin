@@ -17,6 +17,13 @@ public static class Ema
     /// Tính EMA cho chuỗi giá trị. Seed là SMA của <paramref name="period"/> phần tử đầu;
     /// các vị trí trước seed trả về null. Cùng một cách khởi tạo cho live, paper và backtest.
     /// </summary>
+    /// <param name="values">Chuỗi giá (thường là giá đóng cửa), cũ → mới.</param>
+    /// <param name="period">Số nến của EMA, ví dụ 9, 21, 50. Phải &gt;= 1.</param>
+    /// <returns>
+    /// Mảng cùng độ dài với <paramref name="values"/>: phần tử thứ i là EMA tại giá thứ i,
+    /// hoặc null với i &lt; period − 1. Toàn null nếu có ít hơn <paramref name="period"/> giá.
+    /// </returns>
+    /// <exception cref="ArgumentOutOfRangeException">Khi <paramref name="period"/> &lt; 1.</exception>
     /// <example>
     /// Giá [2, 4, 6, 8, 10], period 3 → [null, null, 4, 6, 8]
     /// (seed = (2+4+6)/3 = 4; alpha = 0.5; 0.5×8 + 0.5×4 = 6; 0.5×10 + 0.5×6 = 8).
@@ -50,6 +57,11 @@ public static class Ema
     /// Cùng thứ tự phép tính với <see cref="Calculate"/> nên cho kết quả giống hệt.
     /// Cần ít nhất <paramref name="period"/> + 1 giá trị.
     /// </summary>
+    /// <param name="values">Chuỗi giá, cũ → mới.</param>
+    /// <param name="period">Số nến của EMA. Phải &gt;= 1.</param>
+    /// <returns><c>Prev</c>: EMA tại nến trước; <c>Last</c>: EMA tại nến cuối (nến vừa đóng).</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Khi <paramref name="period"/> &lt; 1.</exception>
+    /// <exception cref="ArgumentException">Khi có ít hơn <paramref name="period"/> + 1 giá trị.</exception>
     /// <remarks>Chiến lược chỉ cần 2 giá trị này để biết hai đường có vừa cắt nhau không.</remarks>
     public static (decimal Prev, decimal Last) LastTwo(ReadOnlySpan<decimal> values, int period)
     {

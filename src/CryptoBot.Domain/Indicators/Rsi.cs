@@ -20,6 +20,13 @@ public static class Rsi
     /// seed bằng trung bình cộng lãi/lỗ, sau đó làm mượt kiểu Wilder: avg = (avg × (period − 1) + mới) / period.
     /// Các vị trí trước đó trả về null. Không có lỗ → 100; không lãi không lỗ (giá đứng yên) → 50.
     /// </summary>
+    /// <param name="values">Chuỗi giá (thường là giá đóng cửa), cũ → mới.</param>
+    /// <param name="period">Số nến tính RSI, thường là 14. Phải &gt;= 1.</param>
+    /// <returns>
+    /// Mảng cùng độ dài với <paramref name="values"/>: phần tử thứ i là RSI tại giá thứ i (0..100),
+    /// hoặc null khi chưa đủ dữ liệu. Toàn null nếu có ít hơn <paramref name="period"/> + 1 giá.
+    /// </returns>
+    /// <exception cref="ArgumentOutOfRangeException">Khi <paramref name="period"/> &lt; 1.</exception>
     public static decimal?[] Calculate(IReadOnlyList<decimal> values, int period)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(period, 1);
@@ -48,6 +55,14 @@ public static class Rsi
     /// Cùng thứ tự phép tính với <see cref="Calculate"/> nên cho kết quả giống hệt.
     /// Cần ít nhất <paramref name="period"/> + 2 giá trị.
     /// </summary>
+    /// <param name="values">Chuỗi giá, cũ → mới.</param>
+    /// <param name="period">Số nến tính RSI. Phải &gt;= 1.</param>
+    /// <returns>
+    /// <c>Prev</c>: RSI tại giá áp chót (nến trước); <c>Last</c>: RSI tại giá cuối (nến vừa đóng).
+    /// Dùng cặp này để biết RSI có vừa cắt qua một mức hay không.
+    /// </returns>
+    /// <exception cref="ArgumentOutOfRangeException">Khi <paramref name="period"/> &lt; 1.</exception>
+    /// <exception cref="ArgumentException">Khi có ít hơn <paramref name="period"/> + 2 giá trị.</exception>
     public static (decimal Prev, decimal Last) LastTwo(ReadOnlySpan<decimal> values, int period)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(period, 1);
