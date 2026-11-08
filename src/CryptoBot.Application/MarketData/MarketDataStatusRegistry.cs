@@ -4,16 +4,6 @@ using CryptoBot.Domain.MarketData;
 
 namespace CryptoBot.Application.MarketData;
 
-public sealed record MarketDataStatus(
-    string Key,
-    DateTime? LastSuccessAtUtc,
-    DateTime? LastAttemptAtUtc,
-    string? LastError,
-    int ConsecutiveFailures,
-    DateTime? LatestClosedOpenTimeUtc,
-    IReadOnlyList<CandleIssue> RecentIssues,
-    bool IsStale);
-
 /// <summary>Trạng thái đồng bộ trong bộ nhớ cho /api/status. Không phải nguồn dữ liệu bền vững.</summary>
 public sealed class MarketDataStatusRegistry(IClock clock, MarketDataOptions options)
 {
