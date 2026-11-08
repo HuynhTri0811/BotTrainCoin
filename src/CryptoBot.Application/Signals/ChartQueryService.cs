@@ -4,11 +4,6 @@ using CryptoBot.Domain.Strategies;
 
 namespace CryptoBot.Application.Signals;
 
-public sealed record ChartPoint(Candle Candle, decimal? FastEma, decimal? SlowEma);
-
-public sealed record ChartData(StrategyInstance Instance, EmaCrossParameters Parameters,
-    IReadOnlyList<ChartPoint> Points, IReadOnlyList<TradingSignal> Signals);
-
 /// <summary>
 /// Dữ liệu chart cho một strategy instance. EMA được tính ở backend bằng đúng quy tắc
 /// cửa sổ của chiến lược, nên đường EMA trên UI khớp với giá trị đã dùng để ra signal.

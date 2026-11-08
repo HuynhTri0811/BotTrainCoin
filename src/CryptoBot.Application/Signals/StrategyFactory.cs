@@ -3,11 +3,6 @@ using CryptoBot.Domain.Strategies;
 
 namespace CryptoBot.Application.Signals;
 
-public static class StrategyTypes
-{
-    public const string EmaCross = "EmaCross";
-}
-
 public static class StrategyFactory
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
