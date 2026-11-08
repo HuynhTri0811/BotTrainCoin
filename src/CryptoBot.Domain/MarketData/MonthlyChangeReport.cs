@@ -1,22 +1,5 @@
 namespace CryptoBot.Domain.MarketData;
 
-/// <summary>Giá một tháng: mở cửa của ngày đầu tiên có nến, đóng cửa của ngày cuối cùng có nến.</summary>
-/// <param name="ChangePercent">(Close − Open) / Open × 100.</param>
-/// <param name="Days">Số nến ngày trong tháng (sàn bỏ qua ngày không có giao dịch).</param>
-/// <param name="Complete">False với tháng đang chạy: Close là giá gần nhất, chưa phải giá cuối tháng.</param>
-public sealed record MonthChange(int Year, int Month, decimal Open, decimal Close, decimal ChangePercent, int Days,
-    bool Complete);
-
-/// <summary>Cả năm: mở cửa của tháng đầu tiên có dữ liệu, đóng cửa của tháng cuối cùng.</summary>
-/// <param name="Complete">True khi đã có tháng 12 trọn vẹn.</param>
-public sealed record YearChange(int Year, decimal Open, decimal Close, decimal ChangePercent, bool Complete);
-
-/// <summary>Cùng một tháng (ví dụ tháng 3) qua các năm, chỉ tính tháng trọn vẹn.</summary>
-/// <param name="Years">Số năm có tháng này.</param>
-/// <param name="UpPercent">Tỷ lệ năm tháng này đóng cao hơn mở (%).</param>
-public sealed record MonthOfYearStats(int Month, int Years, decimal AverageChangePercent, decimal BestChangePercent,
-    decimal WorstChangePercent, int UpCount, decimal UpPercent);
-
 /// <summary>
 /// Chênh lệch giá mở cửa → đóng cửa theo từng tháng của từng năm, từ nến ngày. Dùng để so các tháng với nhau
 /// (tính mùa vụ); không dự đoán tháng tới.
