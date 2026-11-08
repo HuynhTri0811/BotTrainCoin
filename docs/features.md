@@ -201,7 +201,7 @@ Hiện dưới thanh biên độ 24 giờ.
 
 ## 9. Thống kê phiên và cảnh báo mua/bán áp đảo
 
-**Code:** [`VolumePressure`](../src/CryptoBot.Domain/MarketData/Candles/VolumePressure.cs).
+**Code:** [`VolumePressure`](../src/CryptoBot.Domain/MarketData/VolumePressure.cs).
 UI: [`SessionStatsCard.tsx`](../src/cryptobot-dashboard/src/features/market/SessionStatsCard.tsx).
 
 - Mỗi nến là một phiên (15m → phiên 15 phút): số giao dịch khớp, khối lượng (coin và USDT), so với trung bình 20
