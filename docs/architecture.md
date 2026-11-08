@@ -24,8 +24,8 @@ Quy tắc chính:
 - **Domain thuần túy.** Hàm trong Domain chỉ biến đầu vào thành đầu ra: không gọi API, không đọc đồng hồ, không đọc
   file, không giữ trạng thái giữa các lần gọi. Nhờ vậy test Domain không cần fake nào.
 - **Application định nghĩa port, Infrastructure cài đặt.** Ví dụ `ICandleStore`, `IMarketDataClient`, `IClock`
-  ([`Ports.cs`](../src/CryptoBot.Application/Abstractions/Ports.cs)), `IMarkPriceClient`, `IPaperFuturesStore`
-  ([`PaperFuturesContracts.cs`](../src/CryptoBot.Application/Futures/PaperFuturesContracts.cs)), `IAutoOrderStore`.
+  ([`Abstractions/`](../src/CryptoBot.Application/Abstractions/)), `IMarkPriceClient`, `IPaperFuturesStore`
+  ([`Futures/`](../src/CryptoBot.Application/Futures/)), `IAutoOrderStore`.
   Service trong Application chỉ nhận interface, nên test Application dùng fake trong bộ nhớ.
 - **Thời gian đi qua `IClock`.** Không gọi `DateTime.UtcNow` trong Application/Domain; Infrastructure cài
   `SystemClock`, test dùng `FakeClock`.
@@ -122,7 +122,7 @@ tính bằng đúng quy tắc cửa sổ của chiến lược, nên chart luôn
 ## 5. Lưu trữ
 
 **Database:** SQLite, file `data/cryptobot.db` (đường dẫn tương đối với thư mục chạy API), WAL mode,
-`Default Timeout=30`. Context: [`BotDbContext`](../src/CryptoBot.Infrastructure/Persistence/BotDbContext.cs).
+`Default Timeout=30`. Context: [`BotDbContext`](../src/CryptoBot.Infrastructure/Persistence/Database/BotDbContext.cs).
 
 | Bảng | Entity | Khóa duy nhất / index |
 | --- | --- | --- |
