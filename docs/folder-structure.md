@@ -168,7 +168,7 @@ CryptoBot.Application/
 ├── LivePrices/
 │   ├── Sampling/                 # LivePriceSampler, LivePriceOptions, LivePriceSample, LivePriceHistory
 │   ├── DailyRange/               # DailyRangeService: nến ngày Binance (cache) → DailyMoveRange
-│   └── SimilarDays/              # SimilarDaysService, SimilarDaysCache, SimilarDaysResult
+│   └── SimilarDays/              # SimilarDaysService, SimilarDaysCache, SimilarDaysComputation, SimilarDaysResult
 └── Reports/                      # Một chức năng nên không chia thư mục con
     ├── DailyReportService.cs     # Lịch 06:00, lập và đọc báo cáo
     └── DailyReportOptions.cs, DailyReportRun.cs, IDailyReportStore.cs, SavedDailyReport.cs

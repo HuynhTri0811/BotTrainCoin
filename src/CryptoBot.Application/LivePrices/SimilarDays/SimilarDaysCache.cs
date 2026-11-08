@@ -1,5 +1,3 @@
-using CryptoBot.Domain.MarketData;
-
 namespace CryptoBot.Application.LivePrices;
 
 /// <summary>
@@ -11,18 +9,17 @@ public sealed class SimilarDaysCache
     private readonly object _gate = new();
     private readonly Dictionary<(string Symbol, int Horizon), Entry> _entries = new();
 
-    public sealed record Computed(SimilarDaysForecast? Forecast, SimilarDaysBacktest Backtest);
+    private sealed record Entry(DateTime LastDay, Lazy<Task<SimilarDaysComputation>> Value);
 
-    private sealed record Entry(DateTime LastDay, Lazy<Task<Computed>> Value);
-
-    public async Task<Computed> GetOrComputeAsync(string symbol, int horizon, DateTime lastDay,
-        Func<Task<Computed>> compute)
+    public async Task<SimilarDaysComputation> GetOrComputeAsync(string symbol, int horizon, DateTime lastDay,
+        Func<Task<SimilarDaysComputation>> compute)
     {
         Entry entry;
         lock (_gate)
         {
             if (!_entries.TryGetValue((symbol, horizon), out entry!) || entry.LastDay != lastDay)
-                _entries[(symbol, horizon)] = entry = new Entry(lastDay, new Lazy<Task<Computed>>(compute));
+                _entries[(symbol, horizon)] = entry =
+                    new Entry(lastDay, new Lazy<Task<SimilarDaysComputation>>(compute));
         }
 
         try

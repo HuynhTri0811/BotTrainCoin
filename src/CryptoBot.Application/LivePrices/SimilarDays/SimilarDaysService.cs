@@ -65,7 +65,7 @@ public sealed class SimilarDaysService(
             var history = await candles.GetLatestAsync(key, null, MaxDailyCandles, closedOnly: true, ct);
             var closes = history.Select(candle => candle.Close).ToList();
             // Chạy thử nặng (vài trăm ms đến hơn 1 giây): đưa khỏi luồng xử lý request.
-            return await Task.Run(() => new SimilarDaysCache.Computed(
+            return await Task.Run(() => new SimilarDaysComputation(
                 SimilarDaysForecast.Compute(closes, horizonDays),
                 SimilarDaysForecast.Backtest(closes, horizonDays)), ct);
         });
