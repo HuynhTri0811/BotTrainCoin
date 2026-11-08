@@ -1,3 +1,5 @@
+using CryptoBot.Application.Abstractions;
+
 namespace CryptoBot.Application.Futures;
 
 public sealed record AccountSnapshot(

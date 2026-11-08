@@ -1,3 +1,4 @@
+
 namespace CryptoBot.Application.LivePrices;
 
 /// <summary>

@@ -1,3 +1,4 @@
+
 namespace CryptoBot.Api.Endpoints;
 
 public sealed record QuoteDto(bool Accepted, IReadOnlyList<string> Errors, string Symbol, string Side, int Leverage,

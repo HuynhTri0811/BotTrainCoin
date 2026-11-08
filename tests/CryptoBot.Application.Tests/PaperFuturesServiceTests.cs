@@ -1,3 +1,4 @@
+using CryptoBot.Application.Abstractions;
 using CryptoBot.Application.Futures;
 using CryptoBot.Domain.Futures;
 using Microsoft.Extensions.Logging.Abstractions;

@@ -23,9 +23,9 @@ Quy tắc chính:
 
 - **Domain thuần túy.** Hàm trong Domain chỉ biến đầu vào thành đầu ra: không gọi API, không đọc đồng hồ, không đọc
   file, không giữ trạng thái giữa các lần gọi. Nhờ vậy test Domain không cần fake nào.
-- **Application định nghĩa port, Infrastructure cài đặt.** Ví dụ `ICandleStore`, `IMarketDataClient`, `IClock`
-  ([`Abstractions/`](../src/CryptoBot.Application/Abstractions/)), `IMarkPriceClient`, `IPaperFuturesStore`
-  ([`Futures/`](../src/CryptoBot.Application/Futures/)), `IAutoOrderStore`.
+- **Application định nghĩa port, Infrastructure cài đặt.** Ví dụ `ICandleStore`, `IMarketDataClient`, `IClock`,
+  `IMarkPriceClient` ([`Abstractions/`](../src/CryptoBot.Application/Abstractions/)), `IPaperFuturesStore`,
+  `IAutoOrderStore` ([`Futures/`](../src/CryptoBot.Application/Futures/)).
   Service trong Application chỉ nhận interface, nên test Application dùng fake trong bộ nhớ.
 - **Thời gian đi qua `IClock`.** Không gọi `DateTime.UtcNow` trong Application/Domain; Infrastructure cài
   `SystemClock`, test dùng `FakeClock`.

@@ -1,3 +1,4 @@
+
 namespace CryptoBot.Api.Endpoints;
 
 public sealed record PositionDto(long Id, string Environment, string Symbol, string Side, int Leverage,

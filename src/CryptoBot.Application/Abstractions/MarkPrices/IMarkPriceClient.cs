@@ -1,4 +1,4 @@
-namespace CryptoBot.Application.Futures;
+namespace CryptoBot.Application.Abstractions;
 
 public interface IMarkPriceClient
 {

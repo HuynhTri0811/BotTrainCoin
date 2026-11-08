@@ -135,7 +135,8 @@ kiểu chính.
 CryptoBot.Application/
 ├── Abstractions/                 # Port dùng chung nhiều mảng
 │   ├── Clock/                    # IClock
-│   ├── MarketData/               # IMarketDataClient, IDailyHistoryClient, ICandleStore, CandleKey, KlineDto,
+│   ├── MarkPrices/               # IMarkPriceClient, MarkPrice (dùng ở Futures và LivePrices)
+│   └── MarketData/               # IMarketDataClient, IDailyHistoryClient, ICandleStore, CandleKey, KlineDto,
 │                                 # UpsertResult, MarketDataUnavailableException
 ├── MarketData/
 │   ├── CandleSync/               # CandleSyncService, MarketDataOptions, SyncResult
@@ -157,7 +158,7 @@ CryptoBot.Application/
 │   │                             # PaperFuturesOptions, FuturesSymbolOptions, PaperFuturesLock, IPaperFuturesStore,
 │   │                             # ClosedPositionFilter, OpenPositionRequest, OpenQuote, OpenResult, CloseResult,
 │   │                             # PositionView, AccountSnapshot
-│   ├── MarkPrices/               # IMarkPriceClient, MarkPriceCache, MarkPrice
+│   ├── MarkPrices/               # MarkPriceCache
 │   └── AutoOrders/               # AutoOrderService, AutoOrderOptions, IAutoOrderStore, CreateRuleRequest,
 │                                 # CreateRuleResult, DailyRiskState, AutoOrderSummary
 ├── News/
