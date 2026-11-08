@@ -77,7 +77,7 @@ Chi tiết: [signal-functions.md §6](signal-functions.md#6-golden-test-bảo-đ
 - Fake viết tay trong `Fakes.cs` (không dùng thư viện mock). Fake **giữ trạng thái thật** (ví dụ
   `InMemoryCandleStore` dùng `SortedDictionary` và gọi `Candle.ApplyUpdate` giống store thật), nên test kiểm tra được
   hành vi chứ không chỉ "có gọi hàm".
-- Đổi interface trong `Ports.cs` → sửa fake tương ứng để nó vẫn giống cài đặt thật.
+- Đổi interface trong `Application/Abstractions/` → sửa fake tương ứng để nó vẫn giống cài đặt thật.
 - `FakeClock.UtcNow` có setter: tua thời gian trong test (mark hết hạn, qua 00:00 UTC…).
 
 ## Trước khi mở PR
