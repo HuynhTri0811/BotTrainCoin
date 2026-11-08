@@ -5,68 +5,6 @@ using Microsoft.Extensions.Logging;
 
 namespace CryptoBot.Application.LivePrices;
 
-/// <param name="AsOfDayUtc">Ngày (nến đã đóng) cuối cùng dùng để dự báo.</param>
-/// <param name="AnchorPrice">Giá đóng cửa của ngày đó trên sàn của bảng giá (Binance); khoảng giá tính từ đây.</param>
-/// <param name="TargetCloseUtc">Thời điểm đóng cửa được dự báo (cuối ngày hôm nay với 24 giờ).</param>
-/// <param name="Low68">Giá: AnchorPrice × (1 + Low68Percent / 100).</param>
-public sealed record SimilarDaysResult(
-    string HistorySymbol,
-    string Exchange,
-    DateTime AsOfDayUtc,
-    decimal AnchorPrice,
-    DateTime TargetCloseUtc,
-    decimal Low68,
-    decimal High68,
-    SimilarDaysForecast Forecast,
-    SimilarDaysBacktest Backtest);
-
-/// <summary>
-/// Dự báo và chạy thử chỉ đổi khi có nến ngày mới, nên mỗi (symbol, mốc) giữ đúng một kết quả theo ngày cuối:
-/// có ngày mới thì thay, không phình theo thời gian. Lazy đảm bảo nhiều request cùng lúc chỉ tính một lần.
-/// </summary>
-public sealed class SimilarDaysCache
-{
-    private readonly object _gate = new();
-    private readonly Dictionary<(string Symbol, int Horizon), Entry> _entries = new();
-
-    public sealed record Computed(SimilarDaysForecast? Forecast, SimilarDaysBacktest Backtest);
-
-    private sealed record Entry(DateTime LastDay, Lazy<Task<Computed>> Value);
-
-    public async Task<Computed> GetOrComputeAsync(string symbol, int horizon, DateTime lastDay,
-        Func<Task<Computed>> compute)
-    {
-        Entry entry;
-        lock (_gate)
-        {
-            if (!_entries.TryGetValue((symbol, horizon), out entry!) || entry.LastDay != lastDay)
-                _entries[(symbol, horizon)] = entry = new Entry(lastDay, new Lazy<Task<Computed>>(compute));
-        }
-
-        try
-        {
-            return await entry.Value.Value;
-        }
-        catch
-        {
-            // Không giữ kết quả lỗi: lần gọi sau tính lại.
-            lock (_gate)
-            {
-                if (_entries.TryGetValue((symbol, horizon), out var current) && ReferenceEquals(current, entry))
-                    _entries.Remove((symbol, horizon));
-            }
-
-            throw;
-        }
-    }
-
-    /// <summary>Số mục đang giữ (dùng cho test).</summary>
-    public int Count
-    {
-        get { lock (_gate) return _entries.Count; }
-    }
-}
-
 /// <summary>
 /// Dự báo "ngày tương tự" cho symbol của bảng giá trực tiếp (ví dụ BTCUSDT), dùng nến ngày lịch sử dài hạn
 /// trong DB (DailyHistory, ví dụ BTCUSD trên Bitfinex từ 2016).
