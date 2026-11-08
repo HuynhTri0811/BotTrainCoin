@@ -1,4 +1,3 @@
-using CryptoBot.Application.Abstractions;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Strategies;
 using Microsoft.Extensions.Logging;

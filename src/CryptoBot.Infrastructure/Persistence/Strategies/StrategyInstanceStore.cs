@@ -1,4 +1,4 @@
-using CryptoBot.Application.Abstractions;
+using CryptoBot.Application.Signals;
 using CryptoBot.Domain.Strategies;
 using Microsoft.EntityFrameworkCore;
 

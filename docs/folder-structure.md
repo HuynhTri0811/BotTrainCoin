@@ -136,9 +136,7 @@ CryptoBot.Application/
 ├── Abstractions/                 # Port dùng chung nhiều mảng
 │   ├── Clock/                    # IClock
 │   ├── MarketData/               # IMarketDataClient, IDailyHistoryClient, ICandleStore, CandleKey, KlineDto,
-│   │                             # UpsertResult, MarketDataUnavailableException
-│   ├── Strategies/               # IStrategyInstanceStore
-│   └── Signals/                  # ISignalStore, SignalFilter
+│                                 # UpsertResult, MarketDataUnavailableException
 ├── MarketData/
 │   ├── CandleSync/               # CandleSyncService, MarketDataOptions, SyncResult
 │   ├── DailyHistory/             # DailyHistorySyncService, DailyHistoryOptions
@@ -147,7 +145,8 @@ CryptoBot.Application/
 ├── Signals/
 │   ├── Evaluation/               # SignalEvaluationService, SignalOptions, EvaluationResult
 │   ├── Charts/                   # ChartQueryService (EMA theo đúng cửa sổ), ChartData, ChartPoint
-│   └── Configuration/            # StrategyConfigurator, StrategyDefinition, StrategyFactory, StrategyTypes
+│   ├── Configuration/            # StrategyConfigurator, StrategyDefinition, StrategyFactory, StrategyTypes
+│   └── Storage/                  # IStrategyInstanceStore, ISignalStore, SignalFilter (port chỉ mảng Signals dùng)
 ├── Indicators/
 │   ├── Registry/                 # IndicatorRegistry (tìm [Indicator] bằng reflection, gán tham số),
 │   │                             # IndicatorDefinition, ConfiguredIndicator, IndicatorConfigError

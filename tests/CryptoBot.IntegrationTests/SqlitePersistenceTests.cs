@@ -1,6 +1,7 @@
 using CryptoBot.Application.Abstractions;
 using CryptoBot.Application.Futures;
 using CryptoBot.Application.News;
+using CryptoBot.Application.Signals;
 using CryptoBot.Domain.Futures;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.News;

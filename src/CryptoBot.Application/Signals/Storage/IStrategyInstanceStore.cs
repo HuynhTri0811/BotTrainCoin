@@ -1,6 +1,6 @@
 using CryptoBot.Domain.Strategies;
 
-namespace CryptoBot.Application.Abstractions;
+namespace CryptoBot.Application.Signals;
 
 public interface IStrategyInstanceStore
 {
