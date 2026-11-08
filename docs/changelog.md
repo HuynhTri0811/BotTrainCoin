@@ -3,6 +3,12 @@
 Những gì đã làm, theo PR đã merge vào `develop`, mới nhất ở trên. Số trong ngoặc là issue.
 Chi tiết từng tính năng: [features.md](features.md).
 
+## 2026-11-08
+
+- **#129 Chuyển bảng giao dịch theo phiên xuống trang Dự đoán.** Card Giao dịch theo phiên (số giao dịch, khối lượng,
+  mua/bán chủ động, so với trung bình 20 phiên) rời trang Biểu đồ, nằm cuối trang Dự đoán; dùng chung cache nến với
+  trang Biểu đồ.
+
 ## 2026-11-07
 
 - **#127 Sửa các lỗi review của bộ lọc controlled, lần 4** (#119–#126, review #118). Bảng Dự đoán đưa bộ lọc về rỗng
