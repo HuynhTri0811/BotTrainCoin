@@ -30,9 +30,9 @@ Database SQLite nằm ở `src/CryptoBot.Api/data/cryptobot.db`, tự tạo khi 
 
 | Trang | Nội dung |
 | --- | --- |
-| Biểu đồ | Nến + EMA 9/21 + chỉ báo tự viết, tín hiệu BUY/SELL, bảng giá trực tiếp, biên độ 24h/7d/30d, thống kê phiên và cảnh báo mua/bán áp đảo |
+| Biểu đồ | Nến + EMA 9/21 + chỉ báo tự viết, tín hiệu BUY/SELL, bảng giá trực tiếp, biên độ 24h/7d/30d |
 | Giao dịch Paper | Mở Long/Short có đòn bẩy, SL/TP, giá thanh lý; quy tắc tự mở lệnh theo giá hoặc theo chỉ báo; vị thế và lịch sử |
-| Dự đoán | Hàm đoán nến kế tiếp lên/xuống kèm tỷ lệ đúng khi chạy thử; tỷ lệ đúng tín hiệu của từng chỉ báo |
+| Dự đoán | Hàm đoán nến kế tiếp lên/xuống kèm tỷ lệ đúng khi chạy thử; tỷ lệ đúng tín hiệu của từng chỉ báo; thống kê giao dịch theo phiên và cảnh báo mua/bán áp đảo |
 | Tín hiệu | Các tín hiệu BUY/SELL gần đây của chiến lược EMA |
 | Lịch sử theo tháng | Heatmap % thay đổi theo tháng từ 2016, thống kê theo tháng trong năm, sự kiện thị trường cùng tháng |
 | Báo cáo ngày | Báo cáo biến động 24 giờ lập lúc 06:00 giờ VN: cao/thấp, giảm sâu nhất từ đỉnh, giờ khối lượng bất thường, tin trong khoảng đó |
