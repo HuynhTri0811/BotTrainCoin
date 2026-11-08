@@ -26,7 +26,7 @@ hạ xuống `Warning` để log không bị ngập.
 | `FuturesMarketDataBaseUrl` | `https://fapi.binance.com` | REST USDⓈ-M công khai (mark price) |
 | `RequestTimeout` | `00:00:10` | Timeout mỗi request |
 
-## MarketData — `MarketDataOptions` ([`CandleSyncService.cs`](../src/CryptoBot.Application/MarketData/CandleSync/CandleSyncService.cs))
+## MarketData — `MarketDataOptions` ([`MarketDataOptions.cs`](../src/CryptoBot.Application/MarketData/CandleSync/MarketDataOptions.cs))
 
 | Khóa | Mặc định | Ý nghĩa |
 | --- | --- | --- |
@@ -37,14 +37,14 @@ hạ xuống `Warning` để log không bị ngập.
 | `StaleAfter` | `00:02:00` | Quá thời gian này không sync được → feed `isStale` |
 | `VolumeAlertExcessPercent` | 80 | Một phía mua/bán chủ động vượt phía kia bao nhiêu % thì cảnh báo |
 
-## Signals — `SignalOptions` ([`SignalEvaluationService.cs`](../src/CryptoBot.Application/Signals/Evaluation/SignalEvaluationService.cs))
+## Signals — `SignalOptions` ([`SignalOptions.cs`](../src/CryptoBot.Application/Signals/Evaluation/SignalOptions.cs))
 
 | Khóa | Mặc định | Ý nghĩa |
 | --- | --- | --- |
 | `MaxFreshAge` | `00:02:00` | Tín hiệu tạo quá lâu sau khi nến đóng → `IsBackfill = true` |
 | `MaxCandlesPerRun` | 2000 | Số nến đóng tối đa đánh giá mỗi lần chạy |
 
-## Strategies — danh sách `StrategyDefinition` ([`StrategyConfigurator.cs`](../src/CryptoBot.Application/Signals/Configuration/StrategyConfigurator.cs))
+## Strategies — danh sách `StrategyDefinition` ([`StrategyDefinition.cs`](../src/CryptoBot.Application/Signals/Configuration/StrategyDefinition.cs))
 
 ```json
 { "Name": "btc-1h-ema", "Type": "EmaCross", "Symbol": "BTCUSDT", "Interval": "1h", "Enabled": true,
@@ -66,7 +66,7 @@ hạ xuống `Warning` để log không bị ngập.
 Đổi `Type`/`Parameters`/`Exchange`/`Symbol`/`Interval` → `Version + 1`, đánh giá lại lịch sử. Chỉ đổi `Enabled` →
 không tăng version. Cấu hình sai bị bỏ qua và ghi log lỗi.
 
-## Indicators — danh sách `IndicatorDefinition` ([`IndicatorRegistry.cs`](../src/CryptoBot.Application/Indicators/Registry/IndicatorRegistry.cs))
+## Indicators — danh sách `IndicatorDefinition` ([`IndicatorDefinition.cs`](../src/CryptoBot.Application/Indicators/Registry/IndicatorDefinition.cs))
 
 ```json
 { "Name": "eth-15m-myrsi-trend", "Type": "MyRsi", "Symbol": "ETHUSDT", "Interval": "15m",
@@ -102,7 +102,7 @@ Lỗi (loại không tồn tại, tham số sai tên/kiểu, `Validate()` trả 
 Giá trị hiện tại: BTCUSDT (step 0.001, tick 0.1, min 50, mmr 0.004), ETHUSDT (step 0.001, tick 0.01, min 20,
 mmr 0.005). Cần kiểm tra lại với `exchangeInfo` của Binance khi tích hợp testnet.
 
-## AutoOrders — `AutoOrderOptions` ([`AutoOrderService.cs`](../src/CryptoBot.Application/Futures/AutoOrders/AutoOrderService.cs))
+## AutoOrders — `AutoOrderOptions` ([`AutoOrderOptions.cs`](../src/CryptoBot.Application/Futures/AutoOrders/AutoOrderOptions.cs))
 
 | Khóa | Mặc định | Ý nghĩa |
 | --- | --- | --- |
@@ -128,7 +128,7 @@ mmr 0.005). Cần kiểm tra lại với `exchangeInfo` của Binance khi tích 
 | `BaseUrl` | `https://api-pub.bitfinex.com` | REST công khai |
 | `RequestTimeout` | `00:00:20` | |
 
-## DailyHistory — `DailyHistoryOptions` ([`DailyHistorySyncService.cs`](../src/CryptoBot.Application/MarketData/DailyHistory/DailyHistorySyncService.cs))
+## DailyHistory — `DailyHistoryOptions` ([`DailyHistoryOptions.cs`](../src/CryptoBot.Application/MarketData/DailyHistory/DailyHistoryOptions.cs))
 
 | Khóa | Mặc định | Ý nghĩa |
 | --- | --- | --- |
@@ -137,7 +137,7 @@ mmr 0.005). Cần kiểm tra lại với `exchangeInfo` của Binance khi tích 
 | `BatchSize` | 10000 | Bitfinex tối đa 10000 nến/request |
 | `Symbols` | `[]` | Ký hiệu Bitfinex: hiện tại `BTCUSD`, `ETCUSD`, `ETHUSD`. `BTCUSDT` (bảng giá) được nối với `BTCUSD` cho dự báo ngày tương tự |
 
-## DailyReports — `DailyReportOptions` ([`DailyReportService.cs`](../src/CryptoBot.Application/Reports/DailyReportService.cs))
+## DailyReports — `DailyReportOptions` ([`DailyReportOptions.cs`](../src/CryptoBot.Application/Reports/DailyReportOptions.cs))
 
 | Khóa | Mặc định | Ý nghĩa |
 | --- | --- | --- |
@@ -152,7 +152,7 @@ mmr 0.005). Cần kiểm tra lại với `exchangeInfo` của Binance khi tích 
 
 Đổi `RunAt`/`Period` chỉ áp dụng cho báo cáo mới; báo cáo đã lưu giữ nguyên.
 
-## News — `NewsOptions` ([`NewsSyncService.cs`](../src/CryptoBot.Application/News/Sync/NewsSyncService.cs))
+## News — `NewsOptions` ([`NewsOptions.cs`](../src/CryptoBot.Application/News/Sync/NewsOptions.cs))
 
 | Khóa | Mặc định | Ý nghĩa |
 | --- | --- | --- |
