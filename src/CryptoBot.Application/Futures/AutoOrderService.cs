@@ -6,58 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace CryptoBot.Application.Futures;
 
-public sealed class AutoOrderOptions
-{
-    public decimal DefaultMargin { get; set; } = 50m;
-    public int DefaultLeverage { get; set; } = 2;
-    public decimal DefaultStopLossPercent { get; set; } = 1m;
-    public decimal DefaultTakeProfitPercent { get; set; } = 2m;
-
-    /// <summary>Chặn lệnh tự động mới khi lỗ trong ngày UTC vượt mức này so với vốn đầu ngày (%).</summary>
-    public decimal DailyLossLimitPercent { get; set; } = 5m;
-
-    public int MaxActiveRules { get; set; } = 10;
-}
-
-public interface IAutoOrderStore
-{
-    Task<IReadOnlyList<AutoOrderRule>> GetActiveAsync(CancellationToken ct);
-
-    /// <summary>Quy tắc đã mở lệnh và đang chờ chỉ báo đảo chiều để tự đóng.</summary>
-    Task<IReadOnlyList<AutoOrderRule>> GetWatchingCloseAsync(CancellationToken ct);
-    Task<IReadOnlyList<AutoOrderRule>> GetRecentAsync(int limit, CancellationToken ct);
-    Task<AutoOrderRule?> GetAsync(long id, CancellationToken ct);
-    void Add(AutoOrderRule rule);
-    Task SaveAsync(CancellationToken ct);
-}
-
-public sealed record CreateRuleRequest(
-    string Symbol,
-    PositionSide Side,
-    TriggerCondition? Condition,
-    decimal? TriggerPrice,
-    decimal Margin,
-    int Leverage,
-    decimal StopLossPercent,
-    decimal? TakeProfitPercent,
-    RuleTriggerType TriggerType = RuleTriggerType.Price,
-    string? IndicatorName = null,
-    bool CloseOnReverse = false);
-
-public sealed record CreateRuleResult(AutoOrderRule? Rule, IReadOnlyList<string> Errors);
-
-public sealed record DailyRiskState(
-    DateTime DayStartUtc,
-    decimal DayStartEquity,
-    decimal TodayRealizedPnl,
-    decimal LossLimit,
-    bool Blocked);
-
-public sealed record AutoOrderSummary(
-    IReadOnlyList<AutoOrderRule> Rules,
-    AutoOrderOptions Defaults,
-    DailyRiskState Risk);
-
 /// <summary>
 /// Quy tắc tự mở lệnh Paper theo mức giá hoặc theo tín hiệu chỉ báo tự viết; quy tắc theo chỉ báo có thể tự đóng
 /// vị thế khi chỉ báo đảo chiều. Mọi lệnh vẫn đi qua <see cref="PaperFuturesService"/>
