@@ -20,7 +20,7 @@ OpenAPI (môi trường Development): `GET /openapi/v1.json`.
 | 422 | Đúng định dạng nhưng nghiệp vụ từ chối | `{ "errors": [...] }`, `{ "error": "..." }` hoặc DTO có `errors` |
 | 503 | `/health/ready` khi không kết nối được DB | `{ "status": "db-unavailable" }` |
 
-## Trạng thái và chiến lược — [`BotEndpoints.cs`](../src/CryptoBot.Api/Endpoints/BotEndpoints.cs)
+## Trạng thái và chiến lược — [`BotEndpoints.cs`](../src/CryptoBot.Api/Endpoints/Bot/BotEndpoints.cs)
 
 | Method | Đường dẫn | Tham số | Trả về |
 | --- | --- | --- | --- |
@@ -35,7 +35,7 @@ OpenAPI (môi trường Development): `GET /openapi/v1.json`.
 `pressure` của nến: `buyVolume`, `sellVolume`, `buyPercent`, `excessPercent` (null khi một phía = 0), `side`
 (`Balanced`/`BuyHeavy`/`SellHeavy`), `alertExcessPercent`. `null` với nến chưa có khối lượng mua chủ động.
 
-## Paper Futures — [`PaperFuturesEndpoints.cs`](../src/CryptoBot.Api/Endpoints/PaperFuturesEndpoints.cs)
+## Paper Futures — [`PaperFuturesEndpoints.cs`](../src/CryptoBot.Api/Endpoints/PaperFutures/PaperFuturesEndpoints.cs)
 
 Tiền tố `/api/paper/futures`.
 
@@ -61,7 +61,7 @@ Tiền tố `/api/paper/futures`.
 }
 ```
 
-## Quy tắc tự mở lệnh — [`AutoOrderEndpoints.cs`](../src/CryptoBot.Api/Endpoints/AutoOrderEndpoints.cs)
+## Quy tắc tự mở lệnh — [`AutoOrderEndpoints.cs`](../src/CryptoBot.Api/Endpoints/AutoOrders/AutoOrderEndpoints.cs)
 
 Tiền tố `/api/paper/futures/auto-rules`.
 
@@ -86,34 +86,34 @@ Tiền tố `/api/paper/futures/auto-rules`.
 Quy tắc trả về có `status` (`Active`/`Triggered`/`Rejected`/`Cancelled`), `note` (lý do bị chặn/từ chối),
 `triggerDetail` (giá trị chỉ báo lúc kích hoạt), `positionId`, `closeWatchEndedAtUtc`, `closeDetail`.
 
-## Chỉ báo tự viết — [`IndicatorEndpoints.cs`](../src/CryptoBot.Api/Endpoints/IndicatorEndpoints.cs)
+## Chỉ báo tự viết — [`IndicatorEndpoints.cs`](../src/CryptoBot.Api/Endpoints/Indicators/IndicatorEndpoints.cs)
 
 | Method | Đường dẫn | Tham số | Trả về |
 | --- | --- | --- | --- |
 | GET | `/api/indicators` | — | `indicators[]` (tên, loại, mô tả, symbol, interval, `requiredCandles`, `lines[]`), `errors[]` (cấu hình bị bỏ qua), `availableTypes[]` |
 | GET | `/api/indicators/{name}/chart` | `limit` (300, 1–1000) | `indicator`, `points[]` (`time`, `values` theo `lines.key`, `signal`), `markers[]` (nến có tín hiệu + lý do), `latestReason` |
 
-## Giá trực tiếp và biên độ — [`LivePriceEndpoints.cs`](../src/CryptoBot.Api/Endpoints/LivePriceEndpoints.cs)
+## Giá trực tiếp và biên độ — [`LivePriceEndpoints.cs`](../src/CryptoBot.Api/Endpoints/LivePrices/LivePriceEndpoints.cs)
 
 | Method | Đường dẫn | Tham số | Trả về |
 | --- | --- | --- | --- |
 | GET | `/api/live/prices` | `limit` (60, 1–`HistorySize`) | `intervalSeconds`, `serverTimeUtc`, `symbols[]` mỗi symbol có `samples[]` (Spot, Mark, độ trễ, lỗi) |
 | GET | `/api/live/daily-range` | `symbol` (phải có trong `LivePrices:Symbols`), `days` (1, 1–90) | Biên độ ±1σ/±2σ, % ngày tăng, tăng/giảm mạnh nhất; `similarDays` (chỉ khi `days = 1`, có thể `null`) |
 
-## Dự đoán — [`PredictionEndpoints.cs`](../src/CryptoBot.Api/Endpoints/PredictionEndpoints.cs)
+## Dự đoán — [`PredictionEndpoints.cs`](../src/CryptoBot.Api/Endpoints/Prediction/PredictionEndpoints.cs)
 
 | Method | Đường dẫn | Tham số | Trả về |
 | --- | --- | --- | --- |
 | GET | `/api/prediction` | `symbol`, `interval` (`1d` = nến ngày Binance), `history` (300, 1–1000) | Dự đoán nến kế tiếp (`direction`, `score`, `reason`), kết quả chạy thử (`backtestPredictions`, `backtestCorrect`, `hitRatePercent`), 20 lần đoán gần nhất (`recent[]`), `settings` |
 | GET | `/api/prediction/indicators` | `symbol`, `interval`, `history` (1000) | Mỗi chỉ báo cùng symbol/khung: tỷ lệ đúng sau 1/3/6/12 nến (`horizons[]`), các tín hiệu gần nhất kèm % đi sau 1 và 3 nến |
 
-## Lịch sử theo tháng — [`HistoryEndpoints.cs`](../src/CryptoBot.Api/Endpoints/HistoryEndpoints.cs)
+## Lịch sử theo tháng — [`HistoryEndpoints.cs`](../src/CryptoBot.Api/Endpoints/History/HistoryEndpoints.cs)
 
 | Method | Đường dẫn | Tham số | Trả về |
 | --- | --- | --- | --- |
 | GET | `/api/history/monthly` | `symbol?` (mặc định symbol đầu tiên của `DailyHistory:Symbols`) | `months[]`, `years[]`, `monthStats[]`, `events[]`, `firstDayUtc`, `lastDayUtc`, `symbols[]` |
 
-## Báo cáo biến động hằng ngày — [`ReportEndpoints.cs`](../src/CryptoBot.Api/Endpoints/ReportEndpoints.cs)
+## Báo cáo biến động hằng ngày — [`ReportEndpoints.cs`](../src/CryptoBot.Api/Endpoints/Reports/ReportEndpoints.cs)
 
 | Method | Đường dẫn | Tham số | Trả về |
 | --- | --- | --- | --- |
@@ -125,7 +125,7 @@ Mỗi báo cáo: `symbol`, `interval`, `createdAtUtc`, `report` gồm `fromUtc`,
 `volume`, `buyPercent`, `biggestRise`, `biggestDrop`, `volumeSpikes[]`. Mỗi nến trong đó có `openTimeUtc`, `open`,
 `close`, `changePercent`, `volume`, `volumeRatio` (× trung bình), `buyPercent`.
 
-## Tin tức — [`NewsEndpoints.cs`](../src/CryptoBot.Api/Endpoints/NewsEndpoints.cs)
+## Tin tức — [`NewsEndpoints.cs`](../src/CryptoBot.Api/Endpoints/News/NewsEndpoints.cs)
 
 | Method | Đường dẫn | Tham số | Trả về |
 | --- | --- | --- | --- |

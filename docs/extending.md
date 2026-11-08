@@ -7,9 +7,9 @@ Các bước cụ thể cho những thay đổi hay gặp. Mỗi mục liệt k�
 
 Không cần sửa Application, Api hay dashboard: registry tự tìm class, chart và quy tắc tự động tự dùng được.
 
-1. Copy [`TemplateIndicator.cs`](../src/CryptoBot.Domain/Indicators/TemplateIndicator.cs) thành
-   `src/CryptoBot.Domain/Indicators/MyBreakoutIndicator.cs`, đổi tên class. Đọc
-   [`MyRsiIndicator.cs`](../src/CryptoBot.Domain/Indicators/MyRsiIndicator.cs) để có ví dụ đầy đủ.
+1. Copy [`TemplateIndicator.cs`](../src/CryptoBot.Domain/Indicators/Template/TemplateIndicator.cs) thành
+   `src/CryptoBot.Domain/Indicators/MyBreakout/MyBreakoutIndicator.cs`, đổi tên class. Đọc
+   [`MyRsiIndicator.cs`](../src/CryptoBot.Domain/Indicators/Rsi/MyRsiIndicator.cs) để có ví dụ đầy đủ.
 2. Gắn `[Indicator("MyBreakout", Description = "Mô tả ngắn hiện trên dashboard")]`.
 3. Viết theo 4 phần như MyRsi:
    - **Tham số:** property `public` có `set`, có giá trị mặc định. Tên property = khóa trong `Parameters`.
@@ -38,18 +38,19 @@ Hiện code gắn khá chặt với EMA, nên đây là thay đổi lớn. Cần
 | Chỗ | Việc |
 | --- | --- |
 | `Domain/Strategies/` | Class mới cài `IStrategy` + record tham số có `Validate()` |
-| [`StrategyFactory`](../src/CryptoBot.Application/Signals/StrategyFactory.cs) | Thêm hằng trong `StrategyTypes`, nhánh trong `Create` (kiểu trả về đang là `EmaCrossStrategy`, cần đổi thành `IStrategy`) |
-| [`StrategyConfigurator`](../src/CryptoBot.Application/Signals/StrategyConfigurator.cs) | `StrategyDefinition.Parameters` đang là `EmaCrossParameters`; `Validate` chỉ nhận `EmaCross` |
+| [`StrategyFactory`](../src/CryptoBot.Application/Signals/Configuration/StrategyFactory.cs) | Thêm hằng trong `StrategyTypes`, nhánh trong `Create` (kiểu trả về đang là `EmaCrossStrategy`, cần đổi thành `IStrategy`) |
+| [`StrategyConfigurator`](../src/CryptoBot.Application/Signals/Configuration/StrategyConfigurator.cs) | `StrategyDefinition.Parameters` đang là `EmaCrossParameters`; `Validate` chỉ nhận `EmaCross` |
 | `TradingSignal` | Có cột `FastEma`/`SlowEma`; chiến lược mới cần giá trị tương ứng hoặc cột tổng quát hơn (migration) |
 | `StrategyDecision.Indicators` | Đang là `IndicatorValues(FastPrev, SlowPrev, Fast, Slow)` |
-| [`ChartQueryService`](../src/CryptoBot.Application/Signals/ChartQueryService.cs) + `BotEndpoints` + dashboard | Đang vẽ đúng 2 đường EMA |
+| [`ChartQueryService`](../src/CryptoBot.Application/Signals/Charts/ChartQueryService.cs) + `BotEndpoints` + dashboard | Đang vẽ đúng 2 đường EMA |
 
 Nếu chỉ cần tín hiệu Long/Short để xem trên chart và kích hoạt lệnh Paper, **viết chỉ báo tự viết (mục 1)** đơn giản
 hơn nhiều. Chỉ làm chiến lược mới khi cần lưu tín hiệu vào DB theo version.
 
 ## 3. Thêm một endpoint
 
-1. Chọn file `src/CryptoBot.Api/Endpoints/<Mảng>Endpoints.cs` có sẵn, hoặc tạo file mới:
+1. Chọn file `src/CryptoBot.Api/Endpoints/<Mảng>/<Mảng>Endpoints.cs` có sẵn, hoặc tạo thư mục và file mới
+   `Endpoints/Foo/FooEndpoints.cs`:
    ```csharp
    namespace CryptoBot.Api.Endpoints;
 
@@ -68,6 +69,10 @@ hơn nhiều. Chỉ làm chiến lược mới khi cần lưu tín hiệu vào D
            });
        }
    }
+   ```
+   DTO nằm trong file riêng cùng thư mục, `Endpoints/Foo/FooDto.cs`:
+   ```csharp
+   namespace CryptoBot.Api.Endpoints;
 
    /// <summary>Mô tả DTO, đơn vị, khi nào null.</summary>
    public sealed record FooDto(string Symbol, decimal Value);
@@ -80,7 +85,7 @@ hơn nhiều. Chỉ làm chiến lược mới khi cần lưu tín hiệu vào D
 
 ## 4. Thêm một service Application
 
-1. `src/CryptoBot.Application/<Mảng>/FooService.cs`:
+1. `src/CryptoBot.Application/<Mảng>/Foo/FooService.cs` (options `FooOptions.cs` cùng thư mục):
    `public sealed class FooService(ICandleStore candles, IClock clock, FooOptions options, ILogger<FooService> logger)`.
 2. Cần thứ gì từ bên ngoài (DB, HTTP) → khai báo interface (port), cài ở Infrastructure.
 3. Đăng ký trong [`DependencyInjection.cs`](../src/CryptoBot.Infrastructure/DependencyInjection.cs), đúng nhóm, có chú
@@ -90,7 +95,7 @@ hơn nhiều. Chỉ làm chiến lược mới khi cần lưu tín hiệu vào D
 ## 5. Thêm hoặc đổi cột trong database (migration)
 
 1. Sửa entity trong Domain (property `{ get; private set; }`, cập nhật constructor/hàm thay đổi trạng thái).
-2. Sửa mapping trong [`BotDbContext.OnModelCreating`](../src/CryptoBot.Infrastructure/Persistence/BotDbContext.cs):
+2. Sửa mapping trong [`BotDbContext.OnModelCreating`](../src/CryptoBot.Infrastructure/Persistence/Database/BotDbContext.cs):
    `HasMaxLength` cho chuỗi, `HasConversion<string>()` cho enum, index cần thiết. Property tính toán → `e.Ignore(...)`.
 3. Tạo migration (từ thư mục gốc repo):
    ```bash
@@ -165,7 +170,7 @@ Thêm mục vào [`marketevents.json`](../src/CryptoBot.Api/marketevents.json): 
 ## 11. Chỉnh hàm dự đoán nến kế tiếp
 
 1. Sửa trọng số/tham số trong `PredictorSettings` hoặc thêm thành phần vào `PriceDirectionPredictor.Predict`
-   ([file](../src/CryptoBot.Domain/Prediction/PriceDirectionPredictor.cs)). Thêm thành phần → thêm trọng số tương ứng
+   ([file](../src/CryptoBot.Domain/Prediction/DirectionPredictor/PriceDirectionPredictor.cs)). Thêm thành phần → thêm trọng số tương ứng
    (đặt 0 để tắt) và ghi vào `Reason`.
 2. Cập nhật `PredictionSettingsDto` + `client.ts` nếu muốn hiển thị trọng số mới.
 3. Chạy `PriceDirectionPredictorTests`, restart API, xem tỷ lệ đúng trên trang Dự đoán. So sánh với ~50% (đoán bừa)

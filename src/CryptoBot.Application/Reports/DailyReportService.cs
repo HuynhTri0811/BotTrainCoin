@@ -5,50 +5,6 @@ using Microsoft.Extensions.Logging;
 
 namespace CryptoBot.Application.Reports;
 
-public sealed class DailyReportOptions
-{
-    /// <summary>Giờ lập báo cáo mỗi ngày, theo <see cref="TimeZone"/>.</summary>
-    public TimeSpan RunAt { get; set; } = TimeSpan.FromHours(6);
-
-    /// <summary>Múi giờ IANA của <see cref="RunAt"/>.</summary>
-    public string TimeZone { get; set; } = "Asia/Ho_Chi_Minh";
-
-    /// <summary>Độ dài khoảng báo cáo, kết thúc đúng lúc lập báo cáo.</summary>
-    public TimeSpan Period { get; set; } = TimeSpan.FromHours(24);
-
-    /// <summary>Khung nến Binance dùng để lập báo cáo.</summary>
-    public string Interval { get; set; } = "1h";
-
-    /// <summary>Số nến trước mỗi nến dùng làm trung bình khối lượng.</summary>
-    public int BaselineCandles { get; set; } = DailyMoveReport.DefaultBaselineCandles;
-
-    /// <summary>Khối lượng gấp ngần này lần trung bình thì coi là bất thường.</summary>
-    public decimal VolumeSpikeMultiplier { get; set; } = DailyMoveReport.DefaultVolumeSpikeMultiplier;
-
-    /// <summary>Sàn lỗi thì thử lại sau khoảng này thay vì chờ tới hôm sau.</summary>
-    public TimeSpan RetryAfter { get; set; } = TimeSpan.FromMinutes(5);
-
-    /// <summary>Symbol Binance cần báo cáo, ví dụ "BTCUSDT".</summary>
-    public List<string> Symbols { get; set; } = [];
-}
-
-public interface IDailyReportStore
-{
-    Task<bool> ExistsAsync(string symbol, DateTime periodEndUtc, CancellationToken ct);
-
-    /// <summary>Tối đa <paramref name="limit"/> báo cáo mới nhất (theo cuối khoảng), mới → cũ.</summary>
-    Task<IReadOnlyList<DailyReport>> GetRecentAsync(string? symbol, int limit, CancellationToken ct);
-
-    void Add(DailyReport report);
-    Task SaveAsync(CancellationToken ct);
-}
-
-/// <summary>Báo cáo đã lưu kèm nội dung đã đọc lại từ JSON.</summary>
-public sealed record SavedDailyReport(string Symbol, string Interval, DateTime CreatedAtUtc, DailyMoveReport Report);
-
-/// <summary>Kết quả một lượt lập báo cáo: số báo cáo mới và lỗi theo symbol (sàn lỗi, chưa có nến…).</summary>
-public sealed record DailyReportRun(DateTime PeriodEndUtc, int Created, IReadOnlyList<string> Errors);
-
 /// <summary>
 /// Lập báo cáo biến động mỗi ngày lúc <see cref="DailyReportOptions.RunAt"/> cho khoảng
 /// <see cref="DailyReportOptions.Period"/> vừa qua, từ nến đã đóng lấy thẳng từ Binance. Mỗi (symbol, giờ lập)

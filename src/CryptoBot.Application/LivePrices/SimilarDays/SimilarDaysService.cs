@@ -1,0 +1,91 @@
+using CryptoBot.Application.Abstractions;
+using CryptoBot.Application.MarketData;
+using CryptoBot.Domain.MarketData;
+using Microsoft.Extensions.Logging;
+
+namespace CryptoBot.Application.LivePrices;
+
+/// <summary>
+/// Dự báo "ngày tương tự" cho symbol của bảng giá trực tiếp (ví dụ BTCUSDT), dùng nến ngày lịch sử dài hạn
+/// trong DB (DailyHistory, ví dụ BTCUSD trên Bitfinex từ 2016).
+///
+/// Dự báo đo thay đổi từ giá đóng ngày D đến giá đóng ngày D + horizon, nên khoảng giá được neo vào giá đóng
+/// ngày D (không phải giá hiện tại, vốn đã gồm phần giá chạy trong ngày). Chỉ trả kết quả khi D là hôm qua
+/// (UTC): lịch sử cũ hơn nghĩa là dự báo cho một ngày đã qua.
+/// </summary>
+public sealed class SimilarDaysService(
+    ICandleStore candles,
+    IDailyHistoryClient historyClient,
+    DailyHistoryOptions options,
+    DailyRangeService daily,
+    SimilarDaysCache cache,
+    IClock clock,
+    ILogger<SimilarDaysService> logger)
+{
+    /// <summary>Đủ cho hơn 50 năm nến ngày.</summary>
+    private const int MaxDailyCandles = 20_000;
+
+    /// <summary>
+    /// Null khi symbol không có lịch sử dài hạn, chưa đủ dữ liệu, lịch sử chưa cập nhật đến hôm qua, hoặc có lỗi
+    /// (đã ghi log). Không bao giờ ném lỗi, để thanh biên độ vẫn hiện khi phần này hỏng.
+    /// </summary>
+    public async Task<SimilarDaysResult?> GetAsync(string liveSymbol, int horizonDays, CancellationToken ct)
+    {
+        try
+        {
+            return await ComputeAsync(liveSymbol, horizonDays, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Ngày tương tự {Symbol}: bỏ qua do lỗi", liveSymbol);
+            return null;
+        }
+    }
+
+    private async Task<SimilarDaysResult?> ComputeAsync(string liveSymbol, int horizonDays, CancellationToken ct)
+    {
+        var historySymbol = ToHistorySymbol(liveSymbol);
+        if (historySymbol is null)
+            return null;
+
+        var day = CandleInterval.D1.Duration;
+        var yesterday = clock.UtcNow.Date - day;
+        var key = new CandleKey(historyClient.Exchange, historySymbol, CandleInterval.D1);
+        var lastStored = (await candles.GetLatestAsync(key, null, 1, closedOnly: true, ct)).FirstOrDefault();
+        if (lastStored is null || lastStored.OpenTimeUtc != yesterday)
+            return null;
+
+        // Neo vào giá đóng hôm qua trên sàn của bảng giá; hai sàn cùng chốt ngày theo UTC.
+        var anchor = (await daily.GetClosedDailyCandlesAsync(liveSymbol, ct)).LastOrDefault();
+        if (anchor is null || anchor.OpenTimeUtc != yesterday)
+            return null;
+
+        var computed = await cache.GetOrComputeAsync(historySymbol, horizonDays, lastStored.OpenTimeUtc, async () =>
+        {
+            var history = await candles.GetLatestAsync(key, null, MaxDailyCandles, closedOnly: true, ct);
+            var closes = history.Select(candle => candle.Close).ToList();
+            // Chạy thử nặng (vài trăm ms đến hơn 1 giây): đưa khỏi luồng xử lý request.
+            return await Task.Run(() => new SimilarDaysComputation(
+                SimilarDaysForecast.Compute(closes, horizonDays),
+                SimilarDaysForecast.Backtest(closes, horizonDays)), ct);
+        });
+        if (computed.Forecast is not { } forecast)
+            return null;
+
+        var price = anchor.Close;
+        return new SimilarDaysResult(historySymbol, historyClient.Exchange, yesterday, price,
+            yesterday + day * (horizonDays + 1), price * (1 + forecast.Low68Percent / 100),
+                price * (1 + forecast.High68Percent / 100),
+            forecast, computed.Backtest);
+    }
+
+    /// <summary>BTCUSDT → BTCUSD nếu BTCUSD có trong DailyHistory:Symbols.</summary>
+    public string? ToHistorySymbol(string liveSymbol)
+    {
+        var candidate = liveSymbol.EndsWith("USDT", StringComparison.OrdinalIgnoreCase)
+            ? liveSymbol[..^1]
+            : liveSymbol;
+        return options.Symbols.FirstOrDefault(configured => configured.Equals(candidate,
+            StringComparison.OrdinalIgnoreCase));
+    }
+}

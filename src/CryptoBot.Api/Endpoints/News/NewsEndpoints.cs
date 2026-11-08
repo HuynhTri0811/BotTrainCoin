@@ -1,0 +1,42 @@
+using CryptoBot.Application.News;
+using CryptoBot.Domain.News;
+
+namespace CryptoBot.Api.Endpoints;
+
+public static class NewsEndpoints
+{
+    public static void MapNewsEndpoints(this IEndpointRouteBuilder app)
+    {
+        var api = app.MapGroup("/api/news");
+
+        // Tin đã đồng bộ (NewsWorker), mới → cũ; lọc theo coin, nguồn, từ khóa và khoảng giờ đăng [fromUtc, toUtc).
+        api.MapGet("", async (string? coin, string? source, string? search, DateTimeOffset? fromUtc,
+            DateTimeOffset? toUtc, int? limit, INewsStore store, NewsOptions options, CancellationToken ct) =>
+        {
+            var picked = coin is null
+                ? null
+                : NewsText.Coins.FirstOrDefault(candidate => candidate.Equals(coin,
+                    StringComparison.OrdinalIgnoreCase));
+            if (coin is not null && picked is null)
+                return Results.BadRequest(new { error = $"Coin không hỗ trợ: {coin}. Chọn {string.Join(", ", NewsText.Coins)}." });
+
+            var keyword = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+            var filter = new NewsFilter(picked, string.IsNullOrWhiteSpace(source) ? null : source.Trim(), keyword,
+                fromUtc?.UtcDateTime, toUtc?.UtcDateTime);
+            var articles = await store.QueryAsync(filter, Math.Clamp(limit ?? 50, 1, 200), ct);
+            return Results.Ok(new NewsListDto(NewsText.Coins, options.Feeds.Select(feed => feed.Name).ToList(),
+                options.PollInterval.TotalHours, articles.Select(ToDto).ToList()));
+        });
+
+        // Đồng bộ ngay, không chờ tới lượt kế tiếp của worker.
+        api.MapPost("/sync", async (NewsSyncService svc, CancellationToken ct) =>
+        {
+            var result = await svc.SyncAsync(ct);
+            return Results.Ok(new NewsSyncDto(result.Added, result.Errors));
+        });
+    }
+
+    private static NewsArticleDto ToDto(NewsArticle article) =>
+        new(article.Id, article.Source, article.Title, article.Url, article.Summary,
+            article.Coins.Length == 0 ? [] : article.Coins.Split(','), article.PublishedAtUtc);
+}
