@@ -17,7 +17,7 @@ Framework: xUnit 2.9, `using Xunit;` là global using trong mỗi project test.
 | Project | Tham chiếu | Test cái gì | Fake / hạ tầng |
 | --- | --- | --- | --- |
 | [`CryptoBot.Domain.Tests`](../tests/CryptoBot.Domain.Tests) | Domain | Công thức, entity, chiến lược, chỉ báo, dự đoán | Không cần fake. Helper [`TestCandles`](../tests/CryptoBot.Domain.Tests/TestCandles.cs) |
-| [`CryptoBot.Application.Tests`](../tests/CryptoBot.Application.Tests) | Application | Service: sync, đánh giá tín hiệu, paper futures, quy tắc tự động, registry, cache, golden | [`Fakes.cs`](../tests/CryptoBot.Application.Tests/Fakes.cs): `FakeClock`, `InMemoryCandleStore`, `InMemoryStrategyInstanceStore`, `InMemorySignalStore`, `FakeMarketDataClient` |
+| [`CryptoBot.Application.Tests`](../tests/CryptoBot.Application.Tests) | Application | Service: sync, đánh giá tín hiệu, paper futures, quy tắc tự động, registry, cache, golden | [`Fakes/`](../tests/CryptoBot.Application.Tests/Fakes/), mỗi fake một file: `FakeClock`, `InMemoryCandleStore`, `InMemorySignalStore`, `FakeMarketDataClient`… |
 | [`CryptoBot.IntegrationTests`](../tests/CryptoBot.IntegrationTests) | Infrastructure | EF Core mapping, converter, index duy nhất, migration thật; đọc RSS qua `HttpClient` với handler giả | File SQLite tạm trong `%TEMP%`, xóa sau test |
 
 Quy tắc chọn chỗ: test ở **tầng thấp nhất** chứa logic. Công thức → Domain test. Điều phối nhiều port → Application
@@ -74,7 +74,7 @@ Chi tiết: [signal-functions.md §6](signal-functions.md#6-golden-test-bảo-đ
 
 ## Fake
 
-- Fake viết tay trong `Fakes.cs` (không dùng thư viện mock). Fake **giữ trạng thái thật** (ví dụ
+- Fake viết tay trong thư mục `Fakes/`, mỗi fake một file tên trùng tên class (không dùng thư viện mock). Fake **giữ trạng thái thật** (ví dụ
   `InMemoryCandleStore` dùng `SortedDictionary` và gọi `Candle.ApplyUpdate` giống store thật), nên test kiểm tra được
   hành vi chứ không chỉ "có gọi hàm".
 - Đổi interface trong `Application/Abstractions/` → sửa fake tương ứng để nó vẫn giống cài đặt thật.

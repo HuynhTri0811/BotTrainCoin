@@ -27,9 +27,9 @@ viết code mới giống code xung quanh nó.
   Thư mục con chức năng (`MarketData/DailyMove/`) và `Enums/` không thêm vào namespace
   (`Futures/Enums/PositionSide.cs` → `CryptoBot.Domain.Futures`).
 - `using` ở đầu file, sắp theo alphabet, `System.*` trước. Không để `using` thừa.
-- **Mỗi file một kiểu** (class, record, interface, struct, enum), tên file trùng tên kiểu. Enum nằm trong
-  `<Mảng>/Enums/`. DTO của endpoint mỗi DTO một file, cùng thư mục con với endpoint. Xem
-  [folder-structure.md](folder-structure.md#hai-quy-tắc-bố-cục).
+- **Mỗi file một kiểu** (class, record, interface, struct, enum), tên file trùng tên kiểu, áp dụng cả cho `tests/`
+  (fake nằm trong `Fakes/`). Enum nằm trong `<Mảng>/Enums/`. DTO của endpoint mỗi DTO một file, cùng thư mục con
+  với endpoint. Xem [folder-structure.md](folder-structure.md#hai-quy-tắc-bố-cục).
 
 ### Kiểu và từ khóa
 

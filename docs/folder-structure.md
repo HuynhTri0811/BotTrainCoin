@@ -287,7 +287,7 @@ tests/
 ├── CryptoBot.Domain.Tests/       # Tham chiếu chỉ Domain. Một file test cho mỗi kiểu: <Kiểu>Tests.cs
 │   └── TestCandles.cs            # Helper tạo nến (At, FromCloses)
 ├── CryptoBot.Application.Tests/  # Tham chiếu Application. Fake trong bộ nhớ
-│   ├── Fakes.cs                  # FakeClock, InMemoryCandleStore/StrategyInstanceStore/SignalStore, FakeMarketDataClient
+│   ├── Fakes/                    # Mỗi fake một file: FakeClock, InMemoryCandleStore, InMemorySignalStore, FakeMarketDataClient…
 │   ├── SignalGoldenTests.cs      # Khóa đầu ra hàm sinh tín hiệu
 │   └── Golden/signal_outputs.txt # Snapshot 3,026 dòng
 └── CryptoBot.IntegrationTests/   # Tham chiếu Infrastructure. SQLite file thật + migration thật
