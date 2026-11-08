@@ -47,19 +47,3 @@ public static class HistoryEndpoints
         });
     }
 }
-
-public sealed record MonthChangeDto(int Year, int Month, decimal Open, decimal Close, decimal ChangePercent, int Days,
-    bool Complete);
-
-public sealed record YearChangeDto(int Year, decimal Open, decimal Close, decimal ChangePercent, bool Complete);
-
-/// <summary>Sự kiện cùng tháng (marketevents.json), không khẳng định là nguyên nhân.</summary>
-public sealed record MonthEventDto(int Year, int Month, string Title, string? Detail, bool MarketWide);
-
-public sealed record MonthStatsDto(int Month, int Years, decimal AverageChangePercent, decimal BestChangePercent,
-    decimal WorstChangePercent, int UpCount, decimal UpPercent);
-
-/// <summary>Báo cáo theo tháng (xem MonthlyChangeReport). Số chỉ để hiển thị.</summary>
-public sealed record MonthlyHistoryDto(string Symbol, string Exchange, IReadOnlyList<string> Symbols,
-    DateTime FirstDayUtc, DateTime LastDayUtc, IReadOnlyList<MonthChangeDto> Months, IReadOnlyList<YearChangeDto> Years,
-    IReadOnlyList<MonthStatsDto> MonthStats, IReadOnlyList<MonthEventDto> Events);

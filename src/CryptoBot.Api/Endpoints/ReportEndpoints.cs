@@ -1,6 +1,5 @@
 using CryptoBot.Application.Abstractions;
 using CryptoBot.Application.Reports;
-using CryptoBot.Domain.MarketData;
 
 namespace CryptoBot.Api.Endpoints;
 
@@ -36,11 +35,3 @@ public static class ReportEndpoints
         });
     }
 }
-
-/// <summary>Một báo cáo đã lưu; <see cref="Report"/> là nguyên nội dung DailyMoveReport.</summary>
-public sealed record DailyReportDto(string Symbol, string Interval, DateTime CreatedAtUtc, DailyMoveReport Report);
-
-public sealed record DailyReportListDto(IReadOnlyList<string> Symbols, string RunAt, string TimeZone,
-    DateTime NextRunUtc, IReadOnlyList<DailyReportDto> Reports);
-
-public sealed record DailyReportRunDto(DateTime PeriodEndUtc, int Created, IReadOnlyList<string> Errors);

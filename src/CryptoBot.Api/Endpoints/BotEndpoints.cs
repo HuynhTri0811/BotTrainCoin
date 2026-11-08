@@ -4,7 +4,6 @@ using CryptoBot.Application.Signals;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Strategies;
 using CryptoBot.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace CryptoBot.Api.Endpoints;
 
@@ -111,30 +110,3 @@ public static class BotEndpoints
             signal.Reason,
         signal.CandleClose, signal.FastEma, signal.SlowEma, signal.CreatedAtUtc, signal.IsBackfill);
 }
-
-public sealed record StatusDto(string DecisionMode, string Environment, bool LiveLocked, DateTime ServerTimeUtc,
-    IReadOnlyList<FeedStatusDto> Feeds, IReadOnlyList<StrategyDto> Strategies);
-
-public sealed record FeedStatusDto(string Key, bool IsStale, DateTime? LastSuccessAtUtc, DateTime? LastAttemptAtUtc,
-    string? LastError, int ConsecutiveFailures, DateTime? LatestClosedOpenTimeUtc, IReadOnlyList<string> RecentIssues);
-
-public sealed record StrategyDto(int Id, string Name, string Type, int Version, string Exchange, string Symbol,
-    string Interval, bool Enabled, DateTime? LastEvaluatedCandleOpenTimeUtc, EmaCrossParameters Parameters);
-
-public sealed record ChartDto(StrategyDto Strategy, IReadOnlyList<ChartPointDto> Candles, IReadOnlyList<SignalDto> Signals);
-
-/// <summary>
-/// Time là Unix seconds (định dạng của Lightweight Charts). Số chỉ để hiển thị.
-/// QuoteVolume (USDT), TradeCount và Pressure là null với nến lưu trước khi có các cột này.
-/// </summary>
-public sealed record ChartPointDto(long Time, decimal Open, decimal High, decimal Low, decimal Close,
-    decimal Volume, decimal? QuoteVolume, long? TradeCount, bool IsClosed, decimal? FastEma, decimal? SlowEma,
-    VolumePressureDto? Pressure);
-
-/// <summary>Mua/bán chủ động của nến. Side: Balanced | BuyHeavy | SellHeavy so với AlertExcessPercent.</summary>
-public sealed record VolumePressureDto(decimal BuyVolume, decimal SellVolume, decimal BuyPercent,
-    decimal? ExcessPercent, string Side, decimal AlertExcessPercent);
-
-public sealed record SignalDto(long Id, int StrategyInstanceId, int ConfigVersion, string Symbol, string Interval,
-    DateTime CandleOpenTimeUtc, long Time, string Action, string Reason, decimal CandleClose, decimal FastEma,
-    decimal SlowEma, DateTime CreatedAtUtc, bool IsBackfill);

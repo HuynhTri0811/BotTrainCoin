@@ -40,11 +40,3 @@ public static class NewsEndpoints
         new(article.Id, article.Source, article.Title, article.Url, article.Summary,
             article.Coins.Length == 0 ? [] : article.Coins.Split(','), article.PublishedAtUtc);
 }
-
-public sealed record NewsArticleDto(long Id, string Source, string Title, string Url, string Summary,
-    IReadOnlyList<string> Coins, DateTime PublishedAtUtc);
-
-public sealed record NewsListDto(IReadOnlyList<string> Coins, IReadOnlyList<string> Sources, double PollIntervalHours,
-    IReadOnlyList<NewsArticleDto> Articles);
-
-public sealed record NewsSyncDto(int Added, IReadOnlyList<string> Errors);
