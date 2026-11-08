@@ -58,25 +58,3 @@ public static class AutoOrderEndpoints
             rule.CloseWatchEndedAtUtc,
         rule.CloseDetail);
 }
-
-/// <summary>
-/// TriggerType: "Price" (mặc định, cần Condition + TriggerPrice) hoặc "Indicator" (cần IndicatorName).
-/// CloseOnReverse: chỉ với "Indicator", tự đóng vị thế khi chỉ báo phát tín hiệu ngược hướng.
-/// </summary>
-public sealed record CreateRuleDto(string Symbol, string Side, string? Condition, decimal? TriggerPrice, decimal Margin,
-    int Leverage, decimal StopLossPercent, decimal? TakeProfitPercent, string? TriggerType = null,
-    string? IndicatorName = null, bool CloseOnReverse = false);
-
-public sealed record AutoRuleDto(long Id, string Environment, string Symbol, string Side, string TriggerType,
-    string? Condition, decimal? TriggerPrice, string? IndicatorName, decimal Margin, int Leverage,
-    decimal StopLossPercent, decimal? TakeProfitPercent, string Status, DateTime CreatedAtUtc,
-    DateTime? TriggeredAtUtc, decimal? TriggeredMarkPrice, long? PositionId, string? Note, string? TriggerDetail,
-    bool CloseOnReverse, DateTime? CloseWatchEndedAtUtc, string? CloseDetail);
-
-public sealed record AutoDefaultsDto(decimal Margin, int Leverage, decimal StopLossPercent, decimal TakeProfitPercent,
-    decimal DailyLossLimitPercent, int MaxActiveRules);
-
-public sealed record DailyRiskDto(DateTime DayStartUtc, decimal DayStartEquity, decimal TodayRealizedPnl,
-    decimal LossLimit, bool Blocked);
-
-public sealed record AutoSummaryDto(IReadOnlyList<AutoRuleDto> Rules, AutoDefaultsDto Defaults, DailyRiskDto Risk);

@@ -105,30 +105,3 @@ public static class PredictionEndpoints
 
     private static long ToUnixSeconds(DateTime utc) => new DateTimeOffset(utc).ToUnixTimeSeconds();
 }
-
-/// <summary>
-/// Dự đoán nến mở lúc NextCandleTime đóng trên (Up) hay dưới (Down) LastClose,
-/// kèm tỷ lệ đúng khi chạy thử trên các nến đã đóng đang xem.
-/// </summary>
-public sealed record PredictionDto(string Symbol, string Interval, long NextCandleTime, decimal LastClose,
-    string Direction, decimal Score, string Reason, int BacktestPredictions, int BacktestCorrect,
-    decimal HitRatePercent, IReadOnlyList<PredictionHistoryDto> Recent, PredictionSettingsDto Settings);
-
-/// <summary>Actual là null khi nến đóng đúng bằng giá nến trước (không tính đúng/sai).</summary>
-public sealed record PredictionHistoryDto(long Time, string Predicted, decimal Score, string? Actual,
-    decimal PreviousClose, decimal Close, decimal Change, decimal ChangePercent);
-
-public sealed record PredictionSettingsDto(int TrendPeriod, int MomentumPeriod, decimal TrendWeight,
-    decimal MomentumWeight, decimal PressureWeight);
-
-/// <summary>Tín hiệu Long (Up)/Short (Down) chấm trên Candles nến đã đóng gần nhất, bắt đầu từ FromTime.</summary>
-public sealed record IndicatorAccuracyDto(string Name, string Type, int Candles, long? FromTime,
-    IReadOnlyList<HorizonAccuracyDto> Horizons, IReadOnlyList<IndicatorSignalDto> Recent);
-
-/// <summary>AverageMovePercent: trung bình % giá đi theo hướng tín hiệu (âm = đi ngược).</summary>
-public sealed record HorizonAccuracyDto(int Candles, int Signals, int Correct, decimal HitRatePercent,
-    decimal AverageMovePercent);
-
-/// <summary>Move1/Move3: % giá đi theo hướng tín hiệu sau 1/3 nến; null khi chưa đủ nến.</summary>
-public sealed record IndicatorSignalDto(long Time, string Direction, decimal Close, decimal? Move1, decimal? Move3,
-    string Reason);

@@ -88,34 +88,3 @@ public static class PaperFuturesEndpoints
             quote.LiquidationPrice, quote.LossAtStop,
         quote.ProfitAtTakeProfit, quote.AvailableBalance);
 }
-
-public sealed record OpenRequestDto(Guid CommandId, string Symbol, string Side, int Leverage, decimal Margin,
-    decimal StopLoss, decimal? TakeProfit)
-{
-    public OpenPositionRequest? ToRequest() =>
-        Enum.TryParse<PositionSide>(Side, ignoreCase: true, out var side) && Enum.IsDefined(side)
-            ? new OpenPositionRequest(CommandId, (Symbol ?? "").ToUpperInvariant(), side, Leverage, Margin, StopLoss, TakeProfit)
-            : null;
-}
-
-public sealed record CloseRequestDto(Guid CommandId);
-
-public sealed record QuoteDto(bool Accepted, IReadOnlyList<string> Errors, string Symbol, string Side, int Leverage,
-    decimal? MarkPrice, decimal? FillPrice, decimal? Quantity, decimal? Notional, decimal? Margin, decimal? OpenFee,
-    decimal? LiquidationPrice, decimal? LossAtStop, decimal? ProfitAtTakeProfit, decimal AvailableBalance);
-
-public sealed record OpenResponseDto(bool Accepted, bool Duplicate, IReadOnlyList<string> Errors, PositionDto? Position);
-
-public sealed record PositionDto(long Id, string Environment, string Symbol, string Side, int Leverage,
-    decimal Quantity, decimal EntryPrice, decimal Margin, decimal LiquidationPrice, decimal StopLoss,
-    decimal? TakeProfit, decimal OpenFee, decimal CloseFee, string Status, string? CloseReason, decimal? ExitPrice,
-    decimal? RealizedPnl, decimal? NetPnl, DateTime OpenedAtUtc, DateTime? ClosedAtUtc, decimal? MarkPrice,
-    decimal? UnrealizedPnl, decimal? RoePercent);
-
-public sealed record MarkPriceDto(string Symbol, decimal Price, DateTime TimeUtc);
-
-public sealed record RulesDto(int MaxLeverage, decimal TakerFeeRate, decimal SlippageRate, IReadOnlyList<string> Symbols);
-
-public sealed record AccountDto(string Environment, decimal WalletBalance, decimal UsedMargin, decimal UnrealizedPnl,
-    decimal Equity, decimal AvailableBalance, IReadOnlyList<PositionDto> OpenPositions,
-    IReadOnlyList<MarkPriceDto> MarkPrices, RulesDto Rules);

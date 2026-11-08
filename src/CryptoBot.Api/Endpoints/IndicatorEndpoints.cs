@@ -41,21 +41,3 @@ public static class IndicatorEndpoints
         indicator.Indicator.Lines.Select(line => new IndicatorLineDto(line.Key, line.Title, line.Color, line.Overlay,
             line.Levels ?? [])).ToList());
 }
-
-public sealed record IndicatorLineDto(string Key, string Title, string Color, bool Overlay, IReadOnlyList<decimal> Levels);
-
-public sealed record IndicatorDto(string Name, string Type, string Description, string Symbol, string Interval,
-    int RequiredCandles, IReadOnlyList<IndicatorLineDto> Lines);
-
-public sealed record IndicatorErrorDto(string Name, string Error);
-
-public sealed record IndicatorListDto(IReadOnlyList<IndicatorDto> Indicators, IReadOnlyList<IndicatorErrorDto> Errors,
-    IReadOnlyList<string> AvailableTypes);
-
-/// <summary>Time là Unix seconds (open time của nến đã đóng). Values: khóa = <see cref="IndicatorLineDto.Key"/>.</summary>
-public sealed record IndicatorPointDto(long Time, IReadOnlyDictionary<string, decimal?> Values, string Signal);
-
-public sealed record IndicatorMarkerDto(long Time, string Signal, string Reason);
-
-public sealed record IndicatorChartDto(IndicatorDto Indicator, IReadOnlyList<IndicatorPointDto> Points,
-    IReadOnlyList<IndicatorMarkerDto> Markers, string? LatestReason);
