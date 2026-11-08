@@ -33,18 +33,28 @@ domain rất dễ đoán:
 
 | Mảng | Domain | Application | Api / Endpoints | Dashboard |
 | --- | --- | --- | --- | --- |
-| Nến, dữ liệu thị trường | `MarketData/` | `MarketData/` | `BotEndpoints.cs`, `HistoryEndpoints.cs` | `features/market/`, `features/history/` |
-| Chiến lược, tín hiệu | `Strategies/` | `Signals/` | `BotEndpoints.cs` | `pages/SignalsPage.tsx` |
-| Chỉ báo tự viết | `Indicators/` | `Indicators/` | `IndicatorEndpoints.cs` | (trong `features/market/CandleChart.tsx`) |
-| Paper futures + lệnh tự động | `Futures/` | `Futures/` | `PaperFuturesEndpoints.cs`, `AutoOrderEndpoints.cs` | `features/futures/`, `features/auto/` |
-| Giá trực tiếp, biên độ, ngày tương tự | `MarketData/` (công thức) | `LivePrices/` | `LivePriceEndpoints.cs` | `features/live/` |
-| Dự đoán, độ chính xác | `Prediction/` | — | `PredictionEndpoints.cs` | `features/prediction/` |
-| Báo cáo biến động hằng ngày | `MarketData/` (công thức, entity) | `Reports/` | `ReportEndpoints.cs` | `features/reports/`, `pages/ReportsPage.tsx` |
-| Tin tức | `News/` | `News/` | `NewsEndpoints.cs` | `features/news/`, `pages/NewsPage.tsx` |
+| Nến, dữ liệu thị trường | `MarketData/` | `MarketData/` | `Bot/`, `History/` | `features/market/`, `features/history/` |
+| Chiến lược, tín hiệu | `Strategies/` | `Signals/` | `Bot/` | `pages/SignalsPage.tsx` |
+| Chỉ báo tự viết | `Indicators/` | `Indicators/` | `Indicators/` | (trong `features/market/CandleChart.tsx`) |
+| Paper futures + lệnh tự động | `Futures/` | `Futures/` | `PaperFutures/`, `AutoOrders/` | `features/futures/`, `features/auto/` |
+| Giá trực tiếp, biên độ, ngày tương tự | `MarketData/` (công thức) | `LivePrices/` | `LivePrices/` | `features/live/` |
+| Dự đoán, độ chính xác | `Prediction/` | — | `Prediction/` | `features/prediction/` |
+| Báo cáo biến động hằng ngày | `MarketData/DailyMove/` (công thức, entity) | `Reports/` | `Reports/` | `features/reports/`, `pages/ReportsPage.tsx` |
+| Tin tức | `News/` | `News/` | `News/` | `features/news/`, `pages/NewsPage.tsx` |
 | Dùng chung | `Common/` | `Abstractions/` | — | `components/`, `time.ts` |
 
 Không có thư mục kiểu `Models/`, `Services/`, `Helpers/`, `Utils/` gom theo loại kỹ thuật. Service, record, enum và
 interface của cùng một tính năng nằm cạnh nhau.
+
+### Hai quy tắc bố cục
+
+1. **Mỗi file một kiểu.** Mỗi class, record, interface, struct hoặc enum nằm trong file riêng, tên file trùng tên
+   kiểu (`ICandleStore.cs`, `PredictionDto.cs`). Không gom nhiều kiểu vào một file "contracts".
+2. **Mảng lớn chia thư mục con theo chức năng.** Khi một mảng có nhiều file, chia thành thư mục con, mỗi thư mục
+   là **một chức năng** (ví dụ `MarketData/DailyHistory/` chứa service, options và kết quả của việc đồng bộ nến
+   ngày). Thư mục con **không đổi namespace**: file trong `Application/MarketData/DailyHistory/` vẫn là
+   `namespace CryptoBot.Application.MarketData;` (giống `Enums/`), nên chuyển file giữa các thư mục con không phải
+   sửa `using`.
 
 ---
 
@@ -56,43 +66,52 @@ CryptoBot.Domain/
 │   ├── ListSlice.cs              # View read-only trên một đoạn danh sách, không sao chép (cửa sổ nến trượt)
 │   └── PercentChange.cs          # internal: % thay đổi Between(from, to), UpShare
 ├── MarketData/
-│   ├── Candle.cs                 # Entity nến OHLCV + ApplyUpdate (không ghi đè nến đã đóng) + Validate
-│   ├── CandleInterval.cs         # 15m / 1h / 1d; TryParse/Parse; OpenTimeAt (nến chứa một thời điểm)
-│   ├── CandleSeriesValidator.cs  # CandleIssue + Validate: trùng / sai thứ tự / thiếu / OHLCV không hợp lệ; WithoutRejected
-│   ├── DailyCloses.cs            # internal: kiểm tra chung cho chuỗi giá đóng ngày
-│   ├── DailyMoveReport.cs        # Báo cáo biến động một khoảng: cao/thấp, giảm từ đỉnh, khối lượng bất thường
-│   ├── DailyReport.cs            # Entity: báo cáo đã lưu (nội dung JSON)
-│   ├── DailyMoveRange.cs         # Biên độ ±1σ/±2σ sau N ngày
-│   ├── MonthlyChangeReport.cs    # % theo tháng/năm, thống kê theo tháng trong năm
-│   ├── SimilarDaysForecast.cs    # Dự báo "ngày tương tự" + backtest walk-forward
-│   ├── VolumePressure.cs         # Mua/bán chủ động, cảnh báo áp đảo
+│   ├── Candles/                  # Nến và kiểm tra chuỗi nến
+│   │   ├── Candle.cs             # Entity nến OHLCV + ApplyUpdate (không ghi đè nến đã đóng) + Validate
+│   │   ├── CandleInterval.cs     # 15m / 1h / 1d; TryParse/Parse; OpenTimeAt (nến chứa một thời điểm)
+│   │   ├── CandleIssue.cs        # Một lỗi tìm thấy trong chuỗi nến
+│   │   ├── CandleSeriesValidator.cs # Validate: trùng / sai thứ tự / thiếu / OHLCV không hợp lệ; WithoutRejected
+│   │   ├── DailyCloses.cs        # internal: kiểm tra chung cho chuỗi giá đóng ngày
+│   │   └── VolumePressure.cs     # Mua/bán chủ động, cảnh báo áp đảo
+│   ├── DailyMove/                # Biến động theo ngày
+│   │   ├── DailyMoveRange.cs     # Biên độ ±1σ/±2σ sau N ngày
+│   │   ├── DailyMoveReport.cs    # Báo cáo một khoảng: cao/thấp, giảm từ đỉnh, khối lượng bất thường
+│   │   ├── ReportCandle.cs       # Nến rút gọn trong báo cáo
+│   │   └── DailyReport.cs        # Entity: báo cáo đã lưu (nội dung JSON)
+│   ├── MonthlyChange/            # % theo tháng/năm
+│   │   └── MonthlyChangeReport.cs, MonthChange.cs, YearChange.cs, MonthOfYearStats.cs
+│   ├── SimilarDays/              # Dự báo "ngày tương tự"
+│   │   └── SimilarDaysForecast.cs, SimilarDaysBacktest.cs
 │   └── Enums/                    # CandleIssueKind, ForecastLean, VolumePressureSide
 ├── Strategies/
-│   ├── StrategyContracts.cs      # IStrategy, StrategyContext, StrategyDecision, IndicatorValues
-│   ├── EmaCrossStrategy.cs       # Chiến lược EMA cross (+ EmaCrossParameters)
-│   ├── Ema.cs                    # EMA: Calculate (cả chuỗi), LastTwo (2 giá trị cuối, không cấp phát)
-│   ├── Crossover.cs              # Up/Down (2 đường), UpThrough/DownThrough (qua mức cố định)
-│   ├── StrategyInstance.cs       # Entity: cấu hình + Version + checkpoint
-│   ├── TradingSignal.cs          # Entity: tín hiệu BUY/SELL đã phát
+│   ├── Contracts/                # IStrategy, StrategyContext, StrategyDecision,
+│   │                             # StrategyInstance (entity), TradingSignal (entity)
+│   ├── EmaCross/                 # EmaCrossStrategy, EmaCrossParameters, IndicatorValues
+│   ├── Calculations/
+│   │   ├── Ema.cs                # EMA: Calculate (cả chuỗi), LastTwo (2 giá trị cuối, không cấp phát)
+│   │   └── Crossover.cs          # Up/Down (2 đường), UpThrough/DownThrough (qua mức cố định)
 │   └── Enums/                    # SignalAction
 ├── Indicators/
-│   ├── IndicatorContracts.cs     # ICustomIndicator, [Indicator], IndicatorResult, IndicatorLine, IndicatorWindow
-│   ├── Rsi.cs                    # RSI Wilder: Calculate, LastTwo
-│   ├── MyRsiIndicator.cs         # Chỉ báo mẫu đầy đủ (đọc file này trước khi viết chỉ báo mới)
-│   ├── TemplateIndicator.cs      # Khung trống để copy (không có [Indicator] nên không được đăng ký)
+│   ├── Contracts/                # ICustomIndicator, IndicatorAttribute, IndicatorResult, IndicatorLine, IndicatorWindow
+│   ├── Rsi/
+│   │   ├── Rsi.cs                # RSI Wilder: Calculate, LastTwo
+│   │   └── MyRsiIndicator.cs     # Chỉ báo mẫu đầy đủ (đọc file này trước khi viết chỉ báo mới)
+│   ├── Template/
+│   │   └── TemplateIndicator.cs  # Khung trống để copy (không có [Indicator] nên không được đăng ký)
 │   └── Enums/                    # IndicatorSignal
 ├── Futures/
-│   ├── FuturesMath.cs            # Làm tròn, slippage, giá thanh lý, PnL, SL/TP hit; FuturesSymbolRules
-│   ├── FuturesPosition.cs        # Entity vị thế + PaperLedgerEntry
-│   ├── AutoOrderRule.cs          # Entity quy tắc tự mở lệnh
+│   ├── Calculations/             # FuturesMath (làm tròn, slippage, giá thanh lý, PnL, SL/TP), FuturesSymbolRules
+│   ├── Positions/                # FuturesPosition (entity vị thế), PaperLedgerEntry
+│   ├── AutoOrders/               # AutoOrderRule (entity quy tắc tự mở lệnh)
 │   └── Enums/                    # PositionSide, PositionStatus, CloseReason, LedgerEntryType,
 │                                 # TriggerCondition, RuleTriggerType, AutoRuleStatus
 ├── News/
 │   ├── NewsArticle.cs            # Entity: một bài tin (tiêu đề, tóm tắt, link, coin, giờ đăng)
 │   └── NewsText.cs               # Bỏ HTML khỏi tóm tắt, nhận ra coin (BTC/ETH/ETC) theo từ khóa
 └── Prediction/
-    ├── PriceDirectionPredictor.cs# Predict, PredictAt, Backtest + PredictorSettings
-    ├── SignalAccuracy.cs         # Chấm tín hiệu sau 1/3/6/12 nến
+    ├── DirectionPredictor/       # PriceDirectionPredictor (Predict, PredictAt, Backtest), PredictorSettings,
+    │                             # PricePrediction, PredictionAccuracy
+    ├── SignalAccuracy/           # SignalAccuracy (chấm tín hiệu sau 1/3/6/12 nến), DirectionSignal, HorizonAccuracy
     └── Enums/                    # PriceDirection (Up / Down)
 ```
 
@@ -107,69 +126,87 @@ CryptoBot.Domain/
 
 Không đặt ở đây: bất cứ thứ gì cần `await`, `ILogger`, `HttpClient`, `DbContext`, `DateTime.UtcNow`, cấu hình.
 
-Một file có thể chứa vài record/class nhỏ đi cùng nhau (ví dụ `SimilarDaysForecast` + `SimilarDaysBacktest`,
-`FuturesPosition` + `PaperLedgerEntry`); enum thì luôn nằm trong `Enums/`. Tách kiểu ra file riêng khi **nhiều file khác** cùng dùng nó (ví dụ
-`PriceDirection` được tách ở PR #57 vì cả `PriceDirectionPredictor` và `SignalAccuracy` dùng).
+Kiểu đi kèm (ví dụ `SimilarDaysBacktest` của `SimilarDaysForecast`) vẫn có file riêng, đặt cùng thư mục con với
+kiểu chính.
 
 ## `src/CryptoBot.Application` — điều phối
 
 ```text
 CryptoBot.Application/
-├── Abstractions/
-│   └── Ports.cs                  # IClock, CandleKey, KlineDto, IMarketDataClient, IDailyHistoryClient,
-│                                 # ICandleStore, IStrategyInstanceStore, ISignalStore, MarketDataUnavailableException
+├── Abstractions/                 # Port dùng chung nhiều mảng
+│   ├── Clock/                    # IClock
+│   ├── MarkPrices/               # IMarkPriceClient, MarkPrice (dùng ở Futures và LivePrices)
+│   └── MarketData/               # IMarketDataClient, IDailyHistoryClient, ICandleStore, CandleKey, KlineDto,
+│                                 # UpsertResult, MarketDataUnavailableException
 ├── MarketData/
-│   ├── CandleSyncService.cs      # + MarketDataOptions, SyncResult
-│   ├── DailyHistorySyncService.cs# + DailyHistoryOptions
-│   ├── MarketDataStatusRegistry.cs # Trạng thái feed trong bộ nhớ cho /api/status
-│   └── MarketEvents.cs           # MarketEvent, MarketEventCatalog
+│   ├── CandleSync/               # CandleSyncService, MarketDataOptions, SyncResult
+│   ├── DailyHistory/             # DailyHistorySyncService, DailyHistoryOptions
+│   ├── Status/                   # MarketDataStatusRegistry (trạng thái feed cho /api/status), MarketDataStatus
+│   └── Events/                   # MarketEventCatalog, MarketEvent, MonthEvent
 ├── Signals/
-│   ├── SignalEvaluationService.cs# + SignalOptions
-│   ├── ChartQueryService.cs      # Dữ liệu chart chiến lược (EMA theo đúng cửa sổ)
-│   ├── StrategyConfigurator.cs   # + StrategyDefinition (một mục trong "Strategies")
-│   └── StrategyFactory.cs        # StrategyTypes, tạo IStrategy từ StrategyInstance
+│   ├── Evaluation/               # SignalEvaluationService, SignalOptions, EvaluationResult
+│   ├── Charts/                   # ChartQueryService (EMA theo đúng cửa sổ), ChartData, ChartPoint
+│   ├── Configuration/            # StrategyConfigurator, StrategyDefinition, StrategyFactory, StrategyTypes
+│   └── Storage/                  # IStrategyInstanceStore, ISignalStore, SignalFilter (port chỉ mảng Signals dùng)
 ├── Indicators/
-│   ├── IndicatorRegistry.cs      # + IndicatorDefinition; tìm [Indicator] bằng reflection, gán tham số
-│   └── IndicatorService.cs       # Chart chỉ báo, đọc giá trị mới nhất, GapIndex
+│   ├── Registry/                 # IndicatorRegistry (tìm [Indicator] bằng reflection, gán tham số),
+│   │                             # IndicatorDefinition, ConfiguredIndicator, IndicatorConfigError
+│   └── Computation/              # IndicatorService (chart, giá trị mới nhất, GapIndex), IndicatorChart,
+│                                 # IndicatorPoint, IndicatorReading
 ├── Futures/
-│   ├── PaperFuturesContracts.cs  # Options, IMarkPriceClient, MarkPriceCache, PaperFuturesLock, IPaperFuturesStore, DTO nội bộ
-│   ├── PaperFuturesService.cs    # Quote / Open / Close / EvaluateTriggers / Account
-│   └── AutoOrderService.cs       # + AutoOrderOptions, IAutoOrderStore
+│   ├── PaperTrading/             # PaperFuturesService (Quote / Open / Close / EvaluateTriggers / Account),
+│   │                             # PaperFuturesOptions, FuturesSymbolOptions, PaperFuturesLock, IPaperFuturesStore,
+│   │                             # ClosedPositionFilter, OpenPositionRequest, OpenQuote, OpenResult, CloseResult,
+│   │                             # PositionView, AccountSnapshot
+│   ├── MarkPrices/               # MarkPriceCache
+│   └── AutoOrders/               # AutoOrderService, AutoOrderOptions, IAutoOrderStore, CreateRuleRequest,
+│                                 # CreateRuleResult, DailyRiskState, AutoOrderSummary
 ├── News/
-│   └── NewsSyncService.cs        # + NewsOptions, INewsFeedClient, INewsStore; lấy bài mới từ các feed RSS
+│   ├── Feed/                     # INewsFeedClient, NewsFeedOptions, NewsItemDto, NewsFeedUnavailableException
+│   ├── Storage/                  # INewsStore, NewsFilter
+│   └── Sync/                     # NewsSyncService (lấy bài mới từ các feed RSS), NewsOptions, NewsSyncResult
 ├── LivePrices/
-│   ├── LivePrices.cs             # LivePriceOptions, LivePriceSample, LivePriceHistory, LivePriceSampler
-│   ├── DailyRangeService.cs      # Nến ngày Binance (cache) → DailyMoveRange
-│   └── SimilarDaysService.cs     # SimilarDaysCache, SimilarDaysResult, SimilarDaysService
-└── Reports/
-    └── DailyReportService.cs     # + DailyReportOptions, IDailyReportStore; lịch 06:00, lập và đọc báo cáo
+│   ├── Sampling/                 # LivePriceSampler, LivePriceOptions, LivePriceSample, LivePriceHistory
+│   ├── DailyRange/               # DailyRangeService: nến ngày Binance (cache) → DailyMoveRange
+│   └── SimilarDays/              # SimilarDaysService, SimilarDaysCache, SimilarDaysComputation, SimilarDaysResult
+└── Reports/                      # Một chức năng nên không chia thư mục con
+    ├── DailyReportService.cs     # Lịch 06:00, lập và đọc báo cáo
+    └── DailyReportOptions.cs, DailyReportRun.cs, IDailyReportStore.cs, SavedDailyReport.cs
 ```
 
 Quy ước:
 
-- **Options class nằm cùng file với service dùng nó** (ví dụ `MarketDataOptions` ở đầu `CandleSyncService.cs`).
-- Interface (port) nằm ở `Abstractions/Ports.cs` nếu dùng chung nhiều mảng; port chỉ một mảng dùng thì nằm trong
-  file contracts của mảng đó (ví dụ `IPaperFuturesStore` trong `PaperFuturesContracts.cs`, `IAutoOrderStore` trong
-  `AutoOrderService.cs`).
+- **Options class nằm cùng thư mục con với service dùng nó** (ví dụ `MarketDataOptions.cs` cạnh
+  `CandleSyncService.cs` trong `MarketData/CandleSync/`).
+- Interface (port) nằm ở `Abstractions/` nếu dùng chung nhiều mảng; port chỉ một mảng dùng thì nằm trong thư mục
+  con của chức năng đó (ví dụ `IPaperFuturesStore` trong `Futures/PaperTrading/`, `IAutoOrderStore` trong
+  `Futures/AutoOrders/`).
 - Service là `sealed class` với primary constructor nhận dependency.
 
 ## `src/CryptoBot.Infrastructure` — kỹ thuật
 
 ```text
 CryptoBot.Infrastructure/
-├── DependencyInjection.cs        # AddInfrastructure(): đăng ký MỌI service/store/client/options; InitializeDatabaseAsync; SystemClock
+├── DependencyInjection.cs        # AddInfrastructure(): đăng ký MỌI service/store/client/options; InitializeDatabaseAsync
+├── SystemClock.cs                # IClock dùng đồng hồ thật
 ├── Exchanges/
 │   ├── Binance/
-│   │   ├── BinanceMarketDataClient.cs      # IMarketDataClient (+ BinanceOptions)
-│   │   └── BinanceFuturesMarkPriceClient.cs# IMarkPriceClient
+│   │   ├── BinanceMarketDataClient.cs      # IMarketDataClient
+│   │   ├── BinanceFuturesMarkPriceClient.cs# IMarkPriceClient
+│   │   └── BinanceOptions.cs
 │   └── Bitfinex/
-│       └── BitfinexDailyHistoryClient.cs   # IDailyHistoryClient (+ BitfinexOptions)
+│       ├── BitfinexDailyHistoryClient.cs   # IDailyHistoryClient
+│       └── BitfinexOptions.cs
 ├── News/
 │   └── RssNewsFeedClient.cs      # INewsFeedClient: đọc RSS 2.0 / Atom
 └── Persistence/
-    ├── BotDbContext.cs           # DbSet, mapping, converter decimal→TEXT, DateTime→Unix ms
-    ├── Stores.cs                 # CandleStore, StrategyInstanceStore, SignalStore, PaperFuturesStore, AutoOrderStore,
-    │                             # DailyReportStore, NewsStore
+    ├── Database/                 # BotDbContext (DbSet, mapping), DecimalInvariantStringConverter (decimal→TEXT),
+    │                             # UtcUnixMillisecondsConverter (DateTime→Unix ms)
+    ├── MarketData/               # CandleStore
+    ├── Strategies/               # StrategyInstanceStore, SignalStore
+    ├── Futures/                  # PaperFuturesStore, AutoOrderStore
+    ├── Reports/                  # DailyReportStore
+    ├── News/                     # NewsStore
     └── Migrations/               # Sinh bởi dotnet-ef, KHÔNG sửa tay (trừ khi thật cần và có ghi chú)
 ```
 
@@ -185,24 +222,25 @@ CryptoBot.Api/
 ├── appsettings.Development.json  # Trống
 ├── marketevents.json             # Sự kiện thị trường ghi tay
 ├── Properties/launchSettings.json# Profile http: http://localhost:5080
-├── Endpoints/
-│   ├── BotEndpoints.cs           # /api/status, /strategies, /signals, /market/candles, /health/*
-│   ├── PaperFuturesEndpoints.cs  # /api/paper/futures/*
-│   ├── AutoOrderEndpoints.cs     # /api/paper/futures/auto-rules/*
-│   ├── IndicatorEndpoints.cs     # /api/indicators/*
-│   ├── LivePriceEndpoints.cs     # /api/live/*
-│   ├── PredictionEndpoints.cs    # /api/prediction, /api/prediction/indicators
-│   ├── HistoryEndpoints.cs       # /api/history/monthly
-│   ├── ReportEndpoints.cs        # /api/reports/daily, /api/reports/daily/run
-│   └── NewsEndpoints.cs          # /api/news, /api/news/sync
-├── Workers/                      # 6 BackgroundService (architecture.md §3)
+├── Endpoints/                    # Mỗi thư mục con: XxxEndpoints.cs + các XxxDto.cs của nó
+│   ├── Bot/                      # /api/status, /strategies, /signals, /market/candles, /health/*
+│   ├── PaperFutures/             # /api/paper/futures/*
+│   ├── AutoOrders/               # /api/paper/futures/auto-rules/*
+│   ├── Indicators/               # /api/indicators/*
+│   ├── LivePrices/               # /api/live/*
+│   ├── Prediction/               # /api/prediction, /api/prediction/indicators
+│   ├── History/                  # /api/history/monthly
+│   ├── Reports/                  # /api/reports/daily, /api/reports/daily/run
+│   ├── News/                     # /api/news, /api/news/sync
+│   └── QueryEnum.cs              # Helper dùng chung: đọc enum từ query string
+├── Workers/                      # 6 BackgroundService, mỗi worker một chức năng (architecture.md §3)
 ├── data/                         # cryptobot.db khi chạy từ thư mục này (bị .gitignore)
 └── wwwroot/                      # Bản build dashboard (bị .gitignore)
 ```
 
 Mỗi file endpoint là một `static class XxxEndpoints` có extension `MapXxxEndpoints(this IEndpointRouteBuilder app)`.
-**DTO của endpoint nằm ở cuối chính file đó** (`public sealed record XxxDto(...)`), mapping `ToDto` là `private static`
-trong class.
+**Mỗi DTO một file** (`public sealed record XxxDto(...)`), nằm cùng thư mục con với endpoint dùng nó. Mapping
+`ToDto` là `private static` trong class endpoint.
 
 ## `src/cryptobot-dashboard` — frontend
 
@@ -249,7 +287,7 @@ tests/
 ├── CryptoBot.Domain.Tests/       # Tham chiếu chỉ Domain. Một file test cho mỗi kiểu: <Kiểu>Tests.cs
 │   └── TestCandles.cs            # Helper tạo nến (At, FromCloses)
 ├── CryptoBot.Application.Tests/  # Tham chiếu Application. Fake trong bộ nhớ
-│   ├── Fakes.cs                  # FakeClock, InMemoryCandleStore/StrategyInstanceStore/SignalStore, FakeMarketDataClient
+│   ├── Fakes/                    # Mỗi fake một file: FakeClock, InMemoryCandleStore, InMemorySignalStore, FakeMarketDataClient…
 │   ├── SignalGoldenTests.cs      # Khóa đầu ra hàm sinh tín hiệu
 │   └── Golden/signal_outputs.txt # Snapshot 3,026 dòng
 └── CryptoBot.IntegrationTests/   # Tham chiếu Infrastructure. SQLite file thật + migration thật
@@ -263,17 +301,17 @@ Chi tiết: [testing.md](testing.md).
 
 | Bạn đang viết… | Đặt ở | Ví dụ có sẵn |
 | --- | --- | --- |
-| Công thức tính từ dữ liệu có sẵn (không I/O) | `Domain/<Mảng>/` | `DailyMoveRange`, `FuturesMath` |
-| Chỉ báo mới | `Domain/Indicators/<Tên>Indicator.cs` | `MyRsiIndicator` |
-| Loại chiến lược mới | `Domain/Strategies/` + nhánh mới trong `StrategyFactory` | `EmaCrossStrategy` |
-| Entity mới lưu DB | `Domain/<Mảng>/` + `DbSet` và mapping trong `BotDbContext` + migration | `AutoOrderRule` |
+| Công thức tính từ dữ liệu có sẵn (không I/O) | `Domain/<Mảng>/<Chức năng>/` | `DailyMoveRange`, `FuturesMath` |
+| Chỉ báo mới | `Domain/Indicators/<Tên>/<Tên>Indicator.cs` | `Rsi/MyRsiIndicator` |
+| Loại chiến lược mới | `Domain/Strategies/<Tên>/` + nhánh mới trong `StrategyFactory` | `EmaCross/EmaCrossStrategy` |
+| Entity mới lưu DB | `Domain/<Mảng>/<Chức năng>/` + `DbSet` và mapping trong `BotDbContext` + migration | `AutoOrderRule` |
 | Helper thuần túy dùng ở ≥ 2 mảng Domain | `Domain/Common/` | `ListSlice`, `PercentChange` |
-| Việc cần đọc DB / gọi sàn / log / đồng hồ | `Application/<Mảng>/<Tên>Service.cs` | `SimilarDaysService` |
-| Interface tới thế giới bên ngoài | `Application/Abstractions/Ports.cs` (hoặc contracts của mảng) | `ICandleStore` |
-| Cài đặt interface bằng EF Core | `Infrastructure/Persistence/Stores.cs` | `CandleStore` |
+| Việc cần đọc DB / gọi sàn / log / đồng hồ | `Application/<Mảng>/<Chức năng>/<Tên>Service.cs` | `SimilarDaysService` |
+| Interface tới thế giới bên ngoài | `Application/Abstractions/<Mảng>/I<Tên>.cs` (hoặc thư mục con của chức năng) | `ICandleStore` |
+| Cài đặt interface bằng EF Core | `Infrastructure/Persistence/<Mảng>/<Tên>Store.cs` | `CandleStore` |
 | Client cho sàn mới | `Infrastructure/Exchanges/<Sàn>/` | `BitfinexDailyHistoryClient` |
 | Đăng ký DI | `Infrastructure/DependencyInjection.cs` (đúng nhóm) | — |
-| Endpoint REST | `Api/Endpoints/<Mảng>Endpoints.cs`, DTO cuối file, map trong `Program.cs` | `HistoryEndpoints` |
+| Endpoint REST | `Api/Endpoints/<Mảng>/<Mảng>Endpoints.cs` + mỗi DTO một file cùng thư mục, map trong `Program.cs` | `HistoryEndpoints` |
 | Việc chạy định kỳ | `Api/Workers/<Tên>Worker.cs` + `AddHostedService` | `DailyHistoryWorker` |
 | Cấu hình mới | Options class cạnh service + section trong `appsettings.json` + [configuration.md](configuration.md) | `LivePriceOptions` |
 | Kiểu dữ liệu API cho frontend | `dashboard/src/api/client.ts` | `DailyRange` |

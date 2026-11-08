@@ -4,13 +4,6 @@ using CryptoBot.Application.Abstractions;
 
 namespace CryptoBot.Infrastructure.Exchanges.Bitfinex;
 
-public sealed class BitfinexOptions
-{
-    /// <summary>REST base URL công khai (không cần API key).</summary>
-    public string BaseUrl { get; set; } = "https://api-pub.bitfinex.com";
-    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(20);
-}
-
 /// <summary>
 /// Nến ngày công khai của Bitfinex: có BTC từ 2013, ETH từ 03/2016, ETC từ 07/2016 (Binance chỉ từ 2017).
 /// Không trả số giao dịch/khối lượng mua chủ động. Ngày không có giao dịch bị bỏ qua.

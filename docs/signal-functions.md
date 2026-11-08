@@ -10,8 +10,8 @@ Có hai nguồn tín hiệu, cùng tuân theo một quy tắc:
 
 | Nguồn | File | Tín hiệu |
 | --- | --- | --- |
-| Chiến lược EMA 9/21 | [`EmaCrossStrategy.cs`](../src/CryptoBot.Domain/Strategies/EmaCrossStrategy.cs) | BUY khi EMA nhanh cắt lên EMA chậm, SELL khi cắt xuống (chỉ khi đang giữ) |
-| Chỉ báo MyRsi | [`MyRsiIndicator.cs`](../src/CryptoBot.Domain/Indicators/MyRsiIndicator.cs) | Không EMA: Long khi RSI cắt lên 30, Short khi cắt xuống 70. Có EMA xu hướng: Long khi giá trên EMA và RSI cắt lên 40, Short khi giá dưới EMA và RSI cắt xuống 60 |
+| Chiến lược EMA 9/21 | [`EmaCrossStrategy.cs`](../src/CryptoBot.Domain/Strategies/EmaCross/EmaCrossStrategy.cs) | BUY khi EMA nhanh cắt lên EMA chậm, SELL khi cắt xuống (chỉ khi đang giữ) |
+| Chỉ báo MyRsi | [`MyRsiIndicator.cs`](../src/CryptoBot.Domain/Indicators/Rsi/MyRsiIndicator.cs) | Không EMA: Long khi RSI cắt lên 30, Short khi cắt xuống 70. Có EMA xu hướng: Long khi giá trên EMA và RSI cắt lên 40, Short khi giá dưới EMA và RSI cắt xuống 60 |
 
 **Quy tắc chung: cửa sổ cố định.** Mỗi nến được tính trên đúng N nến đã đóng gần nhất, kết thúc tại nến đó: 300 nến với EMA, 200 nến với MyRsi. EMA và RSI phụ thuộc điểm bắt đầu, nên cố định cửa sổ giúp chart, lệnh tự động và backtest luôn ra cùng một giá trị trên cùng dữ liệu. Đổi lại, mỗi nến phải tính lại từ đầu cửa sổ.
 
@@ -86,11 +86,11 @@ Khi tự viết chỉ báo, bạn có thể dùng lại các khối sẵn có th
 
 | Khối dùng chung | File | Dùng để |
 | --- | --- | --- |
-| `Crossover.Up / Down` | [`Crossover.cs`](../src/CryptoBot.Domain/Strategies/Crossover.cs) | Hai đường cắt nhau (ví dụ EMA nhanh/chậm) |
+| `Crossover.Up / Down` | [`Crossover.cs`](../src/CryptoBot.Domain/Strategies/Calculations/Crossover.cs) | Hai đường cắt nhau (ví dụ EMA nhanh/chậm) |
 | `Crossover.UpThrough / DownThrough` | như trên | Một giá trị cắt qua mức cố định (ví dụ RSI qua 30/70) |
-| `Ema.LastTwo` | [`Ema.cs`](../src/CryptoBot.Domain/Strategies/Ema.cs) | EMA tại nến trước và nến cuối |
-| `Rsi.LastTwo` | [`Rsi.cs`](../src/CryptoBot.Domain/Indicators/Rsi.cs) | RSI tại nến trước và nến cuối |
-| `IndicatorWindow.LastCloses` | [`IndicatorContracts.cs`](../src/CryptoBot.Domain/Indicators/IndicatorContracts.cs) | Giá đóng cửa của N nến cuối |
+| `Ema.LastTwo` | [`Ema.cs`](../src/CryptoBot.Domain/Strategies/Calculations/Ema.cs) | EMA tại nến trước và nến cuối |
+| `Rsi.LastTwo` | [`Rsi.cs`](../src/CryptoBot.Domain/Indicators/Rsi/Rsi.cs) | RSI tại nến trước và nến cuối |
+| `IndicatorWindow.LastCloses` | [`IndicatorWindow.cs`](../src/CryptoBot.Domain/Indicators/Contracts/IndicatorWindow.cs) | Giá đóng cửa của N nến cuối |
 
 "Cắt lên" nghĩa là nến trước còn **≤** mức và nến này đã **>** mức. "Cắt xuống" nghĩa là nến trước còn **≥** mức và nến này đã **<** mức. Nhờ vậy một giao cắt chỉ phát tín hiệu đúng một lần, không lặp lại ở các nến sau.
 
@@ -103,8 +103,8 @@ Quy tắc cửa sổ cố định được giữ nguyên, tức là mỗi nến 
 | Tạo mảng `decimal?[]` cho cả cửa sổ, chỉ dùng 2 phần tử cuối | `Ema.LastTwo` / `Rsi.LastTwo` chỉ giữ giá trị đang chạy, không cấp phát mảng | `Ema.cs`, `Rsi.cs` |
 | Tính lại `1 − alpha` ở mỗi vòng lặp EMA | Tính một lần trước vòng lặp | `Ema.cs` |
 | `List.GetRange` sao chép 200–300 tham chiếu nến cho **mỗi** nến | `ListSlice` chỉ là một view trên danh sách gốc | [`ListSlice.cs`](../src/CryptoBot.Domain/Common/ListSlice.cs), `SignalEvaluationService.cs`, `IndicatorService.cs` |
-| Chart EMA tạo lại cửa sổ nến rồi trích giá cho mỗi nến | Trích giá đóng cửa một lần, mỗi nến chỉ truyền một đoạn `span` | [`ChartQueryService.cs`](../src/CryptoBot.Application/Signals/ChartQueryService.cs) |
-| Chỉ báo quét lại cả cửa sổ để tìm nến thiếu ở mỗi nến | `GapIndex` tính một lần cho cả chuỗi, mỗi cửa sổ chỉ tra mảng | [`IndicatorService.cs`](../src/CryptoBot.Application/Indicators/IndicatorService.cs) |
+| Chart EMA tạo lại cửa sổ nến rồi trích giá cho mỗi nến | Trích giá đóng cửa một lần, mỗi nến chỉ truyền một đoạn `span` | [`ChartQueryService.cs`](../src/CryptoBot.Application/Signals/Charts/ChartQueryService.cs) |
+| Chỉ báo quét lại cả cửa sổ để tìm nến thiếu ở mỗi nến | `GapIndex` tính một lần cho cả chuỗi, mỗi cửa sổ chỉ tra mảng | [`IndicatorService.cs`](../src/CryptoBot.Application/Indicators/Computation/IndicatorService.cs) |
 
 **Tại sao kết quả không đổi:** các hàm mới làm **đúng các phép tính cũ theo đúng thứ tự**, chỉ bỏ phần lưu trữ và sao chép. Với `decimal`, cùng phép tính theo cùng thứ tự luôn cho cùng kết quả, kể cả số chữ số sau dấu phẩy.
 

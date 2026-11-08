@@ -4,7 +4,7 @@ Trạng thái tính đến 2026-10-29 (sau PR #60). Mỗi mục nêu: tính năn
 và **chưa làm** gì. Lịch sử theo PR xem ở [changelog.md](changelog.md).
 
 Chế độ cố định của bot: `DecisionMode = SignalOnly`, `Environment = Paper`, `LiveLocked = true`
-([`BotEndpoints.cs`](../src/CryptoBot.Api/Endpoints/BotEndpoints.cs)). Không có API key, không có lệnh thật.
+([`BotEndpoints.cs`](../src/CryptoBot.Api/Endpoints/Bot/BotEndpoints.cs)). Không có API key, không có lệnh thật.
 
 ## Mục lục
 
@@ -32,23 +32,23 @@ Chế độ cố định của bot: `DecisionMode = SignalOnly`, `Environment = 
 ## 1. Đồng bộ nến từ Binance
 
 **Code:** [`MarketDataWorker`](../src/CryptoBot.Api/Workers/MarketDataWorker.cs) →
-[`CandleSyncService`](../src/CryptoBot.Application/MarketData/CandleSyncService.cs) →
+[`CandleSyncService`](../src/CryptoBot.Application/MarketData/CandleSync/CandleSyncService.cs) →
 [`BinanceMarketDataClient`](../src/CryptoBot.Infrastructure/Exchanges/Binance/BinanceMarketDataClient.cs) →
-[`CandleStore`](../src/CryptoBot.Infrastructure/Persistence/Stores.cs).
+[`CandleStore`](../src/CryptoBot.Infrastructure/Persistence/MarketData/CandleStore.cs).
 
 - Mỗi `MarketData:PollInterval` (15 giây), worker đồng bộ mọi cặp (symbol, khung nến) mà **chiến lược đang bật**
   hoặc **chỉ báo tự viết** cần. Khung hỗ trợ: `15m`, `1h`, `1d`
-  ([`CandleInterval.cs`](../src/CryptoBot.Domain/MarketData/CandleInterval.cs)).
+  ([`CandleInterval.cs`](../src/CryptoBot.Domain/MarketData/Candles/CandleInterval.cs)).
 - Lần đầu tải `BootstrapCandles` (1000) nến. Các lần sau tải lại **từ nến mới nhất đã lưu (bao gồm)**, nên nến đang
   chạy được cập nhật và khoảng thiếu sau khi mất mạng/restart được tải bù tự động. Tối đa `MaxBatchesPerSync` (20)
   batch × 1000 nến mỗi lần.
 - Nến "đã đóng" xác định theo **giờ server Binance** (`/api/v3/time`), không theo giờ máy.
-- Mỗi batch qua [`CandleSeriesValidator`](../src/CryptoBot.Domain/MarketData/CandleSeriesValidator.cs): nến có giá
+- Mỗi batch qua [`CandleSeriesValidator`](../src/CryptoBot.Domain/MarketData/Candles/CandleSeriesValidator.cs): nến có giá
   trị không hợp lệ, trùng hoặc sai thứ tự **không được lưu**; nến thiếu (gap) được ghi nhận. Mọi lỗi hiện trong
   `/api/status` và log.
 - Upsert theo khóa `(Exchange, Symbol, Interval, OpenTimeUtc)`. Nến đã đóng **không bao giờ bị ghi đè**; nếu sàn trả
   giá khác cho nến đã đóng thì giữ bản đã lưu và báo xung đột
-  ([`Candle.ApplyUpdate`](../src/CryptoBot.Domain/MarketData/Candle.cs)).
+  ([`Candle.ApplyUpdate`](../src/CryptoBot.Domain/MarketData/Candles/Candle.cs)).
 - Nến lưu từ trước khi có cột `QuoteVolume`/`TradeCount`/`TakerBuyVolume` được tải lại để **điền thêm** các cột này
   (giá không đổi).
 - Lỗi sàn (rate limit, 5xx, mạng) ném `MarketDataUnavailableException`; worker lùi thời gian thử lại theo cấp số nhân
@@ -56,9 +56,9 @@ Chế độ cố định của bot: `DecisionMode = SignalOnly`, `Environment = 
 
 ## 2. Chiến lược EMA 9/21 và tín hiệu BUY/SELL
 
-**Code:** [`EmaCrossStrategy`](../src/CryptoBot.Domain/Strategies/EmaCrossStrategy.cs),
-[`SignalEvaluationService`](../src/CryptoBot.Application/Signals/SignalEvaluationService.cs),
-[`StrategyConfigurator`](../src/CryptoBot.Application/Signals/StrategyConfigurator.cs).
+**Code:** [`EmaCrossStrategy`](../src/CryptoBot.Domain/Strategies/EmaCross/EmaCrossStrategy.cs),
+[`SignalEvaluationService`](../src/CryptoBot.Application/Signals/Evaluation/SignalEvaluationService.cs),
+[`StrategyConfigurator`](../src/CryptoBot.Application/Signals/Configuration/StrategyConfigurator.cs).
 Chi tiết thuật toán: [signal-functions.md](signal-functions.md).
 
 - BUY khi EMA nhanh cắt lên EMA chậm; SELL khi cắt xuống **và đang giữ** (long-only).
@@ -76,11 +76,11 @@ Chi tiết thuật toán: [signal-functions.md](signal-functions.md).
 
 ## 3. Chỉ báo tự viết (C#)
 
-**Code:** [`ICustomIndicator`](../src/CryptoBot.Domain/Indicators/IndicatorContracts.cs),
-[`MyRsiIndicator`](../src/CryptoBot.Domain/Indicators/MyRsiIndicator.cs) (ví dụ đầy đủ),
-[`TemplateIndicator`](../src/CryptoBot.Domain/Indicators/TemplateIndicator.cs) (khung trống),
-[`IndicatorRegistry`](../src/CryptoBot.Application/Indicators/IndicatorRegistry.cs),
-[`IndicatorService`](../src/CryptoBot.Application/Indicators/IndicatorService.cs).
+**Code:** [`ICustomIndicator`](../src/CryptoBot.Domain/Indicators/Contracts/ICustomIndicator.cs),
+[`MyRsiIndicator`](../src/CryptoBot.Domain/Indicators/Rsi/MyRsiIndicator.cs) (ví dụ đầy đủ),
+[`TemplateIndicator`](../src/CryptoBot.Domain/Indicators/Template/TemplateIndicator.cs) (khung trống),
+[`IndicatorRegistry`](../src/CryptoBot.Application/Indicators/Registry/IndicatorRegistry.cs),
+[`IndicatorService`](../src/CryptoBot.Application/Indicators/Computation/IndicatorService.cs).
 
 - Viết một class C# có `[Indicator("TênLoại")]`, khai báo trong `appsettings.json` → `Indicators`, restart API.
   Chỉ báo hiện trên chart (dropdown góc phải) và dùng được trong quy tắc tự mở lệnh. Từng bước:
@@ -99,9 +99,9 @@ Chi tiết thuật toán: [signal-functions.md](signal-functions.md).
 
 ## 4. Paper Futures (Long/Short có đòn bẩy, tiền giả lập)
 
-**Code:** [`PaperFuturesService`](../src/CryptoBot.Application/Futures/PaperFuturesService.cs),
-[`FuturesMath`](../src/CryptoBot.Domain/Futures/FuturesMath.cs),
-[`FuturesPosition`](../src/CryptoBot.Domain/Futures/FuturesPosition.cs),
+**Code:** [`PaperFuturesService`](../src/CryptoBot.Application/Futures/PaperTrading/PaperFuturesService.cs),
+[`FuturesMath`](../src/CryptoBot.Domain/Futures/Calculations/FuturesMath.cs),
+[`FuturesPosition`](../src/CryptoBot.Domain/Futures/Positions/FuturesPosition.cs),
 [`PaperFuturesWorker`](../src/CryptoBot.Api/Workers/PaperFuturesWorker.cs).
 UI: [`TradePanel.tsx`](../src/cryptobot-dashboard/src/features/futures/TradePanel.tsx),
 [`PositionsCard.tsx`](../src/cryptobot-dashboard/src/features/futures/PositionsCard.tsx).
@@ -125,8 +125,8 @@ UI: [`TradePanel.tsx`](../src/cryptobot-dashboard/src/features/futures/TradePane
 
 ## 5. Tự mở lệnh theo giá hoặc theo chỉ báo
 
-**Code:** [`AutoOrderService`](../src/CryptoBot.Application/Futures/AutoOrderService.cs),
-[`AutoOrderRule`](../src/CryptoBot.Domain/Futures/AutoOrderRule.cs).
+**Code:** [`AutoOrderService`](../src/CryptoBot.Application/Futures/AutoOrders/AutoOrderService.cs),
+[`AutoOrderRule`](../src/CryptoBot.Domain/Futures/AutoOrders/AutoOrderRule.cs).
 UI: [`AutoOrdersCard.tsx`](../src/cryptobot-dashboard/src/features/auto/AutoOrdersCard.tsx).
 
 **Theo giá:** điều kiện `mark ≤ mức` hoặc `mark ≥ mức`, hướng, margin, đòn bẩy, SL %, TP %. Khi mark chạm mức, bot
@@ -159,7 +159,7 @@ Quy tắc chung:
 ## 6. Bảng giá trực tiếp (mỗi 15 giây)
 
 **Code:** [`LivePriceWorker`](../src/CryptoBot.Api/Workers/LivePriceWorker.cs),
-[`LivePrices.cs`](../src/CryptoBot.Application/LivePrices/LivePrices.cs).
+[`Sampling/`](../src/CryptoBot.Application/LivePrices/Sampling/).
 UI: [`LivePricePanel.tsx`](../src/cryptobot-dashboard/src/features/live/LivePricePanel.tsx).
 
 - Mỗi `LivePrices:PollInterval` lấy **Spot** (`/api/v3/ticker/price`) và **Mark Futures** song song cho từng symbol
@@ -171,8 +171,8 @@ UI: [`LivePricePanel.tsx`](../src/cryptobot-dashboard/src/features/live/LivePric
 
 ## 7. Biên độ 24 giờ / 7 ngày / 30 ngày
 
-**Code:** [`DailyMoveRange`](../src/CryptoBot.Domain/MarketData/DailyMoveRange.cs),
-[`DailyRangeService`](../src/CryptoBot.Application/LivePrices/DailyRangeService.cs).
+**Code:** [`DailyMoveRange`](../src/CryptoBot.Domain/MarketData/DailyMove/DailyMoveRange.cs),
+[`DailyRangeService`](../src/CryptoBot.Application/LivePrices/DailyRange/DailyRangeService.cs).
 UI: [`DailyRangeBar.tsx`](../src/cryptobot-dashboard/src/features/live/DailyRangeBar.tsx).
 
 - Lấy nến ngày đã đóng từ Binance (365 ngày, cache 15 phút, không lưu DB). Tính σ của log return một ngày.
@@ -184,8 +184,8 @@ UI: [`DailyRangeBar.tsx`](../src/cryptobot-dashboard/src/features/live/DailyRang
 
 ## 8. Dự báo "ngày tương tự"
 
-**Code:** [`SimilarDaysForecast`](../src/CryptoBot.Domain/MarketData/SimilarDaysForecast.cs),
-[`SimilarDaysService`](../src/CryptoBot.Application/LivePrices/SimilarDaysService.cs).
+**Code:** [`SimilarDaysForecast`](../src/CryptoBot.Domain/MarketData/SimilarDays/SimilarDaysForecast.cs),
+[`SimilarDaysService`](../src/CryptoBot.Application/LivePrices/SimilarDays/SimilarDaysService.cs).
 Hiện dưới thanh biên độ 24 giờ.
 
 - Mô tả mỗi ngày bằng 5 con số: khoảng cách giá tới EMA200 và EMA50, RSI14, % thay đổi 7 ngày, % thay đổi 1 ngày.
@@ -213,15 +213,15 @@ UI: [`SessionStatsCard.tsx`](../src/cryptobot-dashboard/src/features/market/Sess
 
 ## 10. Dự đoán nến kế tiếp lên/xuống
 
-**Code:** [`PriceDirectionPredictor`](../src/CryptoBot.Domain/Prediction/PriceDirectionPredictor.cs),
-[`PredictionEndpoints`](../src/CryptoBot.Api/Endpoints/PredictionEndpoints.cs).
+**Code:** [`PriceDirectionPredictor`](../src/CryptoBot.Domain/Prediction/DirectionPredictor/PriceDirectionPredictor.cs),
+[`PredictionEndpoints`](../src/CryptoBot.Api/Endpoints/Prediction/PredictionEndpoints.cs).
 UI: [`PredictionCard.tsx`](../src/cryptobot-dashboard/src/features/prediction/PredictionCard.tsx), trang **Dự đoán**.
 
 - "Hàm core" để tự tối ưu dần: điểm = tổng có trọng số của 3 thành phần, dương nghiêng Up, âm nghiêng Down:
   - **Xu hướng:** giá đóng cách trung bình `TrendPeriod` (20) nến bao nhiêu %.
   - **Đà:** giá đã đi bao nhiêu % trong `MomentumPeriod` (3) nến gần nhất.
   - **Lực mua/bán:** mua chủ động hơn/kém 50% bao nhiêu điểm % ở nến cuối (trọng số 0.05; bỏ qua nếu thiếu dữ liệu).
-- Trọng số trong [`PredictorSettings`](../src/CryptoBot.Domain/Prediction/PriceDirectionPredictor.cs); đặt trọng số
+- Trọng số trong [`PredictorSettings`](../src/CryptoBot.Domain/Prediction/DirectionPredictor/PriceDirectionPredictor.cs); đặt trọng số
   = 0 để tắt một thành phần. Sửa rồi restart API là thấy kết quả mới.
 - Kèm `Backtest`: với mỗi nến, chỉ dùng các nến trước nó để đoán (`PredictAt`), so với thực tế, bỏ qua nến đóng bằng
   đúng giá nến trước. Dashboard hiện tỷ lệ đúng và các lần đoán gần nhất.
@@ -229,7 +229,7 @@ UI: [`PredictionCard.tsx`](../src/cryptobot-dashboard/src/features/prediction/Pr
 
 ## 11. Tỷ lệ đúng tín hiệu chỉ báo
 
-**Code:** [`SignalAccuracy`](../src/CryptoBot.Domain/Prediction/SignalAccuracy.cs).
+**Code:** [`SignalAccuracy`](../src/CryptoBot.Domain/Prediction/SignalAccuracy/SignalAccuracy.cs).
 UI: [`IndicatorAccuracyCard.tsx`](../src/cryptobot-dashboard/src/features/prediction/IndicatorAccuracyCard.tsx).
 
 - Với mỗi chỉ báo tự viết cùng symbol/khung: sau 1, 3, 6, 12 nến, giá có đi đúng hướng tín hiệu Long/Short không, và
@@ -239,7 +239,7 @@ UI: [`IndicatorAccuracyCard.tsx`](../src/cryptobot-dashboard/src/features/predic
 ## 12. Nến ngày lịch sử từ 2016 (Bitfinex)
 
 **Code:** [`DailyHistoryWorker`](../src/CryptoBot.Api/Workers/DailyHistoryWorker.cs),
-[`DailyHistorySyncService`](../src/CryptoBot.Application/MarketData/DailyHistorySyncService.cs),
+[`DailyHistorySyncService`](../src/CryptoBot.Application/MarketData/DailyHistory/DailyHistorySyncService.cs),
 [`BitfinexDailyHistoryClient`](../src/CryptoBot.Infrastructure/Exchanges/Bitfinex/BitfinexDailyHistoryClient.cs).
 
 - Lưu nến `1d` của BTCUSD, ETCUSD, ETHUSD từ 2016-01-01 vào bảng `Candles` với `Exchange = "Bitfinex"`.
@@ -249,8 +249,8 @@ UI: [`IndicatorAccuracyCard.tsx`](../src/cryptobot-dashboard/src/features/predic
 
 ## 13. Lịch sử theo tháng và sự kiện thị trường
 
-**Code:** [`MonthlyChangeReport`](../src/CryptoBot.Domain/MarketData/MonthlyChangeReport.cs),
-[`MarketEventCatalog`](../src/CryptoBot.Application/MarketData/MarketEvents.cs),
+**Code:** [`MonthlyChangeReport`](../src/CryptoBot.Domain/MarketData/MonthlyChange/MonthlyChangeReport.cs),
+[`MarketEventCatalog`](../src/CryptoBot.Application/MarketData/Events/MarketEventCatalog.cs),
 [`marketevents.json`](../src/CryptoBot.Api/marketevents.json).
 UI: trang **Lịch sử theo tháng** ([`HistoryPage.tsx`](../src/cryptobot-dashboard/src/pages/HistoryPage.tsx),
 [`MonthlyHeatmap.tsx`](../src/cryptobot-dashboard/src/features/history/MonthlyHeatmap.tsx),
@@ -300,7 +300,7 @@ UI: trang **Lịch sử theo tháng** ([`HistoryPage.tsx`](../src/cryptobot-dash
 - `GET /api/status`: chế độ, môi trường, giờ server, trạng thái từng feed (lần thành công/thử gần nhất, lỗi, số lần
   lỗi liên tiếp, nến đóng mới nhất, 20 lỗi dữ liệu gần nhất, `isStale`) và danh sách chiến lược.
   Feed stale khi quá `StaleAfter` (2 phút) không sync thành công, hoặc nến đóng mới nhất trễ hơn một khung + 2 phút.
-  Trạng thái chỉ nằm trong bộ nhớ ([`MarketDataStatusRegistry`](../src/CryptoBot.Application/MarketData/MarketDataStatusRegistry.cs)).
+  Trạng thái chỉ nằm trong bộ nhớ ([`MarketDataStatusRegistry`](../src/CryptoBot.Application/MarketData/Status/MarketDataStatusRegistry.cs)).
 - `GET /health/live` (process sống), `GET /health/ready` (kết nối được DB, không thì 503).
 - Log Serilog ra console: `[HH:mm:ss LVL] SourceContext: message`. Log có cấu trúc (`{Symbol}`, `{Key}`…), không nối
   chuỗi.
@@ -308,7 +308,7 @@ UI: trang **Lịch sử theo tháng** ([`HistoryPage.tsx`](../src/cryptobot-dash
 
 ## 16. Báo cáo biến động hằng ngày
 
-**Code:** [`DailyMoveReport`](../src/CryptoBot.Domain/MarketData/DailyMoveReport.cs),
+**Code:** [`DailyMoveReport`](../src/CryptoBot.Domain/MarketData/DailyMove/DailyMoveReport.cs),
 [`DailyReportService`](../src/CryptoBot.Application/Reports/DailyReportService.cs),
 [`DailyReportWorker`](../src/CryptoBot.Api/Workers/DailyReportWorker.cs).
 UI: trang **Báo cáo ngày** ([`ReportsPage.tsx`](../src/cryptobot-dashboard/src/pages/ReportsPage.tsx),
@@ -334,7 +334,7 @@ UI: trang **Báo cáo ngày** ([`ReportsPage.tsx`](../src/cryptobot-dashboard/sr
 
 **Code:** [`NewsText`](../src/CryptoBot.Domain/News/NewsText.cs),
 [`NewsArticle`](../src/CryptoBot.Domain/News/NewsArticle.cs),
-[`NewsSyncService`](../src/CryptoBot.Application/News/NewsSyncService.cs),
+[`NewsSyncService`](../src/CryptoBot.Application/News/Sync/NewsSyncService.cs),
 [`RssNewsFeedClient`](../src/CryptoBot.Infrastructure/News/RssNewsFeedClient.cs),
 [`NewsWorker`](../src/CryptoBot.Api/Workers/NewsWorker.cs).
 UI: trang **Tin tức** ([`NewsPage.tsx`](../src/cryptobot-dashboard/src/pages/NewsPage.tsx),

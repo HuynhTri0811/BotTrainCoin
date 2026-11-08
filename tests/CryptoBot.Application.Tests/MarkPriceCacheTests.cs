@@ -1,3 +1,4 @@
+using CryptoBot.Application.Abstractions;
 using CryptoBot.Application.Futures;
 
 namespace CryptoBot.Application.Tests;

@@ -5,11 +5,10 @@ import { api, futuresApi, indicatorApi, type Strategy } from '../api/client';
 import { formatVn } from '../time';
 import { LivePricePanel } from '../features/live/LivePricePanel';
 import { CandleChart, EMA_COLORS, INDICATOR_MARKER_COLOR } from '../features/market/CandleChart';
-import { SessionStatsCard } from '../features/market/SessionStatsCard';
 
 const REFRESH_MS = 15_000;
 
-/** Biểu đồ nến + EMA + chỉ báo tự viết, giá trực tiếp và thống kê phiên của chiến lược đang chọn. */
+/** Biểu đồ nến + EMA + chỉ báo tự viết và giá trực tiếp của chiến lược đang chọn. */
 export function MarketPage({ strategy }: { strategy: Strategy }) {
   const chart = useQuery({
     queryKey: ['chart', strategy.id],
@@ -124,10 +123,6 @@ export function MarketPage({ strategy }: { strategy: Strategy }) {
           </Card>
         </Col>
       </Row>
-
-      {chart.data && chart.data.candles.length > 0 && (
-        <SessionStatsCard candles={chart.data.candles} symbol={strategy.symbol} interval={strategy.interval} />
-      )}
     </Space>
   );
 }
