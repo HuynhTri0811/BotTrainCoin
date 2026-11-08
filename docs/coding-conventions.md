@@ -23,11 +23,13 @@ viết code mới giống code xung quanh nó.
 
 ### Bố cục file
 
-- **File-scoped namespace**: `namespace CryptoBot.Domain.MarketData;`. Namespace = tên project + thư mục, trừ thư
-  mục `Enums/`: enum giữ namespace của mảng chứa nó (`Futures/Enums/PositionSide.cs` → `CryptoBot.Domain.Futures`).
-- `using` ở đầu file, sắp theo alphabet, `System.*` trước.
-- Thứ tự trong file: record nhỏ đi kèm → class chính. Enum không nằm chung file: mỗi enum một file trong
-  `<Mảng>/Enums/` (Domain). DTO của endpoint ở **cuối** file endpoint.
+- **File-scoped namespace**: `namespace CryptoBot.Domain.MarketData;`. Namespace = tên project + thư mục **mảng**.
+  Thư mục con chức năng (`MarketData/DailyMove/`) và `Enums/` không thêm vào namespace
+  (`Futures/Enums/PositionSide.cs` → `CryptoBot.Domain.Futures`).
+- `using` ở đầu file, sắp theo alphabet, `System.*` trước. Không để `using` thừa.
+- **Mỗi file một kiểu** (class, record, interface, struct, enum), tên file trùng tên kiểu. Enum nằm trong
+  `<Mảng>/Enums/`. DTO của endpoint mỗi DTO một file, cùng thư mục con với endpoint. Xem
+  [folder-structure.md](folder-structure.md#hai-quy-tắc-bố-cục).
 
 ### Kiểu và từ khóa
 
