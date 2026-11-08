@@ -1,10 +1,8 @@
-using System.Globalization;
 using CryptoBot.Domain.Futures;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.News;
 using CryptoBot.Domain.Strategies;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace CryptoBot.Infrastructure.Persistence;
 
@@ -130,21 +128,5 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(entry => new { entry.Environment, entry.TimeUtc });
         });
-    }
-}
-
-public sealed class DecimalInvariantStringConverter() : ValueConverter<decimal, string>(
-    value => value.ToString(CultureInfo.InvariantCulture),
-    value => decimal.Parse(value, NumberStyles.Number, CultureInfo.InvariantCulture));
-
-public sealed class UtcUnixMillisecondsConverter() : ValueConverter<DateTime, long>(
-    value => ToUnixMs(value),
-    value => DateTime.UnixEpoch.AddMilliseconds(value))
-{
-    private static long ToUnixMs(DateTime value)
-    {
-        if (value.Kind != DateTimeKind.Utc)
-            throw new InvalidOperationException("Chỉ lưu DateTime UTC.");
-        return (value.Ticks - DateTime.UnixEpoch.Ticks) / TimeSpan.TicksPerMillisecond;
     }
 }

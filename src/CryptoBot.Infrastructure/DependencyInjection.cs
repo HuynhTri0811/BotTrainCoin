@@ -18,11 +18,6 @@ using Microsoft.Extensions.Options;
 
 namespace CryptoBot.Infrastructure;
 
-public sealed class SystemClock : IClock
-{
-    public DateTime UtcNow => DateTime.UtcNow;
-}
-
 public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
