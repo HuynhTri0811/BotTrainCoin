@@ -5,13 +5,6 @@ using CryptoBot.Domain.MarketData;
 
 namespace CryptoBot.Application.Indicators;
 
-public sealed record IndicatorPoint(Candle Candle, IndicatorResult Result);
-
-public sealed record IndicatorChart(ConfiguredIndicator Indicator, IReadOnlyList<IndicatorPoint> Points);
-
-/// <summary>Giá trị chỉ báo tại nến đã đóng mới nhất.</summary>
-public sealed record IndicatorReading(ConfiguredIndicator Indicator, Candle Candle, IndicatorResult Result);
-
 /// <summary>
 /// Tính chỉ báo trên nến trong DB. Chart và lệnh tự động dùng cùng quy tắc cửa sổ
 /// (<see cref="ICustomIndicator.RequiredCandles"/> nến đã đóng kết thúc tại nến đánh giá).
