@@ -10,21 +10,39 @@ namespace CryptoBot.Domain.Strategies;
 public static class Crossover
 {
     /// <summary>Đường A cắt lên đường B: trước đó A ≤ B, bây giờ A &gt; B.</summary>
+    /// <param name="firstPrevious">Giá trị đường A ở nến trước.</param>
+    /// <param name="secondPrevious">Giá trị đường B ở nến trước.</param>
+    /// <param name="first">Giá trị đường A ở nến hiện tại.</param>
+    /// <param name="second">Giá trị đường B ở nến hiện tại.</param>
+    /// <returns><c>true</c> nếu A vừa cắt lên B đúng tại nến hiện tại.</returns>
     /// <example>EMA9 nến trước 100 ≤ EMA21 101, nến này EMA9 103 &gt; EMA21 102 → true.</example>
     public static bool Up(decimal firstPrevious, decimal secondPrevious, decimal first,
         decimal second) => firstPrevious <= secondPrevious && first > second;
 
     /// <summary>Đường A cắt xuống đường B: trước đó A ≥ B, bây giờ A &lt; B.</summary>
+    /// <param name="firstPrevious">Giá trị đường A ở nến trước.</param>
+    /// <param name="secondPrevious">Giá trị đường B ở nến trước.</param>
+    /// <param name="first">Giá trị đường A ở nến hiện tại.</param>
+    /// <param name="second">Giá trị đường B ở nến hiện tại.</param>
+    /// <returns><c>true</c> nếu A vừa cắt xuống B đúng tại nến hiện tại.</returns>
     /// <example>EMA9 nến trước 103 ≥ EMA21 102, nến này EMA9 100 &lt; EMA21 101 → true.</example>
     public static bool Down(decimal firstPrevious, decimal secondPrevious, decimal first,
         decimal second) => firstPrevious >= secondPrevious && first < second;
 
     /// <summary>Giá trị cắt lên qua một mức cố định (ví dụ RSI vượt lên 30).</summary>
+    /// <param name="prev">Giá trị ở nến trước.</param>
+    /// <param name="now">Giá trị ở nến hiện tại.</param>
+    /// <param name="level">Mức cố định cần vượt qua.</param>
+    /// <returns><c>true</c> nếu trước đó ≤ <paramref name="level"/> và bây giờ &gt; <paramref name="level"/>.</returns>
     /// <remarks>Mức cố định coi như một đường nằm ngang, nên dùng lại <see cref="Up"/> với B = mức.</remarks>
     /// <example>RSI 28.4 → 31.2, mức 30 → true; RSI 31 → 35 → false (đã ở trên 30 từ trước).</example>
     public static bool UpThrough(decimal prev, decimal now, decimal level) => Up(prev, level, now, level);
 
     /// <summary>Giá trị cắt xuống qua một mức cố định (ví dụ RSI rơi xuống dưới 70).</summary>
+    /// <param name="prev">Giá trị ở nến trước.</param>
+    /// <param name="now">Giá trị ở nến hiện tại.</param>
+    /// <param name="level">Mức cố định cần rơi qua.</param>
+    /// <returns><c>true</c> nếu trước đó ≥ <paramref name="level"/> và bây giờ &lt; <paramref name="level"/>.</returns>
     /// <example>RSI 72 → 68, mức 70 → true.</example>
     public static bool DownThrough(decimal prev, decimal now, decimal level) => Down(prev, level, now, level);
 }
