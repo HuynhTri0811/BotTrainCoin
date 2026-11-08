@@ -5,6 +5,12 @@ Chi tiết từng tính năng: [features.md](features.md).
 
 ## 2026-11-08
 
+- **#130 Mỗi file một kiểu, chia thư mục con theo chức năng** (#131–#140). Thêm XML doc cho `FuturesMath`, các kiểu
+  dùng chung của chỉ báo, `Rsi`, `Ema`, `Crossover`, `TemplateIndicator`. Tách 41 file nhiều kiểu thành mỗi kiểu một
+  file (bỏ `Ports.cs`, `Stores.cs`, `IndicatorContracts.cs`, `PaperFuturesContracts.cs`…); DTO endpoint và fake trong
+  test cũng mỗi cái một file. Mảng lớn chia thư mục con theo chức năng (`MarketData/DailyHistory/`,
+  `Endpoints/Prediction/`…); thư mục con không đổi namespace. Port chỉ Signals dùng chuyển vào `Signals/Storage/`,
+  `IMarkPriceClient` dùng chung chuyển vào `Abstractions/MarkPrices/`. Docs ghi quy tắc mới. Không đổi hành vi.
 - **#129 Chuyển bảng giao dịch theo phiên xuống trang Dự đoán.** Card Giao dịch theo phiên (số giao dịch, khối lượng,
   mua/bán chủ động, so với trung bình 20 phiên) rời trang Biểu đồ, nằm cuối trang Dự đoán; dùng chung cache nến với
   trang Biểu đồ.
