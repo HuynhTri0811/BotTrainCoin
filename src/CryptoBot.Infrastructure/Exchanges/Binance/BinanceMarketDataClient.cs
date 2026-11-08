@@ -7,16 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace CryptoBot.Infrastructure.Exchanges.Binance;
 
-public sealed class BinanceOptions
-{
-    /// <summary>REST base URL cho dữ liệu thị trường công khai (không cần API key).</summary>
-    public string MarketDataBaseUrl { get; set; } = "https://api.binance.com";
-
-    /// <summary>REST base URL USDⓈ-M Futures cho mark price công khai.</summary>
-    public string FuturesMarketDataBaseUrl { get; set; } = "https://fapi.binance.com";
-    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(10);
-}
-
 /// <summary>
 /// Dữ liệu thị trường Spot qua REST công khai. Chỉ đọc; không ký request, không có key.
 /// Tham khảo: https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md
