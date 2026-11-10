@@ -449,6 +449,21 @@ export interface MarketOpening {
   time: number;
 }
 
+/** Sàn được đánh dấu giờ mở cửa (CryptoBot.Domain/MarketData/StockMarkets/StockMarkets.cs). */
+export interface StockMarket {
+  code: string;
+  name: string;
+  exchange: string;
+  /** Múi giờ IANA của sàn, ví dụ `America/New_York`. */
+  timeZoneId: string;
+  /** Giờ mở cửa theo giờ địa phương, `HH:mm`. */
+  localOpen: string;
+  /** Năm cuối cùng đã có lịch nghỉ lễ; sau năm này mọi ngày thường đều tính là mở cửa. */
+  holidaysKnownThroughYear: number;
+  /** Unix seconds, lần mở cửa kế tiếp tính từ nến được dự đoán. */
+  nextOpenTime: number | null;
+}
+
 export interface PredictionHistory {
   time: number; // Unix seconds, open time của nến được đoán
   predicted: PriceDirection;
@@ -460,7 +475,7 @@ export interface PredictionHistory {
   /** Giá đóng − giá đóng nến trước. */
   change: number;
   changePercent: number;
-  /** Các sàn mở cửa trong nến; luôn rỗng với nến ngày. */
+  /** Các sàn mở cửa trong nến; rỗng khi `Prediction.markets` rỗng. */
   openings: MarketOpening[];
 }
 
@@ -477,8 +492,13 @@ export interface Prediction {
   backtestCorrect: number;
   hitRatePercent: number;
   recent: PredictionHistory[];
-  /** Các sàn mở cửa trong nến được dự đoán; luôn rỗng với nến ngày. */
+  /** Các sàn mở cửa trong nến được dự đoán. */
   nextCandleOpenings: MarketOpening[];
+  /**
+   * Các sàn được đánh dấu giờ mở cửa. Rỗng khi khung nến từ một ngày trở lên hoặc server thiếu dữ liệu múi giờ: khi đó
+   * dashboard ẩn phần giờ mở cửa.
+   */
+  markets: StockMarket[];
   settings: {
     trendPeriod: number;
     momentumPeriod: number;

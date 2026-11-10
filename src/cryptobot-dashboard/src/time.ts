@@ -24,6 +24,9 @@ export const formatVn = (iso: string | null | undefined) => (iso ? dateTime.form
 export const formatVnUnix = (seconds: number) => dateTime.format(new Date(seconds * 1000));
 /** Chỉ giờ:phút theo giờ Việt Nam, ví dụ `21:30`. */
 export const formatVnTimeUnix = (seconds: number) => timeOnly.format(new Date(seconds * 1000));
+/** Giờ:phút và ngày/tháng theo giờ Việt Nam, ví dụ `21:30 11/11`. */
+export const formatVnTimeDayUnix = (seconds: number) =>
+  `${timeOnly.format(new Date(seconds * 1000))} ${dayMonth.format(new Date(seconds * 1000))}`;
 export const formatVnTick = (seconds: number, showDate: boolean) =>
   (showDate ? dayMonth : timeOnly).format(new Date(seconds * 1000));
 
