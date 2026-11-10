@@ -5,6 +5,10 @@ Chi tiết từng tính năng: [features.md](features.md).
 
 ## 2026-11-10
 
+- **#145 Đánh dấu giờ mở cửa sàn chứng khoán trên bảng Dự đoán** (#144). `MarketOpenings` tìm các lần mở cửa của sàn
+  Nhật, Hàn, Việt Nam, Anh, Mỹ trong một khoảng thời gian, có tính giờ mùa hè. Bảng Dự đoán có cột Mở cửa, bộ lọc theo
+  sàn, cột trong file Excel, và cảnh báo khi nến kế tiếp có sàn mở cửa. Chưa tính ngày nghỉ lễ.
+
 - **#143 Hiện 300 lần đoán gần nhất và báo cáo phân tích** (#142). Bảng Dự đoán và bảng tín hiệu gần nhất của chỉ báo
   hiện tối đa 300 dòng thay vì 20. Thêm báo cáo
   [analysis/btc-prediction-and-rebounds](analysis/btc-prediction-and-rebounds/README.md): vì sao hàm dự đoán chỉ đúng
