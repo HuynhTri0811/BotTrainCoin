@@ -30,6 +30,12 @@ Cập nhật lần cuối: 2026-10-29, sau PR #60 (`develop` và `main` giống 
 | [signal-functions.md](signal-functions.md) | Chi tiết hàm sinh tín hiệu EMA cross và MyRsi, phần tối ưu, golden test |
 | [changelog.md](changelog.md) | Những gì đã làm, theo từng PR và ngày |
 
+## Phân tích
+
+| Thư mục | Nội dung |
+| --- | --- |
+| [analysis/btc-prediction-and-rebounds/](analysis/btc-prediction-and-rebounds/README.md) | Vì sao hàm dự đoán sai, nhịp hồi sau nến sập, DCA trên một năm nến BTCUSDT 1h; kèm dữ liệu Binance và script chạy lại |
+
 ## Giữ tài liệu đúng với code
 
 - PR đổi hành vi (luật vào lệnh, cấu hình mới, endpoint mới, thư mục mới) cập nhật luôn file tài liệu liên quan

@@ -10,6 +10,7 @@ BotTrainCoin/
 ├── dotnet-tools.json             # Tool cục bộ: dotnet-ef 10.0.13 (chạy `dotnet tool restore`)
 ├── README.md                     # Trang vào: chạy nhanh + link tới docs
 ├── docs/                         # Tài liệu (file này)
+│   └── analysis/                 # Báo cáo phân tích, mỗi báo cáo một thư mục: README.md + data/ + scripts/ Python
 ├── data/                         # Dữ liệu cục bộ (CSV, backup .db) — bị .gitignore, không commit
 ├── src/
 │   ├── CryptoBot.Domain/         # Nghiệp vụ thuần túy, không phụ thuộc gì

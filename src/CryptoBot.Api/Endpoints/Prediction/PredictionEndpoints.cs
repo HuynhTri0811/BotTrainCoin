@@ -10,7 +10,7 @@ namespace CryptoBot.Api.Endpoints;
 public static class PredictionEndpoints
 {
     /// <summary>Số lần đoán gần nhất trả về để so với thực tế.</summary>
-    private const int RecentCount = 20;
+    private const int RecentCount = 300;
 
     public static void MapPredictionEndpoints(this IEndpointRouteBuilder app)
     {

@@ -224,7 +224,7 @@ UI: [`PredictionCard.tsx`](../src/cryptobot-dashboard/src/features/prediction/Pr
 - Trọng số trong [`PredictorSettings`](../src/CryptoBot.Domain/Prediction/DirectionPredictor/PriceDirectionPredictor.cs); đặt trọng số
   = 0 để tắt một thành phần. Sửa rồi restart API là thấy kết quả mới.
 - Kèm `Backtest`: với mỗi nến, chỉ dùng các nến trước nó để đoán (`PredictAt`), so với thực tế, bỏ qua nến đóng bằng
-  đúng giá nến trước. Dashboard hiện tỷ lệ đúng và các lần đoán gần nhất.
+  đúng giá nến trước. Dashboard hiện tỷ lệ đúng và 300 lần đoán gần nhất (bảng phân trang 10 dòng).
 - Chọn **Nến kế tiếp** (theo khung của chiến lược) hoặc **Theo ngày** (`1d`, nến ngày Binance).
 
 ## 11. Tỷ lệ đúng tín hiệu chỉ báo
@@ -235,6 +235,7 @@ UI: [`IndicatorAccuracyCard.tsx`](../src/cryptobot-dashboard/src/features/predic
 - Với mỗi chỉ báo tự viết cùng symbol/khung: sau 1, 3, 6, 12 nến, giá có đi đúng hướng tín hiệu Long/Short không, và
   trung bình đi được bao nhiêu % theo hướng tín hiệu (âm = đi ngược). Tín hiệu quá gần cuối chuỗi không được chấm ở
   mốc chưa đủ nến.
+- Bảng tín hiệu gần nhất của mỗi chỉ báo hiện tối đa 300 tín hiệu, dùng chung giới hạn với bảng Dự đoán.
 
 ## 12. Nến ngày lịch sử từ 2016 (Bitfinex)
 

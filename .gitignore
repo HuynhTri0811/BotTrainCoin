@@ -481,6 +481,8 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 data/
+# Dữ liệu của báo cáo phân tích được commit để chạy lại được
+!docs/analysis/*/data/
 *.db
 *.db-shm
 *.db-wal
