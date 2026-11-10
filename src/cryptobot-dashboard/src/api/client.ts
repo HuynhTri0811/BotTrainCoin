@@ -437,6 +437,18 @@ export const liveApi = {
 
 export type PriceDirection = 'Up' | 'Down';
 
+/** Sàn chứng khoán mở cửa trong một nến (CryptoBot.Domain/MarketData/StockMarkets/StockMarkets.cs). */
+export interface MarketOpening {
+  /** `JP`, `KR`, `VN`, `UK`, `US`. */
+  code: string;
+  /** Tên quốc gia: Nhật, Hàn, Việt Nam, Anh, Mỹ. */
+  name: string;
+  /** Tên sàn: TSE, KRX, HOSE, LSE, NYSE. */
+  exchange: string;
+  /** Unix seconds, lúc mở cửa. */
+  time: number;
+}
+
 export interface PredictionHistory {
   time: number; // Unix seconds, open time của nến được đoán
   predicted: PriceDirection;
@@ -448,6 +460,8 @@ export interface PredictionHistory {
   /** Giá đóng − giá đóng nến trước. */
   change: number;
   changePercent: number;
+  /** Các sàn mở cửa trong nến; luôn rỗng với nến ngày. */
+  openings: MarketOpening[];
 }
 
 export interface Prediction {
@@ -463,6 +477,8 @@ export interface Prediction {
   backtestCorrect: number;
   hitRatePercent: number;
   recent: PredictionHistory[];
+  /** Các sàn mở cửa trong nến được dự đoán; luôn rỗng với nến ngày. */
+  nextCandleOpenings: MarketOpening[];
   settings: {
     trendPeriod: number;
     momentumPeriod: number;
