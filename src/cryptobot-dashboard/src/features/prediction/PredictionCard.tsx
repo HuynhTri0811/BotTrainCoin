@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react';
 import { Alert, Card, Col, Row, Segmented, Space, Statistic, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useQuery } from '@tanstack/react-query';
-import { predictionApi, type PredictionHistory, type PriceDirection } from '../../api/client';
+import { predictionApi, type MarketOpening, type PredictionHistory, type PriceDirection } from '../../api/client';
 import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
 import { applyColumnFilters, columnFilter, useScopedFilters, withFilteredValues } from '../../components/tableFilters';
 import { fmtPrice2 as fmtPrice } from '../futures/format';
-import { excelVnDateUnix, formatVnUnix } from '../../time';
+import { excelVnDateUnix, formatVnTimeUnix, formatVnUnix } from '../../time';
 
 const HISTORY = 300;
 
@@ -27,6 +27,34 @@ function DirectionTag({ direction, big }: { direction: PriceDirection | null; bi
     <Tag color="red" style={style}>
       ▼ Xuống
     </Tag>
+  );
+}
+
+/** Màu thẻ của từng sàn; tránh xanh lá và đỏ vì đã dùng cho Lên/Xuống. */
+const MARKET_COLORS: Record<string, string> = { JP: 'magenta', KR: 'cyan', VN: 'gold', UK: 'purple', US: 'blue' };
+
+/** Bộ lọc cột Mở cửa, cùng thứ tự với `StockMarkets.All` trong Domain. */
+const MARKET_FILTERS = [
+  { text: 'Nhật (TSE)', value: 'JP' },
+  { text: 'Hàn (KRX)', value: 'KR' },
+  { text: 'Việt Nam (HOSE)', value: 'VN' },
+  { text: 'Anh (LSE)', value: 'UK' },
+  { text: 'Mỹ (NYSE)', value: 'US' },
+  { text: 'Không có sàn nào', value: 'None' },
+];
+
+const openingText = (opening: MarketOpening) => `${opening.name} ${formatVnTimeUnix(opening.time)}`;
+
+function OpeningTags({ openings }: { openings: MarketOpening[] }) {
+  if (openings.length === 0) return <Typography.Text type="secondary">—</Typography.Text>;
+  return (
+    <Space size={4} wrap>
+      {openings.map((opening) => (
+        <Tag key={opening.code} color={MARKET_COLORS[opening.code]} title={`Sàn ${opening.exchange} mở cửa`}>
+          {openingText(opening)}
+        </Tag>
+      ))}
+    </Space>
   );
 }
 
@@ -52,6 +80,9 @@ const excelColumns = (day: boolean): ExcelColumn<PredictionHistory>[] => [
     format: EXCEL_FORMAT.dateTime,
     width: 17,
   },
+  ...(day
+    ? []
+    : [{ header: 'Sàn mở cửa', value: (entry: PredictionHistory) => entry.openings.map(openingText).join(', '), width: 22 }]),
   { header: 'Đoán', value: (entry) => directionText(entry.predicted) },
   { header: 'Điểm', value: (entry) => entry.score, format: '0.0000' },
   { header: 'Thực tế', value: (entry) => directionText(entry.actual) },
@@ -71,6 +102,21 @@ const excelColumns = (day: boolean): ExcelColumn<PredictionHistory>[] => [
 /** Cột bảng lịch sử dự đoán; bộ lọc của bảng cũng dùng khi xuất Excel. */
 const historyColumns = (day: boolean): ColumnsType<PredictionHistory> => [
   { title: day ? 'Ngày (mở lúc)' : 'Nến (mở lúc)', dataIndex: 'time', render: formatVnUnix },
+  // Nến ngày luôn chứa mọi phiên mở cửa trong tuần nên không hiện cột này.
+  ...(day
+    ? []
+    : [
+        {
+          title: 'Mở cửa',
+          key: 'openings',
+          filters: MARKET_FILTERS,
+          onFilter: (selected: unknown, entry: PredictionHistory) =>
+            selected === 'None'
+              ? entry.openings.length === 0
+              : entry.openings.some((opening) => opening.code === selected),
+          render: (_: unknown, entry: PredictionHistory) => <OpeningTags openings={entry.openings} />,
+        },
+      ]),
   {
     title: 'Đoán',
     dataIndex: 'predicted',
@@ -183,6 +229,14 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
               <div style={{ margin: '6px 0' }}>
                 <DirectionTag direction={prediction.direction} big />
               </div>
+              {prediction.nextCandleOpenings.length > 0 && (
+                <div style={{ marginBottom: 6 }}>
+                  <Typography.Text type="warning" style={{ fontSize: 12, marginRight: 4 }}>
+                    Nến này có sàn mở cửa, giá hay biến động mạnh:
+                  </Typography.Text>
+                  <OpeningTags openings={prediction.nextCandleOpenings} />
+                </div>
+              )}
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 so với giá đóng {day ? 'ngày' : 'nến'} trước {fmtPrice(prediction.lastClose)} · điểm {prediction.score.toFixed(4)}
               </Typography.Text>
@@ -212,6 +266,12 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
             {unit} × {prediction.settings.momentumWeight}, lực mua/bán × {prediction.settings.pressureWeight}. Sửa trong{' '}
             <code>CryptoBot.Domain/Prediction/PriceDirectionPredictor.cs</code> rồi restart API.
           </Typography.Paragraph>
+          {!day && (
+            <Typography.Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 12 }}>
+              Giờ mở cửa theo giờ Việt Nam, Thứ Hai đến Thứ Sáu: Nhật và Hàn 07:00, Việt Nam 09:00, Anh 14:00 (mùa hè) hoặc
+              15:00 (mùa đông), Mỹ 20:30 (mùa hè) hoặc 21:30 (mùa đông). Chưa tính ngày nghỉ lễ.
+            </Typography.Paragraph>
+          )}
 
           {/* Mount lại khi đổi symbol/khung/chế độ để phân trang về trang 1 (trang mới nhất). */}
           <Table<PredictionHistory>
