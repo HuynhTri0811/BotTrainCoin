@@ -49,7 +49,8 @@ public static class PredictionEndpoints
                 recent.Add(new PredictionHistoryDto(ToUnixSeconds(closed[index].OpenTimeUtc),
                     prediction.Direction.ToString(),
                     prediction.Score, actual, previousClose, closed[index].Close, closed[index].Close - previousClose,
-                    (closed[index].Close / previousClose - 1) * 100));
+                    (closed[index].Close / previousClose - 1) * 100,
+                    OpeningsIn(closed[index].OpenTimeUtc, iv)));
             }
             recent.Reverse();
 
@@ -57,7 +58,8 @@ public static class PredictionEndpoints
                 ToUnixSeconds(last.OpenTimeUtc + iv.Duration), last.Close, next.Direction.ToString(), next.Score,
                 next.Reason, accuracy.Predictions, accuracy.Correct, accuracy.HitRatePercent, recent,
                 new PredictionSettingsDto(settings.TrendPeriod, settings.MomentumPeriod, settings.TrendWeight,
-                    settings.MomentumWeight, settings.PressureWeight)));
+                    settings.MomentumWeight, settings.PressureWeight),
+                OpeningsIn(last.OpenTimeUtc + iv.Duration, iv)));
         });
 
         // Độ chính xác tín hiệu Long/Short của các chỉ báo tự viết cùng symbol/khung nến.
@@ -102,6 +104,18 @@ public static class PredictionEndpoints
             return Results.Ok(result);
         });
     }
+
+    /// <summary>
+    /// Các sàn chứng khoán mở cửa trong nến mở lúc <paramref name="openTimeUtc"/>. Nến ngày luôn chứa mọi phiên mở
+    /// cửa trong tuần nên trả rỗng.
+    /// </summary>
+    private static IReadOnlyList<MarketOpeningDto> OpeningsIn(DateTime openTimeUtc, CandleInterval interval) =>
+        interval == CandleInterval.D1
+            ? []
+            : MarketOpenings.Between(openTimeUtc, openTimeUtc + interval.Duration)
+                .Select(opening => new MarketOpeningDto(opening.Market.Code, opening.Market.Name,
+                    opening.Market.Exchange, ToUnixSeconds(opening.OpenUtc)))
+                .ToList();
 
     private static long ToUnixSeconds(DateTime utc) => new DateTimeOffset(utc).ToUnixTimeSeconds();
 }
