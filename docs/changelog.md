@@ -7,7 +7,10 @@ Chi tiết từng tính năng: [features.md](features.md).
 
 - **#145 Đánh dấu giờ mở cửa sàn chứng khoán trên bảng Dự đoán** (#144). `MarketOpenings` tìm các lần mở cửa của sàn
   Nhật, Hàn, Việt Nam, Anh, Mỹ trong một khoảng thời gian, có tính giờ mùa hè. Bảng Dự đoán có cột Mở cửa, bộ lọc theo
-  sàn, cột trong file Excel, và cảnh báo khi nến kế tiếp có sàn mở cửa. Chưa tính ngày nghỉ lễ.
+  sàn, cột trong file Excel, và cảnh báo khi nến kế tiếp có sàn mở cửa. Sửa theo review (#146–#152): dashboard dựng
+  phần giờ mở cửa từ danh sách sàn API trả về và ẩn nó khi khung là 1d; múi giờ tra lúc tính, thiếu dữ liệu múi giờ thì
+  dự đoán vẫn chạy; giờ mở cửa tính một lần cho cả bảng; thêm ngày nghỉ lễ 2026–2027 cho Mỹ, Anh, Nhật và 2026 cho
+  Hàn, Việt Nam.
 
 - **#143 Hiện 300 lần đoán gần nhất và báo cáo phân tích** (#142). Bảng Dự đoán và bảng tín hiệu gần nhất của chỉ báo
   hiện tối đa 300 dòng thay vì 20. Thêm báo cáo

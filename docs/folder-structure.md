@@ -84,7 +84,8 @@ CryptoBot.Domain/
 │   ├── SimilarDays/              # Dự báo "ngày tương tự"
 │   │   └── SimilarDaysForecast.cs, SimilarDaysBacktest.cs
 │   ├── StockMarkets/             # Giờ mở cửa sàn chứng khoán Mỹ, Anh, Nhật, Hàn, Việt Nam
-│   │   └── StockMarket.cs, StockMarkets.cs (danh sách sàn), MarketOpening.cs, MarketOpenings.cs (Between)
+│   │   └── StockMarket.cs, StockMarkets.cs (danh sách sàn), StockMarketHolidays.cs (ngày lễ), MarketOpening.cs,
+│   │       MarketOpenings.cs (Between, ByCandle, Next, AppliesTo), TimeZoneCache.cs (internal)
 │   └── Enums/                    # CandleIssueKind, ForecastLean, VolumePressureSide
 ├── Strategies/
 │   ├── Contracts/                # IStrategy, StrategyContext, StrategyDecision,

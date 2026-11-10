@@ -104,7 +104,7 @@ Quy tắc trả về có `status` (`Active`/`Triggered`/`Rejected`/`Cancelled`),
 
 | Method | Đường dẫn | Tham số | Trả về |
 | --- | --- | --- | --- |
-| GET | `/api/prediction` | `symbol`, `interval` (`1d` = nến ngày Binance), `history` (300, 1–1000) | Dự đoán nến kế tiếp (`direction`, `score`, `reason`), kết quả chạy thử (`backtestPredictions`, `backtestCorrect`, `hitRatePercent`), 300 lần đoán gần nhất (`recent[]`, mỗi lần kèm `openings[]`), `settings`, `nextCandleOpenings[]`. `openings` là các sàn chứng khoán mở cửa trong nến (`code`, `name`, `exchange`, `time`), luôn rỗng với `1d` |
+| GET | `/api/prediction` | `symbol`, `interval` (`1d` = nến ngày Binance), `history` (300, 1–1000) | Dự đoán nến kế tiếp (`direction`, `score`, `reason`), kết quả chạy thử (`backtestPredictions`, `backtestCorrect`, `hitRatePercent`), 300 lần đoán gần nhất (`recent[]`, mỗi lần kèm `openings[]`), `settings`, `nextCandleOpenings[]`, `markets[]`. `openings` là các sàn chứng khoán mở cửa trong nến (`code`, `name`, `exchange`, `time`). `markets` là các sàn được đánh dấu (`code`, `name`, `exchange`, `timeZoneId`, `localOpen`, `holidaysKnownThroughYear`, `nextOpenTime`); rỗng với nến từ một ngày trở lên hoặc khi server thiếu dữ liệu múi giờ, và khi đó mọi `openings` cũng rỗng |
 | GET | `/api/prediction/indicators` | `symbol`, `interval`, `history` (1000) | Mỗi chỉ báo cùng symbol/khung: tỷ lệ đúng sau 1/3/6/12 nến (`horizons[]`), tối đa 300 tín hiệu gần nhất kèm % đi sau 1 và 3 nến |
 
 ## Lịch sử theo tháng — [`HistoryEndpoints.cs`](../src/CryptoBot.Api/Endpoints/History/HistoryEndpoints.cs)

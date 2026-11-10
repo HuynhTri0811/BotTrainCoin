@@ -228,7 +228,9 @@ UI: [`PredictionCard.tsx`](../src/cryptobot-dashboard/src/features/prediction/Pr
 - Chọn **Nến kế tiếp** (theo khung của chiến lược) hoặc **Theo ngày** (`1d`, nến ngày Binance).
 - **Giờ mở cửa sàn chứng khoán** ([`MarketOpenings`](../src/CryptoBot.Domain/MarketData/StockMarkets/MarketOpenings.cs)):
   mỗi nến trong bảng có cột Mở cửa, ghi sàn nào mở cửa trong nến đó, có bộ lọc theo sàn và cột trong file Excel. Nến
-  kế tiếp có sàn mở cửa thì hiện cảnh báo dưới hướng dự đoán. Các sàn, theo giờ Việt Nam từ Thứ Hai đến Thứ Sáu:
+  kế tiếp có sàn mở cửa thì hiện cảnh báo dưới hướng dự đoán. Dưới bảng có lần mở cửa kế tiếp của từng sàn theo giờ
+  Việt Nam. Bộ lọc, màu thẻ và ghi chú dựng từ danh sách sàn API trả về (`markets`), không chép tay trong dashboard.
+  Các sàn, từ Thứ Hai đến Thứ Sáu trừ ngày lễ:
 
   | Sàn | Giờ địa phương | Giờ Việt Nam |
   | --- | --- | --- |
@@ -238,8 +240,22 @@ UI: [`PredictionCard.tsx`](../src/cryptobot-dashboard/src/features/prediction/Pr
   | Anh (LSE) | 08:00 London | 14:00 mùa hè, 15:00 mùa đông |
   | Mỹ (NYSE) | 09:30 New York | 20:30 mùa hè, 21:30 mùa đông |
 
-  Giờ mùa hè tính theo múi giờ IANA của từng sàn, ngày mở cửa tính theo giờ địa phương của sàn. Chưa tính ngày nghỉ
-  lễ. Chế độ 1 ngày không hiện cột này vì ngày nào cũng có đủ sàn.
+  - Giờ mùa hè tính theo múi giờ IANA của từng sàn, ngày mở cửa tính theo giờ địa phương của sàn. Múi giờ tra lúc
+    tính, không lúc khởi động: máy thiếu dữ liệu múi giờ thì API ghi cảnh báo và trả dự đoán không kèm giờ mở cửa.
+  - Chỉ đánh dấu nến ngắn hơn một ngày (`MarketOpenings.AppliesTo`); nến ngày luôn chứa đủ các sàn. API tính giờ mở
+    cửa một lần cho cả bảng rồi chia theo nến (`MarketOpenings.ByCandle`).
+  - Ngày nghỉ lễ trong [`StockMarketHolidays`](../src/CryptoBot.Domain/MarketData/StockMarkets/StockMarketHolidays.cs):
+
+    | Sàn | Đã có | Nguồn và ghi chú |
+    | --- | --- | --- |
+    | Mỹ | 2026–2027 | Thông báo lịch nghỉ của NYSE Group ngày 23/12/2025 |
+    | Anh | 2026–2027 | Ngày nghỉ ngân hàng của Anh, kể cả nghỉ bù |
+    | Nhật | 2026–2027 | Ngày lễ quốc gia, nghỉ bù và nghỉ cuối năm 31/12 đến 03/01 của TSE |
+    | Hàn | 2026 | Chỉ các ngày mọi nguồn thống nhất. Chưa ghi 02/03, 01/05, 25/05, 03/06, 17/08, 05/10 vì nguồn mâu thuẫn |
+    | Việt Nam | 2026 | Thông báo 2294/TB-SGDHCM của HOSE. Chưa ghi 02/01 vì nguồn mâu thuẫn |
+
+    Sau năm cuối cùng đã có, mọi ngày thường đều tính là mở cửa. Mỗi năm cần thêm lịch mới và nâng
+    `HolidaysKnownThroughYear` trong `StockMarkets`.
 
 ## 11. Tỷ lệ đúng tín hiệu chỉ báo
 
