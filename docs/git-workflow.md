@@ -111,3 +111,4 @@ Khi một đợt tính năng ổn định: mở PR `develop → main` tiêu đ�
 
 `bin/`, `obj/`, `data/`, `*.db`, `*.db-shm`, `*.db-wal`, `src/CryptoBot.Api/wwwroot/`, `node_modules/`,
 `*.tsbuildinfo`, `.env`. Không commit API key hay bí mật (dự án hiện không cần bí mật nào).
+Ngoại lệ: `docs/analysis/<báo cáo>/data/` được commit để báo cáo phân tích chạy lại được.
