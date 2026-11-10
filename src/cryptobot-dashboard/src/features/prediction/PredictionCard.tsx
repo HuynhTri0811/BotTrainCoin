@@ -2,12 +2,18 @@ import { useMemo, useState } from 'react';
 import { Alert, Card, Col, Row, Segmented, Space, Statistic, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useQuery } from '@tanstack/react-query';
-import { predictionApi, type MarketOpening, type PredictionHistory, type PriceDirection } from '../../api/client';
+import {
+  predictionApi,
+  type MarketOpening,
+  type PredictionHistory,
+  type PriceDirection,
+  type StockMarket,
+} from '../../api/client';
 import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
 import { applyColumnFilters, columnFilter, useScopedFilters, withFilteredValues } from '../../components/tableFilters';
 import { fmtPrice2 as fmtPrice } from '../futures/format';
-import { excelVnDateUnix, formatVnTimeUnix, formatVnUnix } from '../../time';
+import { excelVnDateUnix, formatVnTimeDayUnix, formatVnTimeUnix, formatVnUnix } from '../../time';
 
 const HISTORY = 300;
 
@@ -30,31 +36,55 @@ function DirectionTag({ direction, big }: { direction: PriceDirection | null; bi
   );
 }
 
-/** Màu thẻ của từng sàn; tránh xanh lá và đỏ vì đã dùng cho Lên/Xuống. */
-const MARKET_COLORS: Record<string, string> = { JP: 'magenta', KR: 'cyan', VN: 'gold', UK: 'purple', US: 'blue' };
+/** Màu thẻ theo thứ tự sàn API trả về; tránh xanh lá và đỏ vì đã dùng cho Lên/Xuống. */
+const MARKET_PALETTE = ['magenta', 'cyan', 'gold', 'purple', 'blue', 'orange', 'geekblue', 'lime', 'volcano'];
 
-/** Bộ lọc cột Mở cửa, cùng thứ tự với `StockMarkets.All` trong Domain. */
-const MARKET_FILTERS = [
-  { text: 'Nhật (TSE)', value: 'JP' },
-  { text: 'Hàn (KRX)', value: 'KR' },
-  { text: 'Việt Nam (HOSE)', value: 'VN' },
-  { text: 'Anh (LSE)', value: 'UK' },
-  { text: 'Mỹ (NYSE)', value: 'US' },
-  { text: 'Không có sàn nào', value: 'None' },
-];
+/** Phần của danh sách sàn dùng để dựng cột; không đổi giữa các lần tải lại nên cột không dựng lại mỗi 15 giây. */
+type MarketColumnInfo = Pick<StockMarket, 'code' | 'name' | 'exchange'>;
+
+const marketColor = (markets: MarketColumnInfo[], code: string) => {
+  const index = markets.findIndex((market) => market.code === code);
+  return index < 0 ? undefined : MARKET_PALETTE[index % MARKET_PALETTE.length];
+};
 
 const openingText = (opening: MarketOpening) => `${opening.name} ${formatVnTimeUnix(opening.time)}`;
 
-function OpeningTags({ openings }: { openings: MarketOpening[] }) {
+function OpeningTags({ openings, markets }: { openings: MarketOpening[]; markets: MarketColumnInfo[] }) {
   if (openings.length === 0) return <Typography.Text type="secondary">—</Typography.Text>;
   return (
     <Space size={4} wrap>
       {openings.map((opening) => (
-        <Tag key={opening.code} color={MARKET_COLORS[opening.code]} title={`Sàn ${opening.exchange} mở cửa`}>
+        <Tag
+          key={`${opening.code}-${opening.time}`}
+          color={marketColor(markets, opening.code)}
+          title={`Sàn ${opening.exchange} mở cửa`}
+        >
           {openingText(opening)}
         </Tag>
       ))}
     </Space>
+  );
+}
+
+/** Ghi chú giờ mở cửa: lần mở cửa kế tiếp của từng sàn theo giờ Việt Nam, đã tính giờ mùa hè và ngày lễ đã biết. */
+function MarketHoursNote({ markets }: { markets: StockMarket[] }) {
+  const nextOpens = markets
+    .map((market) =>
+      market.nextOpenTime == null
+        ? `${market.name} (${market.exchange}) ${market.localOpen} giờ địa phương`
+        : `${market.name} (${market.exchange}) ${formatVnTimeDayUnix(market.nextOpenTime)}`,
+    )
+    .join(', ');
+  const knownYears = [...new Set(markets.map((market) => market.holidaysKnownThroughYear))].sort();
+  const holidayNote = markets
+    .filter((market) => market.holidaysKnownThroughYear < knownYears[knownYears.length - 1])
+    .map((market) => market.name);
+  return (
+    <Typography.Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 12 }}>
+      Lần mở cửa kế tiếp theo giờ Việt Nam: {nextOpens}. Đã tính giờ mùa hè và ngày nghỉ lễ đến hết năm{' '}
+      {knownYears[knownYears.length - 1]}
+      {holidayNote.length > 0 && ` (${holidayNote.join(', ')} mới có đến ${knownYears[0]})`}.
+    </Typography.Paragraph>
   );
 }
 
@@ -72,17 +102,17 @@ const directionText = (direction: PriceDirection | null) =>
   direction == null ? 'Đứng giá' : direction === 'Up' ? 'Lên' : 'Xuống';
 const OUTCOME_TEXT = { Hit: 'Đúng', Miss: 'Sai' } as const;
 
-/** Cột file Excel; `day` đổi tên cột thời gian giống bảng. */
-const excelColumns = (day: boolean): ExcelColumn<PredictionHistory>[] => [
+/** Cột file Excel; `day` đổi tên cột thời gian giống bảng, `withOpenings` thêm cột sàn mở cửa. */
+const excelColumns = (day: boolean, withOpenings: boolean): ExcelColumn<PredictionHistory>[] => [
   {
     header: day ? 'Ngày (mở lúc)' : 'Nến (mở lúc)',
     value: (entry) => excelVnDateUnix(entry.time),
     format: EXCEL_FORMAT.dateTime,
     width: 17,
   },
-  ...(day
-    ? []
-    : [{ header: 'Sàn mở cửa', value: (entry: PredictionHistory) => entry.openings.map(openingText).join(', '), width: 22 }]),
+  ...(withOpenings
+    ? [{ header: 'Sàn mở cửa', value: (entry: PredictionHistory) => entry.openings.map(openingText).join(', '), width: 22 }]
+    : []),
   { header: 'Đoán', value: (entry) => directionText(entry.predicted) },
   { header: 'Điểm', value: (entry) => entry.score, format: '0.0000' },
   { header: 'Thực tế', value: (entry) => directionText(entry.actual) },
@@ -99,22 +129,29 @@ const excelColumns = (day: boolean): ExcelColumn<PredictionHistory>[] => [
   },
 ];
 
-/** Cột bảng lịch sử dự đoán; bộ lọc của bảng cũng dùng khi xuất Excel. */
-const historyColumns = (day: boolean): ColumnsType<PredictionHistory> => [
+/**
+ * Cột bảng lịch sử dự đoán; bộ lọc của bảng cũng dùng khi xuất Excel. Cột Mở cửa chỉ có khi API trả danh sách sàn,
+ * bộ lọc dựng từ chính danh sách đó.
+ */
+const historyColumns = (day: boolean, markets: MarketColumnInfo[]): ColumnsType<PredictionHistory> => [
   { title: day ? 'Ngày (mở lúc)' : 'Nến (mở lúc)', dataIndex: 'time', render: formatVnUnix },
-  // Nến ngày luôn chứa mọi phiên mở cửa trong tuần nên không hiện cột này.
-  ...(day
+  ...(markets.length === 0
     ? []
     : [
         {
           title: 'Mở cửa',
           key: 'openings',
-          filters: MARKET_FILTERS,
+          filters: [
+            ...markets.map((market) => ({ text: `${market.name} (${market.exchange})`, value: market.code })),
+            { text: 'Không có sàn nào', value: 'None' },
+          ],
           onFilter: (selected: unknown, entry: PredictionHistory) =>
             selected === 'None'
               ? entry.openings.length === 0
               : entry.openings.some((opening) => opening.code === selected),
-          render: (_: unknown, entry: PredictionHistory) => <OpeningTags openings={entry.openings} />,
+          render: (_: unknown, entry: PredictionHistory) => (
+            <OpeningTags openings={entry.openings} markets={markets} />
+          ),
         },
       ]),
   {
@@ -189,13 +226,19 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
   const recentHits = prediction?.recent.filter((entry) => outcomeOf(entry) === 'Hit').length ?? 0;
   const recentCounted = prediction?.recent.filter((entry) => outcomeOf(entry) != null).length ?? 0;
 
-  const columns = useMemo(() => historyColumns(day), [day]);
+  // So theo nội dung để cột chỉ dựng lại khi danh sách sàn thật sự đổi, không phải mỗi lần tải lại.
+  const marketsKey = JSON.stringify(
+    prediction?.markets.map(({ code, name, exchange }) => ({ code, name, exchange })) ?? [],
+  );
+  const columnMarkets = useMemo(() => JSON.parse(marketsKey) as MarketColumnInfo[], [marketsKey]);
+  const withOpenings = columnMarkets.length > 0;
+  const columns = useMemo(() => historyColumns(day, columnMarkets), [day, columnMarkets]);
   const tableColumns = useMemo(() => withFilteredValues(columns, tableFilters), [columns, tableFilters]);
 
   // Đúng các dòng bảng đang hiển thị (sau bộ lọc Đoán / Thực tế / Kết quả), mọi trang.
   const exportHistory = async () => {
     const rows = applyColumnFilters(prediction?.recent ?? [], columns, tableFilters);
-    return { count: await downloadExcel(`du-doan-${symbol}-${queryInterval}`, 'Dự đoán', rows, excelColumns(day)) };
+    return { count: await downloadExcel(`du-doan-${symbol}-${queryInterval}`, 'Dự đoán', rows, excelColumns(day, withOpenings)) };
   };
 
   return (
@@ -234,7 +277,7 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
                   <Typography.Text type="warning" style={{ fontSize: 12, marginRight: 4 }}>
                     Nến này có sàn mở cửa, giá hay biến động mạnh:
                   </Typography.Text>
-                  <OpeningTags openings={prediction.nextCandleOpenings} />
+                  <OpeningTags openings={prediction.nextCandleOpenings} markets={columnMarkets} />
                 </div>
               )}
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -266,12 +309,7 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
             {unit} × {prediction.settings.momentumWeight}, lực mua/bán × {prediction.settings.pressureWeight}. Sửa trong{' '}
             <code>CryptoBot.Domain/Prediction/PriceDirectionPredictor.cs</code> rồi restart API.
           </Typography.Paragraph>
-          {!day && (
-            <Typography.Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 12 }}>
-              Giờ mở cửa theo giờ Việt Nam, Thứ Hai đến Thứ Sáu: Nhật và Hàn 07:00, Việt Nam 09:00, Anh 14:00 (mùa hè) hoặc
-              15:00 (mùa đông), Mỹ 20:30 (mùa hè) hoặc 21:30 (mùa đông). Chưa tính ngày nghỉ lễ.
-            </Typography.Paragraph>
-          )}
+          {withOpenings && <MarketHoursNote markets={prediction.markets} />}
 
           {/* Mount lại khi đổi symbol/khung/chế độ để phân trang về trang 1 (trang mới nhất). */}
           <Table<PredictionHistory>
