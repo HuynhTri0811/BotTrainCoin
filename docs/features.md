@@ -226,6 +226,20 @@ UI: [`PredictionCard.tsx`](../src/cryptobot-dashboard/src/features/prediction/Pr
 - Kèm `Backtest`: với mỗi nến, chỉ dùng các nến trước nó để đoán (`PredictAt`), so với thực tế, bỏ qua nến đóng bằng
   đúng giá nến trước. Dashboard hiện tỷ lệ đúng và 300 lần đoán gần nhất (bảng phân trang 10 dòng).
 - Chọn **Nến kế tiếp** (theo khung của chiến lược) hoặc **Theo ngày** (`1d`, nến ngày Binance).
+- **Giờ mở cửa sàn chứng khoán** ([`MarketOpenings`](../src/CryptoBot.Domain/MarketData/StockMarkets/MarketOpenings.cs)):
+  mỗi nến trong bảng có cột Mở cửa, ghi sàn nào mở cửa trong nến đó, có bộ lọc theo sàn và cột trong file Excel. Nến
+  kế tiếp có sàn mở cửa thì hiện cảnh báo dưới hướng dự đoán. Các sàn, theo giờ Việt Nam từ Thứ Hai đến Thứ Sáu:
+
+  | Sàn | Giờ địa phương | Giờ Việt Nam |
+  | --- | --- | --- |
+  | Nhật (TSE) | 09:00 Tokyo | 07:00 |
+  | Hàn (KRX) | 09:00 Seoul | 07:00 |
+  | Việt Nam (HOSE) | 09:00, phiên ATO | 09:00 |
+  | Anh (LSE) | 08:00 London | 14:00 mùa hè, 15:00 mùa đông |
+  | Mỹ (NYSE) | 09:30 New York | 20:30 mùa hè, 21:30 mùa đông |
+
+  Giờ mùa hè tính theo múi giờ IANA của từng sàn, ngày mở cửa tính theo giờ địa phương của sàn. Chưa tính ngày nghỉ
+  lễ. Chế độ 1 ngày không hiện cột này vì ngày nào cũng có đủ sàn.
 
 ## 11. Tỷ lệ đúng tín hiệu chỉ báo
 

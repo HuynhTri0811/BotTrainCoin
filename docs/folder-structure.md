@@ -83,6 +83,8 @@ CryptoBot.Domain/
 │   │   └── MonthlyChangeReport.cs, MonthChange.cs, YearChange.cs, MonthOfYearStats.cs
 │   ├── SimilarDays/              # Dự báo "ngày tương tự"
 │   │   └── SimilarDaysForecast.cs, SimilarDaysBacktest.cs
+│   ├── StockMarkets/             # Giờ mở cửa sàn chứng khoán Mỹ, Anh, Nhật, Hàn, Việt Nam
+│   │   └── StockMarket.cs, StockMarkets.cs (danh sách sàn), MarketOpening.cs, MarketOpenings.cs (Between)
 │   └── Enums/                    # CandleIssueKind, ForecastLean, VolumePressureSide
 ├── Strategies/
 │   ├── Contracts/                # IStrategy, StrategyContext, StrategyDecision,
