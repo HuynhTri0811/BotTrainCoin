@@ -17,6 +17,102 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
 
+            modelBuilder.Entity("CryptoBot.Domain.Backtesting.SavedBacktest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<long>("CreatedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("FastPeriod")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FeePercent")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("FirstCandleUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("InitialCapital")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Interval")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("LastCandleUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LookbackCandles")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("MaxDrawdownPercent")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NetProfit")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NetProfitPercent")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SizeValue")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Sizing")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SlowPeriod")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("StopLossPercent")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("StrategyInstanceId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TakeProfitPercent")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TotalTrades")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("WinRatePercent")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("StrategyInstanceId", "CreatedAtUtc");
+
+                    b.ToTable("SavedBacktests");
+                });
+
             modelBuilder.Entity("CryptoBot.Domain.Futures.AutoOrderRule", b =>
                 {
                     b.Property<long>("Id")

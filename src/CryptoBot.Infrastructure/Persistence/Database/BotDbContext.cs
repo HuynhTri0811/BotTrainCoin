@@ -1,3 +1,4 @@
+using CryptoBot.Domain.Backtesting;
 using CryptoBot.Domain.Futures;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.News;
@@ -16,6 +17,7 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<AutoOrderRule> AutoOrderRules => Set<AutoOrderRule>();
     public DbSet<DailyReport> DailyReports => Set<DailyReport>();
     public DbSet<NewsArticle> NewsArticles => Set<NewsArticle>();
+    public DbSet<SavedBacktest> SavedBacktests => Set<SavedBacktest>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
@@ -101,6 +103,19 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
             entity.Property(report => report.Interval).HasMaxLength(8);
             // Một báo cáo cho mỗi (symbol, giờ lập): chạy lại hoặc tạo bù không sinh bản trùng.
             entity.HasIndex(report => new { report.Symbol, report.PeriodEndUtc }).IsUnique();
+        });
+
+        builder.Entity<SavedBacktest>(entity =>
+        {
+            entity.HasKey(saved => saved.Id);
+            entity.Property(saved => saved.Symbol).HasMaxLength(32);
+            entity.Property(saved => saved.Interval).HasMaxLength(8);
+            entity.Property(saved => saved.Sizing).HasConversion<string>().HasMaxLength(16);
+            entity.Property(saved => saved.Note).HasMaxLength(SavedBacktest.MaxNoteLength);
+            entity.Ignore(saved => saved.Settings);
+            // Lịch sử liệt kê mới → cũ, có thể lọc theo chiến lược.
+            entity.HasIndex(saved => new { saved.StrategyInstanceId, saved.CreatedAtUtc });
+            entity.HasIndex(saved => saved.CreatedAtUtc);
         });
 
         builder.Entity<NewsArticle>(entity =>
