@@ -32,7 +32,7 @@ public static class BacktestEndpoints
             if (from >= clock.UtcNow)
                 return Results.BadRequest(new { error = "Ngày bắt đầu phải ở quá khứ." });
 
-            var key = new CandleKey(instance.Exchange, instance.Symbol, CandleInterval.Parse(instance.Interval));
+            var key = CandleKey.For(instance);
             try
             {
                 return await backfill.BackfillAsync(key, from, ct) is { } result

@@ -26,7 +26,7 @@ public sealed class BacktestService(IStrategyInstanceStore instances, ICandleSto
         if (await instances.GetAsync(strategyId, ct) is not { } instance)
             return null;
 
-        var key = KeyOf(instance);
+        var key = CandleKey.For(instance);
         var first = (await candles.GetAfterAsync(key, null, 1, closedOnly: true, ct)).FirstOrDefault();
         var last = (await candles.GetLatestAsync(key, null, 1, closedOnly: true, ct)).FirstOrDefault();
         return new BacktestCoverage(first?.OpenTimeUtc, last?.OpenTimeUtc);
@@ -48,7 +48,7 @@ public sealed class BacktestService(IStrategyInstanceStore instances, ICandleSto
         if (parameters.Validate() is { } parametersError)
             throw new ArgumentException(parametersError);
         var strategy = new EmaCrossStrategy(parameters);
-        var key = KeyOf(instance);
+        var key = CandleKey.For(instance);
 
         var range = await LoadRangeAsync(key, request.FromUtc, request.ToUtc, ct);
         // Nến trước khoảng chỉ để có đủ cửa sổ cho nến đầu, giống SignalEvaluationService.
@@ -92,7 +92,4 @@ public sealed class BacktestService(IStrategyInstanceStore instances, ICandleSto
             after = page[^1].OpenTimeUtc;
         }
     }
-
-    private static CandleKey KeyOf(StrategyInstance instance) =>
-        new(instance.Exchange, instance.Symbol, CandleInterval.Parse(instance.Interval));
 }
