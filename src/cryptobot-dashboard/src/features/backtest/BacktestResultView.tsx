@@ -5,6 +5,7 @@ import { ExportExcelButton } from '../../components/ExportExcelButton';
 import { excelVnDate, formatVn } from '../../time';
 import { fmtPrice2, fmtSigned, fmtUsdt, pnlColor } from '../futures/format';
 import { BacktestChart, EXIT_COLORS } from './BacktestChart';
+import { fmtSizing, fmtStops } from './BacktestHistoryCard';
 
 const percent = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtPercent = (value: number) => `${percent.format(value)}%`;
@@ -39,7 +40,11 @@ export function BacktestResultView({ result }: { result: BacktestResult }) {
 
   return (
     <>
-      <Card size="small" title={`Kết quả · ${name}`}>
+      <Card
+        size="small"
+        title={`Kết quả #${result.id} · ${name}`}
+        extra={<Typography.Text type="secondary">Chạy lúc {formatVn(result.createdAtUtc)} · đã lưu vào lịch sử</Typography.Text>}
+      >
         <Row gutter={[16, 16]}>
           <Col xs={12} md={6}>
             <Statistic title={`Tổng số lệnh đã đóng (${stats.wins} thắng · ${stats.losses} thua)`} value={stats.totalTrades} />
@@ -81,6 +86,10 @@ export function BacktestResultView({ result }: { result: BacktestResult }) {
           </Col>
         </Row>
         <Descriptions size="small" column={{ xs: 1, md: 2 }} style={{ marginTop: 16 }}>
+          <Descriptions.Item label="Vốn · rủi ro">
+            {fmtSizing(result.settings)} · {fmtStops(result.settings)} · phí {result.settings.feePercent}%
+          </Descriptions.Item>
+          {result.note && <Descriptions.Item label="Ghi chú">{result.note}</Descriptions.Item>}
           <Descriptions.Item label="Khoảng nến">
             {formatVn(result.firstCandleUtc)} → {formatVn(result.lastCandleUtc)}
           </Descriptions.Item>

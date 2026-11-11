@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -25,6 +25,7 @@ import {
   type PositionSizing,
   type Strategy,
 } from '../api/client';
+import { BacktestHistoryCard } from '../features/backtest/BacktestHistoryCard';
 import { BacktestResultView } from '../features/backtest/BacktestResultView';
 import { formatVn } from '../time';
 
@@ -94,8 +95,26 @@ export function BacktestPage({ strategy }: { strategy: Strategy }) {
     onError: (error) => message.error(errorText(error), 8),
   });
 
+  // Kết quả đang hiển thị: lần vừa chạy hoặc một lần mở lại từ lịch sử.
+  const [shown, setShown] = useState<BacktestResult | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  const show = (result: BacktestResult) => {
+    setShown(result);
+    requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+
   const run = useMutation<BacktestResult, Error, BacktestRequest>({
     mutationFn: (request) => backtestApi.run(strategy.id, request),
+    onSuccess: (result) => {
+      show(result);
+      queryClient.invalidateQueries({ queryKey: ['backtests'] });
+    },
+  });
+
+  const open = useMutation({
+    mutationFn: backtestApi.get,
+    onSuccess: show,
+    onError: (error) => message.error(errorText(error)),
   });
 
   const submit = () => {
@@ -241,8 +260,18 @@ export function BacktestPage({ strategy }: { strategy: Strategy }) {
       </Card>
 
       {run.isError && <Alert type="error" showIcon title={errorText(run.error)} />}
-      {run.data && <BacktestResultView result={run.data} />}
-      {run.data && (
+
+      <BacktestHistoryCard strategyId={strategy.id} openedId={shown?.id ?? null} onOpen={(id) => open.mutate(id)} />
+
+      <div ref={resultRef} style={{ scrollMarginTop: 16 }}>
+        {open.isPending && <Spin />}
+        {shown && (
+          <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+            <BacktestResultView result={shown} />
+          </Space>
+        )}
+      </div>
+      {shown && (
         <Alert
           type="info"
           showIcon

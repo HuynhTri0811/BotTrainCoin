@@ -205,12 +205,13 @@ export class ApiError extends Error {
   }
 }
 
-async function postJson<T>(url: string, body: unknown): Promise<T> {
+/** Gửi JSON bằng `method`; lỗi trả `ApiError` với chi tiết từ body. Body rỗng (204) trả `null`. */
+async function sendJson<T>(method: 'POST' | 'PUT' | 'DELETE', url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
-    method: 'POST',
+    method,
     cache: 'no-store',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
@@ -219,6 +220,8 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   }
   return data as T;
 }
+
+const postJson = <T,>(url: string, body: unknown) => sendJson<T>('POST', url, body);
 
 export const futuresApi = {
   account: () => getJson<FuturesAccount>('/api/paper/futures/account'),
@@ -798,11 +801,44 @@ export interface BacktestMarker {
   netPnl: number | null;
 }
 
-export interface BacktestResult {
+export interface BacktestSettings {
+  initialCapital: number;
+  sizing: PositionSizing;
+  sizeValue: number;
+  takeProfitPercent: number | null;
+  stopLossPercent: number | null;
+  feePercent: number;
+}
+
+/** Một lần backtest đã lưu (mọi lần chạy đều được lưu). */
+export interface BacktestSummary {
+  id: number;
+  createdAtUtc: string;
   strategyId: number;
   symbol: string;
   interval: string;
   parameters: StrategyParameters;
+  firstCandleUtc: string | null;
+  lastCandleUtc: string | null;
+  settings: BacktestSettings;
+  totalTrades: number;
+  winRatePercent: number;
+  netProfit: number;
+  netProfitPercent: number;
+  maxDrawdownPercent: number;
+  note: string | null;
+}
+
+export interface BacktestResult {
+  /** Id của bản lưu trong lịch sử. */
+  id: number;
+  createdAtUtc: string;
+  note: string | null;
+  strategyId: number;
+  symbol: string;
+  interval: string;
+  parameters: StrategyParameters;
+  settings: BacktestSettings;
   firstCandleUtc: string | null;
   lastCandleUtc: string | null;
   candleCount: number;
@@ -822,6 +858,11 @@ export const backtestApi = {
   coverage: (strategyId: number) => getJson<BacktestCoverage>(`/api/strategies/${strategyId}/backtest/coverage`),
   history: (strategyId: number, fromUtc: string) =>
     postJson<BackfillResult>(`/api/strategies/${strategyId}/backtest/history`, { fromUtc }),
+  /** Chạy và lưu vào lịch sử. */
   run: (strategyId: number, request: BacktestRequest) =>
     postJson<BacktestResult>(`/api/strategies/${strategyId}/backtest`, request),
+  list: (limit = 200) => getJson<BacktestSummary[]>(`/api/backtests?limit=${limit}`),
+  get: (id: number) => getJson<BacktestResult>(`/api/backtests/${id}`),
+  setNote: (id: number, note: string) => sendJson<{ note: string | null }>('PUT', `/api/backtests/${id}/note`, { note }),
+  remove: (id: number) => sendJson<null>('DELETE', `/api/backtests/${id}`),
 };
