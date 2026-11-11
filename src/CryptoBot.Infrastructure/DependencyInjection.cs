@@ -1,4 +1,5 @@
 using CryptoBot.Application.Abstractions;
+using CryptoBot.Application.Backtesting;
 using CryptoBot.Application.Futures;
 using CryptoBot.Application.Indicators;
 using CryptoBot.Application.LivePrices;
@@ -42,9 +43,13 @@ public static class DependencyInjection
         services.AddSingleton(config.GetSection("Signals").Get<SignalOptions>() ?? new SignalOptions());
         services.AddSingleton<MarketDataStatusRegistry>();
         services.AddScoped<CandleSyncService>();
+        // Tải nến cũ cho backtest (chỉ đi lùi về trước nến sớm nhất đã lưu).
+        services.AddScoped<CandleBackfillService>();
         services.AddScoped<SignalEvaluationService>();
         services.AddScoped<StrategyConfigurator>();
         services.AddScoped<ChartQueryService>();
+        // Backtest chiến lược trên nến đã lưu (chỉ đọc DB).
+        services.AddScoped<BacktestService>();
 
         // Chỉ báo tự viết: class có [Indicator] trong CryptoBot.Domain + cấu hình "Indicators".
         services.AddSingleton(sp => new IndicatorRegistry(

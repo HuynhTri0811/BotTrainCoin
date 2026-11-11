@@ -1,0 +1,90 @@
+using CryptoBot.Application.Abstractions;
+using CryptoBot.Domain.MarketData;
+using Microsoft.Extensions.Logging;
+
+namespace CryptoBot.Application.MarketData;
+
+/// <summary>
+/// Tải nến cũ hơn nến sớm nhất đang có trong DB, để backtest có đủ lịch sử. Chỉ đi lùi về quá khứ:
+/// phần mới đã có <see cref="CandleSyncService"/> lo, nên hai bên không ghi cùng một khoảng nến.
+/// Dùng cùng kiểm tra nến (<see cref="CandleSeriesValidator"/>) và cùng upsert như đồng bộ thường.
+/// </summary>
+public sealed class CandleBackfillService(
+    IMarketDataClient client,
+    ICandleStore store,
+    MarketDataOptions options,
+    ILogger<CandleBackfillService> logger)
+{
+    /// <summary>Số request tối đa mỗi lần gọi (1000 × 1000 nến ≈ 11 năm nến 1h, ≈ 28 năm nến 15m).</summary>
+    public const int MaxRequests = 1000;
+
+    // Một lần tải tại một thời điểm: hai lần tải chồng nhau sẽ cùng chèn một khoảng nến.
+    private static readonly SemaphoreSlim Gate = new(1, 1);
+
+    /// <summary>
+    /// Tải nến từ <paramref name="fromUtc"/> đến ngay trước nến sớm nhất đã lưu (hoặc đến hiện tại nếu DB trống).
+    /// Trả null nếu đang có một lần tải khác chạy.
+    /// </summary>
+    public async Task<CandleBackfillResult?> BackfillAsync(CandleKey key, DateTime fromUtc, CancellationToken ct)
+    {
+        if (!await Gate.WaitAsync(0, ct))
+            return null;
+
+        try
+        {
+            return await RunAsync(key, fromUtc, ct);
+        }
+        finally
+        {
+            Gate.Release();
+        }
+    }
+
+    private async Task<CandleBackfillResult> RunAsync(CandleKey key, DateTime fromUtc, CancellationToken ct)
+    {
+        if (key.Exchange != client.Exchange)
+            throw new ArgumentException($"Chỉ tải được nến {client.Exchange}, không phải {key.Exchange}.");
+
+        var serverTime = await client.GetServerTimeAsync(ct);
+        var earliest = (await store.GetAfterAsync(key, null, 1, closedOnly: false, ct)).FirstOrDefault()?.OpenTimeUtc;
+        var end = earliest ?? key.Interval.OpenTimeAt(serverTime);
+        var start = key.Interval.OpenTimeAt(fromUtc);
+
+        var inserted = 0;
+        var rejected = 0;
+        var requests = 0;
+        while (start < end && requests < MaxRequests)
+        {
+            var klines = await client.GetKlinesAsync(key.Symbol, key.Interval, start, options.BatchSize, ct);
+            requests++;
+            if (klines.Count == 0)
+                break;
+
+            // Chỉ giữ phần trước nến sớm nhất đã có: không đụng tới nến đồng bộ thường đã lưu.
+            var candles = klines
+                .Where(kline => kline.OpenTimeUtc < end)
+                .Select(kline => kline.ToCandle(key, serverTime))
+                .ToList();
+            if (candles.Count > 0)
+            {
+                var issues = CandleSeriesValidator.Validate(candles, key.Interval);
+                foreach (var issue in issues)
+                    logger.LogWarning("Backfill {Key}: {Kind} tại {OpenTime:O} - {Detail}",
+                        key, issue.Kind, issue.OpenTimeUtc, issue.Detail);
+                var valid = CandleSeriesValidator.WithoutRejected(candles, issues);
+                rejected += candles.Count - valid.Count;
+                inserted += (await store.UpsertAsync(key, valid, ct)).Inserted;
+            }
+
+            if (klines.Count < options.BatchSize || candles.Count < klines.Count)
+                break;
+            start = klines[^1].OpenTimeUtc + key.Interval.Duration;
+        }
+
+        var first = (await store.GetAfterAsync(key, null, 1, closedOnly: false, ct)).FirstOrDefault()?.OpenTimeUtc;
+        var reachedLimit = requests >= MaxRequests && start < end;
+        logger.LogInformation("Backfill {Key} từ {From:O}: +{Inserted} nến, {Requests} request, sớm nhất {First:O}",
+            key, fromUtc, inserted, requests, first);
+        return new CandleBackfillResult(inserted, requests, rejected, first, reachedLimit);
+    }
+}
