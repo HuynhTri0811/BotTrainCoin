@@ -793,8 +793,17 @@ export interface BacktestBar {
   high: number;
   low: number;
   close: number;
-  /** null với cột thuộc phần warm-up. */
+  /** null với cột thuộc phần warm-up (và với chart chi tiết lệnh). */
   equity: number | null;
+  /** EMA nhanh/chậm tại nến cuối của cột; null khi chưa đủ nến hoặc lần chạy lưu trước khi có EMA. */
+  emaFast: number | null;
+  emaSlow: number | null;
+}
+
+/** Nến thật quanh một lệnh backtest (chart chi tiết lệnh). */
+export interface BacktestTradeChart {
+  candlesPerBar: number;
+  bars: BacktestBar[];
 }
 
 export interface BacktestMarker {
@@ -886,6 +895,9 @@ export const backtestApi = {
     }
   },
   get: (id: number) => getJson<BacktestResult>(`/api/backtests/${id}`),
+  /** `tradeIndex` theo thứ tự `trades`; bằng `trades.length` = lệnh còn mở ở cuối kỳ. */
+  tradeChart: (id: number, tradeIndex: number) =>
+    getJson<BacktestTradeChart>(`/api/backtests/${id}/trades/${tradeIndex}/chart`),
   setNote: (id: number, note: string) => sendJson<{ note: string | null }>('PUT', `/api/backtests/${id}/note`, { note }),
   remove: (id: number) => sendJson<null>('DELETE', `/api/backtests/${id}`),
 };
