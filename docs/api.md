@@ -139,10 +139,10 @@ Tiền tố `/api/strategies/{id}/backtest`. Chỉ mô phỏng, không đặt l�
 | Method | Đường dẫn | Tham số | Trả về |
 | --- | --- | --- | --- |
 | GET | `/coverage` | — | `firstOpenTimeUtc`, `lastOpenTimeUtc`: khoảng nến đã đóng đang có trong DB (null khi chưa có) |
-| POST | `/history` | Body `{ "fromUtc" }` | Tải nến Binance từ `fromUtc` đến trước nến sớm nhất đã lưu: `inserted`, `requests`, `rejectedCandles`, `firstOpenTimeUtc`, `reachedRequestLimit` (true thì gọi lại để tải tiếp). 400 khi DB chưa có nến nào của chiến lược (chờ đồng bộ nến chạy lần đầu), 409 khi đang có lần tải khác cho cùng cặp và khung nến, 503 khi sàn tạm lỗi |
-| POST | `/` | Body: `fromUtc?`, `toUtc?` (null = toàn bộ), `fastPeriod?`, `slowPeriod?`, `lookbackCandles?` (null = của chiến lược), `initialCapital`, `sizing` (`PercentOfEquity`/`FixedAmount`), `sizeValue`, `takeProfitPercent?`, `stopLossPercent?` (null = không dùng), `feePercent` | `parameters`, khoảng nến (`firstCandleUtc`, `lastCandleUtc`, `candleCount`, `warmupCandles`, `evaluatedCandles`, `skippedGapWindows`), `buySignals`, `sellSignals`, `statistics` (`totalTrades`, `wins`, `losses`, `winRatePercent`, `netProfit`, `netProfitPercent`, `grossProfit`, `grossLoss`, `profitFactor`, `totalFees`, `maxDrawdown`, `maxDrawdownPercent`, `endingEquity`, `buyAndHoldPercent`), `trades[]` (`exitReason`: `Signal`/`TakeProfit`/`StopLoss`), `openTrade`, `chart` (`candlesPerBar`, `bars[]` có `equity`, `markers[]` `Entry`/`Exit`). Tham số sai → 400 |
+| POST | `/history` | Body `{ "fromUtc" }` | Tải nến Binance từ `fromUtc` đến trước nến sớm nhất đã lưu: `inserted`, `requests`, `rejectedCandles`, `firstOpenTimeUtc`, `reachedRequestLimit` (true khi hết 1000 request mà chưa tới nến đã lưu; gọi lại để tải tiếp). 400 khi DB chưa có nến nào của chiến lược (chờ đồng bộ nến chạy lần đầu), 409 khi đang có lần tải khác cho cùng cặp và khung nến, 503 khi sàn tạm lỗi |
+| POST | `/` | Body: `fromUtc?`, `toUtc?` (null = toàn bộ), `fastPeriod?`, `slowPeriod?`, `lookbackCandles?` (null = của chiến lược), `initialCapital`, `sizing` (`PercentOfEquity`/`FixedAmount`), `sizeValue`, `takeProfitPercent?`, `stopLossPercent?` (null = không dùng), `feePercent` | `parameters`, khoảng nến (`firstCandleUtc`, `lastCandleUtc`, `candleCount`, `warmupCandles`, `evaluatedCandles`, `skippedGapWindows`), `buySignals`, `sellSignals`, `statistics` (`totalTrades`, `wins`, `losses`, `winRatePercent`, `netProfit`, `netProfitPercent`, `grossProfit`, `grossLoss`, `profitFactor`, `totalFees`, `maxDrawdown`, `maxDrawdownPercent`, `endingEquity`, `buyAndHoldPercent`), `trades[]` (`exitReason`: `Signal`/`TakeProfit`/`StopLoss`), `openTrade`, `chart` (`candlesPerBar`, `bars[]` có `equity`, `markers[]` `Entry`/`Exit`). 400 khi tham số sai, `lookbackCandles` > 1000, chiến lược không phải `EmaCross` hoặc tham số đã lưu hỏng, hay khoảng đã chọn không có nến (khi đó không lưu gì) |
 
-Mỗi lần `POST /` được lưu vào lịch sử; kết quả trả về có thêm `id`, `createdAtUtc`, `note`, `settings`.
+Mỗi lần `POST /` thành công được lưu vào lịch sử; kết quả trả về có thêm `id`, `createdAtUtc`, `note`, `settings`. Client hủy request thì lần chạy dừng giữa chừng và không được lưu.
 
 ### Lịch sử backtest
 
@@ -150,7 +150,8 @@ Tiền tố `/api/backtests`.
 
 | Method | Đường dẫn | Tham số | Trả về |
 | --- | --- | --- | --- |
-| GET | `/` | `strategyId?`, `limit` (100, 1–500) | Các lần chạy mới → cũ: `id`, `createdAtUtc`, `strategyId`, `symbol`, `interval`, `parameters`, `firstCandleUtc`, `lastCandleUtc`, `settings`, `totalTrades`, `winRatePercent`, `netProfit`, `netProfitPercent`, `maxDrawdownPercent`, `note` |
+| GET | `/` | `strategyId?`, `limit` (100, 1–500), `offset` (0) | Các lần chạy mới → cũ: `id`, `createdAtUtc`, `strategyId`, `symbol`, `interval`, `parameters`, `firstCandleUtc`, `lastCandleUtc`, `settings`, `totalTrades`, `winRatePercent`, `netProfit`, `netProfitPercent`, `maxDrawdownPercent`, `note` |
+| GET | `/count` | `strategyId?` | `{ "total" }`: tổng số lần chạy, để biết danh sách đã đủ chưa |
 | GET | `/{id}` | — | Kết quả đầy đủ như `POST /api/strategies/{id}/backtest`, không chạy lại |
 | PUT | `/{id}/note` | Body `{ "note" }` (null/trống = xóa, tối đa 500 ký tự) | `{ "note" }` |
 | DELETE | `/{id}` | — | 204 |

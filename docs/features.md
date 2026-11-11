@@ -410,18 +410,22 @@ UI: trang **Backtest** ([`BacktestPage.tsx`](../src/cryptobot-dashboard/src/page
 - **Chart:** nến kèm mũi tên vào lệnh/thoát lệnh (SELL, TP, SL khác màu) và đường tổng vốn. Quá 3000 nến thì backend gộp
   nến liên tiếp (OHLC đúng của cả nhóm) chỉ để hiển thị; thống kê vẫn tính trên từng nến gốc. Bảng lệnh xuất Excel.
 - **Tải lịch sử:** nút **Tải lịch sử từ Binance** tải nến cũ hơn nến sớm nhất đang có (không đụng phần đồng bộ thường),
-  tối đa 1000 request mỗi lần, một lần tải tại một thời điểm cho mỗi cặp và khung nến. DB chưa có nến nào thì phải chờ
+  tối đa 1000 request mỗi lần, một lần tải tại một thời điểm cho mỗi cặp và khung nến. Mọi bên ghi nến (đồng bộ
+  thường, nến 1d, tải lịch sử) upsert lần lượt theo cặp và khung nến (`CandleStore`), nên không chèn trùng nến. DB chưa có nến nào thì phải chờ
   đồng bộ thường chạy lần đầu. Nến 1h từ 2020 (≈ 58 nghìn nến) mất khoảng 16 giây; chạy
   backtest trên khoảng đó khoảng 4 giây.
 - **Giới hạn:** không trượt giá, độ sâu sổ lệnh, funding; không short; tối đa 400 nghìn nến mỗi lần chạy. Cửa sổ chứa
   khoảng nến thiếu của Binance (bảo trì) bị bỏ qua giống bot, nên có vài nghìn nến không được đánh giá trên nhiều năm.
-  Kết quả quá khứ không bảo đảm cho tương lai.
+  Cửa sổ EMA (`LookbackCandles`) tối đa 1000 khi backtest. Khoảng không có nến
+  thì báo lỗi, không lưu. Đóng tab hoặc bấm chạy lại thì lần chạy cũ dừng giữa chừng. Kết quả quá khứ không bảo đảm cho
+  tương lai.
 - **Lịch sử backtest:** mọi lần chạy được lưu tự động vào bảng `SavedBacktests`
   ([`SavedBacktest`](../src/CryptoBot.Domain/Backtesting/History/SavedBacktest.cs),
   [`BacktestHistoryService`](../src/CryptoBot.Application/Backtesting/History/BacktestHistoryService.cs)). Thông số và
   con số chính là cột riêng để liệt kê nhanh; toàn bộ kết quả (lệnh, chart gộp) lưu dạng JSON nén gzip (≈ 250 KB một
   lần chạy 1h nhiều năm, ≈ 700 KB với 15m; enum lưu dạng chữ). Card **Lịch sử backtest** trên trang: mở lại đầy đủ không cần chạy lại, so
-  sánh tối đa 4 lần cạnh nhau, sửa ghi chú tại chỗ, xóa, xuất Excel, lọc theo chiến lược đang chọn. Đường vốn từng nến
+  sánh tối đa 4 lần cạnh nhau, sửa ghi chú tại chỗ, xóa, lọc theo chiến lược đang chọn. Bảng hiện 200 lần mới nhất (tiêu đề ghi
+  "200 mới nhất / tổng" khi còn nhiều hơn); Xuất Excel tải đủ mọi lần chạy. Đường vốn từng nến
   không lưu, chỉ lưu bản gộp trên chart.
 - Bản Pine Script tương đương để đối chiếu trên TradingView:
   [`tools/tradingview/ema-cross-backtest.pine`](../tools/tradingview/ema-cross-backtest.pine).
