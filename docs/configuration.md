@@ -84,6 +84,7 @@ không tăng version. Cấu hình sai bị bỏ qua và ghi log lỗi.
 
 Tham số của `MyRsi`: `Period` (14), `Oversold` (30), `Overbought` (70), `TrendEmaPeriod` (0 = tắt),
 `PullbackLong` (40), `PullbackShort` (60), `LookbackCandles` (200).
+Tham số của `FlowRsi`: `Period` (14), `Oversold` (30), `Overbought` (70), `LookbackCandles` (200).
 Lỗi (loại không tồn tại, tham số sai tên/kiểu, `Validate()` trả lỗi, interval sai) hiện trong
 `GET /api/indicators` → `errors` và log.
 
