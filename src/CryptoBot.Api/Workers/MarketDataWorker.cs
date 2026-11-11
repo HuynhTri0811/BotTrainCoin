@@ -61,8 +61,7 @@ public sealed class MarketDataWorker(
         var delay = options.PollInterval;
         var enabled = instances.Where(instance => instance.Enabled).ToList();
 
-        var byKey = enabled.ToLookup(instance => new CandleKey(instance.Exchange, instance.Symbol,
-            CandleInterval.Parse(instance.Interval)));
+        var byKey = enabled.ToLookup(instance => CandleKey.For(instance));
         var keys = byKey.Select(group => group.Key).Concat(indicators.All.Select(indicator => indicator.Key))
             .Distinct();
 

@@ -205,12 +205,13 @@ export class ApiError extends Error {
   }
 }
 
-async function postJson<T>(url: string, body: unknown): Promise<T> {
+/** Gửi JSON bằng `method`; lỗi trả `ApiError` với chi tiết từ body. Body rỗng (204) trả `null`. */
+async function sendJson<T>(method: 'POST' | 'PUT' | 'DELETE', url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
-    method: 'POST',
+    method,
     cache: 'no-store',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
@@ -219,6 +220,8 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   }
   return data as T;
 }
+
+const postJson = <T,>(url: string, body: unknown) => sendJson<T>('POST', url, body);
 
 export const futuresApi = {
   account: () => getJson<FuturesAccount>('/api/paper/futures/account'),
@@ -704,4 +707,180 @@ export const newsApi = {
     return getJson<NewsList>(`/api/news?${params}`);
   },
   sync: () => postJson<{ added: number; errors: string[] }>('/api/news/sync', {}),
+};
+
+// ---- Backtest chiến lược trên nến lịch sử (chỉ mô phỏng, không đặt lệnh) ----
+
+export type PositionSizing = 'PercentOfEquity' | 'FixedAmount';
+export type BacktestExitReason = 'Signal' | 'TakeProfit' | 'StopLoss';
+
+export interface BacktestCoverage {
+  firstOpenTimeUtc: string | null;
+  lastOpenTimeUtc: string | null;
+}
+
+export interface BackfillResult {
+  inserted: number;
+  requests: number;
+  rejectedCandles: number;
+  firstOpenTimeUtc: string | null;
+  /** true: dừng vì chạm giới hạn số request mỗi lần, bấm tải lại để tải tiếp. */
+  reachedRequestLimit: boolean;
+}
+
+/** Số tiền gửi dạng chuỗi để không mất chính xác qua JSON number. Để null = dùng mặc định / không dùng. */
+export interface BacktestRequest {
+  fromUtc: string | null;
+  toUtc: string | null;
+  fastPeriod: number | null;
+  slowPeriod: number | null;
+  lookbackCandles: number | null;
+  initialCapital: string;
+  sizing: PositionSizing;
+  sizeValue: string;
+  takeProfitPercent: string | null;
+  stopLossPercent: string | null;
+  feePercent: string;
+}
+
+export interface BacktestStatistics {
+  totalTrades: number;
+  wins: number;
+  losses: number;
+  winRatePercent: number;
+  netProfit: number;
+  netProfitPercent: number;
+  grossProfit: number;
+  grossLoss: number;
+  /** null khi chưa có lệnh lỗ. */
+  profitFactor: number | null;
+  totalFees: number;
+  maxDrawdown: number;
+  maxDrawdownPercent: number;
+  endingEquity: number;
+  buyAndHoldPercent: number;
+}
+
+export interface BacktestTrade {
+  entryTimeUtc: string;
+  entryPrice: number;
+  exitTimeUtc: string;
+  exitPrice: number;
+  quantity: number;
+  fees: number;
+  netPnl: number;
+  returnPercent: number;
+  exitReason: BacktestExitReason;
+}
+
+export interface BacktestOpenTrade {
+  entryTimeUtc: string;
+  entryPrice: number;
+  quantity: number;
+  entryFee: number;
+  markPrice: number;
+  unrealizedPnl: number;
+}
+
+export interface BacktestBar {
+  time: number; // Unix seconds, UTC
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  /** null với cột thuộc phần warm-up. */
+  equity: number | null;
+}
+
+export interface BacktestMarker {
+  /** Trùng `time` của cột chứa nến khớp lệnh. */
+  time: number;
+  kind: 'Entry' | 'Exit';
+  price: number;
+  exitReason: BacktestExitReason | null;
+  netPnl: number | null;
+}
+
+export interface BacktestSettings {
+  initialCapital: number;
+  sizing: PositionSizing;
+  sizeValue: number;
+  takeProfitPercent: number | null;
+  stopLossPercent: number | null;
+  feePercent: number;
+}
+
+/** Một lần backtest đã lưu (mọi lần chạy đều được lưu). */
+export interface BacktestSummary {
+  id: number;
+  createdAtUtc: string;
+  strategyId: number;
+  symbol: string;
+  interval: string;
+  parameters: StrategyParameters;
+  firstCandleUtc: string | null;
+  lastCandleUtc: string | null;
+  settings: BacktestSettings;
+  totalTrades: number;
+  winRatePercent: number;
+  netProfit: number;
+  netProfitPercent: number;
+  maxDrawdownPercent: number;
+  note: string | null;
+}
+
+export interface BacktestResult {
+  /** Id của bản lưu trong lịch sử. */
+  id: number;
+  createdAtUtc: string;
+  note: string | null;
+  strategyId: number;
+  symbol: string;
+  interval: string;
+  parameters: StrategyParameters;
+  settings: BacktestSettings;
+  firstCandleUtc: string | null;
+  lastCandleUtc: string | null;
+  candleCount: number;
+  warmupCandles: number;
+  evaluatedCandles: number;
+  skippedGapWindows: number;
+  buySignals: number;
+  sellSignals: number;
+  statistics: BacktestStatistics;
+  trades: BacktestTrade[];
+  openTrade: BacktestOpenTrade | null;
+  /** Mỗi cột gộp `candlesPerBar` nến liên tiếp khi khoảng thời gian dài. */
+  chart: { candlesPerBar: number; bars: BacktestBar[]; markers: BacktestMarker[] };
+}
+
+/** Số dòng tối đa mỗi lần gọi `/api/backtests` (BacktestHistoryService.MaxListLimit). */
+const BACKTEST_PAGE_LIMIT = 500;
+
+export const backtestApi = {
+  coverage: (strategyId: number) => getJson<BacktestCoverage>(`/api/strategies/${strategyId}/backtest/coverage`),
+  history: (strategyId: number, fromUtc: string) =>
+    postJson<BackfillResult>(`/api/strategies/${strategyId}/backtest/history`, { fromUtc }),
+  /** Chạy và lưu vào lịch sử. */
+  run: (strategyId: number, request: BacktestRequest) =>
+    postJson<BacktestResult>(`/api/strategies/${strategyId}/backtest`, request),
+  list: (strategyId?: number, limit = 200, offset = 0) =>
+    getJson<BacktestSummary[]>(
+      `/api/backtests?limit=${limit}&offset=${offset}${strategyId === undefined ? '' : `&strategyId=${strategyId}`}`,
+    ),
+  /** Tổng số lần chạy: `list` chỉ trả một trang. */
+  count: (strategyId?: number) =>
+    getJson<{ total: number }>(`/api/backtests/count${strategyId === undefined ? '' : `?strategyId=${strategyId}`}`),
+  /** Mọi lần chạy, đọc theo trang tối đa của API (dùng cho Xuất Excel). */
+  listAll: async (strategyId?: number) => {
+    const all: BacktestSummary[] = [];
+    for (;;) {
+      const page = await backtestApi.list(strategyId, BACKTEST_PAGE_LIMIT, all.length);
+      all.push(...page);
+      if (page.length < BACKTEST_PAGE_LIMIT) return all;
+    }
+  },
+  get: (id: number) => getJson<BacktestResult>(`/api/backtests/${id}`),
+  setNote: (id: number, note: string) => sendJson<{ note: string | null }>('PUT', `/api/backtests/${id}/note`, { note }),
+  remove: (id: number) => sendJson<null>('DELETE', `/api/backtests/${id}`),
 };
