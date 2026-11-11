@@ -10,6 +10,7 @@ BotTrainCoin/
 ├── dotnet-tools.json             # Tool cục bộ: dotnet-ef 10.0.13 (chạy `dotnet tool restore`)
 ├── README.md                     # Trang vào: chạy nhanh + link tới docs
 ├── docs/                         # Tài liệu (file này)
+│   └── analysis/                 # Báo cáo phân tích, mỗi báo cáo một thư mục: README.md + data/ + scripts/ Python
 ├── data/                         # Dữ liệu cục bộ (CSV, backup .db) — bị .gitignore, không commit
 ├── src/
 │   ├── CryptoBot.Domain/         # Nghiệp vụ thuần túy, không phụ thuộc gì
@@ -82,6 +83,9 @@ CryptoBot.Domain/
 │   │   └── MonthlyChangeReport.cs, MonthChange.cs, YearChange.cs, MonthOfYearStats.cs
 │   ├── SimilarDays/              # Dự báo "ngày tương tự"
 │   │   └── SimilarDaysForecast.cs, SimilarDaysBacktest.cs
+│   ├── StockMarkets/             # Giờ mở cửa sàn chứng khoán Mỹ, Anh, Nhật, Hàn, Việt Nam
+│   │   └── StockMarket.cs, StockMarkets.cs (danh sách sàn), StockMarketHolidays.cs (ngày lễ), MarketOpening.cs,
+│   │       MarketOpenings.cs (Between, ByCandle, Next, AppliesTo), TimeZoneCache.cs (internal)
 │   └── Enums/                    # CandleIssueKind, ForecastLean, VolumePressureSide
 ├── Strategies/
 │   ├── Contracts/                # IStrategy, StrategyContext, StrategyDecision,

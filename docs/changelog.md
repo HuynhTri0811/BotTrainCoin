@@ -3,6 +3,21 @@
 Những gì đã làm, theo PR đã merge vào `develop`, mới nhất ở trên. Số trong ngoặc là issue.
 Chi tiết từng tính năng: [features.md](features.md).
 
+## 2026-11-10
+
+- **#145 Đánh dấu giờ mở cửa sàn chứng khoán trên bảng Dự đoán** (#144). `MarketOpenings` tìm các lần mở cửa của sàn
+  Nhật, Hàn, Việt Nam, Anh, Mỹ trong một khoảng thời gian, có tính giờ mùa hè. Bảng Dự đoán có cột Mở cửa, bộ lọc theo
+  sàn, cột trong file Excel, và cảnh báo khi nến kế tiếp có sàn mở cửa. Sửa theo review (#146–#152): dashboard dựng
+  phần giờ mở cửa từ danh sách sàn API trả về và ẩn nó khi khung là 1d; múi giờ tra lúc tính, thiếu dữ liệu múi giờ thì
+  dự đoán vẫn chạy; giờ mở cửa tính một lần cho cả bảng; thêm ngày nghỉ lễ 2026–2027 cho Mỹ, Anh, Nhật và 2026 cho
+  Hàn, Việt Nam.
+
+- **#143 Hiện 300 lần đoán gần nhất và báo cáo phân tích** (#142). Bảng Dự đoán và bảng tín hiệu gần nhất của chỉ báo
+  hiện tối đa 300 dòng thay vì 20. Thêm báo cáo
+  [analysis/btc-prediction-and-rebounds](analysis/btc-prediction-and-rebounds/README.md): vì sao hàm dự đoán chỉ đúng
+  khoảng 50%, nhịp hồi sau nến 1h sập, DCA định kỳ và bot DCA trên một năm nến BTCUSDT; kèm dữ liệu Binance và script
+  Python chạy lại. `.gitignore` cho phép `docs/analysis/*/data/`.
+
 ## 2026-11-08
 
 - **#130 Mỗi file một kiểu, chia thư mục con theo chức năng** (#131–#140). Thêm XML doc cho `FuturesMath`, các kiểu

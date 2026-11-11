@@ -224,8 +224,38 @@ UI: [`PredictionCard.tsx`](../src/cryptobot-dashboard/src/features/prediction/Pr
 - Trọng số trong [`PredictorSettings`](../src/CryptoBot.Domain/Prediction/DirectionPredictor/PriceDirectionPredictor.cs); đặt trọng số
   = 0 để tắt một thành phần. Sửa rồi restart API là thấy kết quả mới.
 - Kèm `Backtest`: với mỗi nến, chỉ dùng các nến trước nó để đoán (`PredictAt`), so với thực tế, bỏ qua nến đóng bằng
-  đúng giá nến trước. Dashboard hiện tỷ lệ đúng và các lần đoán gần nhất.
+  đúng giá nến trước. Dashboard hiện tỷ lệ đúng và 300 lần đoán gần nhất (bảng phân trang 10 dòng).
 - Chọn **Nến kế tiếp** (theo khung của chiến lược) hoặc **Theo ngày** (`1d`, nến ngày Binance).
+- **Giờ mở cửa sàn chứng khoán** ([`MarketOpenings`](../src/CryptoBot.Domain/MarketData/StockMarkets/MarketOpenings.cs)):
+  mỗi nến trong bảng có cột Mở cửa, ghi sàn nào mở cửa trong nến đó, có bộ lọc theo sàn và cột trong file Excel. Nến
+  kế tiếp có sàn mở cửa thì hiện cảnh báo dưới hướng dự đoán. Dưới bảng có lần mở cửa kế tiếp của từng sàn theo giờ
+  Việt Nam. Bộ lọc, màu thẻ và ghi chú dựng từ danh sách sàn API trả về (`markets`), không chép tay trong dashboard.
+  Các sàn, từ Thứ Hai đến Thứ Sáu trừ ngày lễ:
+
+  | Sàn | Giờ địa phương | Giờ Việt Nam |
+  | --- | --- | --- |
+  | Nhật (TSE) | 09:00 Tokyo | 07:00 |
+  | Hàn (KRX) | 09:00 Seoul | 07:00 |
+  | Việt Nam (HOSE) | 09:00, phiên ATO | 09:00 |
+  | Anh (LSE) | 08:00 London | 14:00 mùa hè, 15:00 mùa đông |
+  | Mỹ (NYSE) | 09:30 New York | 20:30 mùa hè, 21:30 mùa đông |
+
+  - Giờ mùa hè tính theo múi giờ IANA của từng sàn, ngày mở cửa tính theo giờ địa phương của sàn. Múi giờ tra lúc
+    tính, không lúc khởi động: máy thiếu dữ liệu múi giờ thì API ghi cảnh báo và trả dự đoán không kèm giờ mở cửa.
+  - Chỉ đánh dấu nến ngắn hơn một ngày (`MarketOpenings.AppliesTo`); nến ngày luôn chứa đủ các sàn. API tính giờ mở
+    cửa một lần cho cả bảng rồi chia theo nến (`MarketOpenings.ByCandle`).
+  - Ngày nghỉ lễ trong [`StockMarketHolidays`](../src/CryptoBot.Domain/MarketData/StockMarkets/StockMarketHolidays.cs):
+
+    | Sàn | Đã có | Nguồn và ghi chú |
+    | --- | --- | --- |
+    | Mỹ | 2026–2027 | Thông báo lịch nghỉ của NYSE Group ngày 23/12/2025 |
+    | Anh | 2026–2027 | Ngày nghỉ ngân hàng của Anh, kể cả nghỉ bù |
+    | Nhật | 2026–2027 | Ngày lễ quốc gia, nghỉ bù và nghỉ cuối năm 31/12 đến 03/01 của TSE |
+    | Hàn | 2026 | Chỉ các ngày mọi nguồn thống nhất. Chưa ghi 02/03, 01/05, 25/05, 03/06, 17/08, 05/10 vì nguồn mâu thuẫn |
+    | Việt Nam | 2026 | Thông báo 2294/TB-SGDHCM của HOSE. Chưa ghi 02/01 vì nguồn mâu thuẫn |
+
+    Sau năm cuối cùng đã có, mọi ngày thường đều tính là mở cửa. Mỗi năm cần thêm lịch mới và nâng
+    `HolidaysKnownThroughYear` trong `StockMarkets`.
 
 ## 11. Tỷ lệ đúng tín hiệu chỉ báo
 
@@ -235,6 +265,7 @@ UI: [`IndicatorAccuracyCard.tsx`](../src/cryptobot-dashboard/src/features/predic
 - Với mỗi chỉ báo tự viết cùng symbol/khung: sau 1, 3, 6, 12 nến, giá có đi đúng hướng tín hiệu Long/Short không, và
   trung bình đi được bao nhiêu % theo hướng tín hiệu (âm = đi ngược). Tín hiệu quá gần cuối chuỗi không được chấm ở
   mốc chưa đủ nến.
+- Bảng tín hiệu gần nhất của mỗi chỉ báo hiện tối đa 300 tín hiệu, dùng chung giới hạn với bảng Dự đoán.
 
 ## 12. Nến ngày lịch sử từ 2016 (Bitfinex)
 
