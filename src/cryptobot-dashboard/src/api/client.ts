@@ -705,3 +705,123 @@ export const newsApi = {
   },
   sync: () => postJson<{ added: number; errors: string[] }>('/api/news/sync', {}),
 };
+
+// ---- Backtest chiến lược trên nến lịch sử (chỉ mô phỏng, không đặt lệnh) ----
+
+export type PositionSizing = 'PercentOfEquity' | 'FixedAmount';
+export type BacktestExitReason = 'Signal' | 'TakeProfit' | 'StopLoss';
+
+export interface BacktestCoverage {
+  firstOpenTimeUtc: string | null;
+  lastOpenTimeUtc: string | null;
+}
+
+export interface BackfillResult {
+  inserted: number;
+  requests: number;
+  rejectedCandles: number;
+  firstOpenTimeUtc: string | null;
+  /** true: dừng vì chạm giới hạn số request mỗi lần, bấm tải lại để tải tiếp. */
+  reachedRequestLimit: boolean;
+}
+
+/** Số tiền gửi dạng chuỗi để không mất chính xác qua JSON number. Để null = dùng mặc định / không dùng. */
+export interface BacktestRequest {
+  fromUtc: string | null;
+  toUtc: string | null;
+  fastPeriod: number | null;
+  slowPeriod: number | null;
+  lookbackCandles: number | null;
+  initialCapital: string;
+  sizing: PositionSizing;
+  sizeValue: string;
+  takeProfitPercent: string | null;
+  stopLossPercent: string | null;
+  feePercent: string;
+}
+
+export interface BacktestStatistics {
+  totalTrades: number;
+  wins: number;
+  losses: number;
+  winRatePercent: number;
+  netProfit: number;
+  netProfitPercent: number;
+  grossProfit: number;
+  grossLoss: number;
+  /** null khi chưa có lệnh lỗ. */
+  profitFactor: number | null;
+  totalFees: number;
+  maxDrawdown: number;
+  maxDrawdownPercent: number;
+  endingEquity: number;
+  buyAndHoldPercent: number;
+}
+
+export interface BacktestTrade {
+  entryTimeUtc: string;
+  entryPrice: number;
+  exitTimeUtc: string;
+  exitPrice: number;
+  quantity: number;
+  fees: number;
+  netPnl: number;
+  returnPercent: number;
+  exitReason: BacktestExitReason;
+}
+
+export interface BacktestOpenTrade {
+  entryTimeUtc: string;
+  entryPrice: number;
+  quantity: number;
+  entryFee: number;
+  markPrice: number;
+  unrealizedPnl: number;
+}
+
+export interface BacktestBar {
+  time: number; // Unix seconds, UTC
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  /** null với cột thuộc phần warm-up. */
+  equity: number | null;
+}
+
+export interface BacktestMarker {
+  /** Trùng `time` của cột chứa nến khớp lệnh. */
+  time: number;
+  kind: 'Entry' | 'Exit';
+  price: number;
+  exitReason: BacktestExitReason | null;
+  netPnl: number | null;
+}
+
+export interface BacktestResult {
+  strategyId: number;
+  symbol: string;
+  interval: string;
+  parameters: StrategyParameters;
+  firstCandleUtc: string | null;
+  lastCandleUtc: string | null;
+  candleCount: number;
+  warmupCandles: number;
+  evaluatedCandles: number;
+  skippedGapWindows: number;
+  buySignals: number;
+  sellSignals: number;
+  statistics: BacktestStatistics;
+  trades: BacktestTrade[];
+  openTrade: BacktestOpenTrade | null;
+  /** Mỗi cột gộp `candlesPerBar` nến liên tiếp khi khoảng thời gian dài. */
+  chart: { candlesPerBar: number; bars: BacktestBar[]; markers: BacktestMarker[] };
+}
+
+export const backtestApi = {
+  coverage: (strategyId: number) => getJson<BacktestCoverage>(`/api/strategies/${strategyId}/backtest/coverage`),
+  history: (strategyId: number, fromUtc: string) =>
+    postJson<BackfillResult>(`/api/strategies/${strategyId}/backtest/history`, { fromUtc }),
+  run: (strategyId: number, request: BacktestRequest) =>
+    postJson<BacktestResult>(`/api/strategies/${strategyId}/backtest`, request),
+};
