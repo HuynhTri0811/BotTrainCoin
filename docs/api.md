@@ -132,6 +132,16 @@ Mỗi báo cáo: `symbol`, `interval`, `createdAtUtc`, `report` gồm `fromUtc`,
 | GET | `/api/news` | `coin?` (`BTC`/`ETH`/`ETC`), `source?` (tên nguồn), `search?` (tìm trong tiêu đề và tóm tắt, không phân biệt hoa thường với chữ không dấu), `fromUtc?`, `toUtc?` (ISO 8601, lọc giờ đăng trong [from, to)), `limit` (50, 1–200) | `coins[]`, `sources[]`, `pollIntervalHours`, `articles[]` mới → cũ: `id`, `source`, `title`, `url`, `summary`, `coins[]`, `publishedAtUtc` |
 | POST | `/api/news/sync` | — | Đồng bộ ngay: `added`, `errors[]` (lỗi theo nguồn) |
 
+## Backtest — [`BacktestEndpoints.cs`](../src/CryptoBot.Api/Endpoints/Backtesting/BacktestEndpoints.cs)
+
+Tiền tố `/api/strategies/{id}/backtest`. Chỉ mô phỏng, không đặt lệnh nào. Không có chiến lược `{id}` → 404.
+
+| Method | Đường dẫn | Tham số | Trả về |
+| --- | --- | --- | --- |
+| GET | `/coverage` | — | `firstOpenTimeUtc`, `lastOpenTimeUtc`: khoảng nến đã đóng đang có trong DB (null khi chưa có) |
+| POST | `/history` | Body `{ "fromUtc" }` | Tải nến Binance từ `fromUtc` đến trước nến sớm nhất đã lưu: `inserted`, `requests`, `rejectedCandles`, `firstOpenTimeUtc`, `reachedRequestLimit` (true thì gọi lại để tải tiếp). 409 khi đang có lần tải khác, 503 khi sàn tạm lỗi |
+| POST | `/` | Body: `fromUtc?`, `toUtc?` (null = toàn bộ), `fastPeriod?`, `slowPeriod?`, `lookbackCandles?` (null = của chiến lược), `initialCapital`, `sizing` (`PercentOfEquity`/`FixedAmount`), `sizeValue`, `takeProfitPercent?`, `stopLossPercent?` (null = không dùng), `feePercent` | `parameters`, khoảng nến (`firstCandleUtc`, `lastCandleUtc`, `candleCount`, `warmupCandles`, `evaluatedCandles`, `skippedGapWindows`), `buySignals`, `sellSignals`, `statistics` (`totalTrades`, `wins`, `losses`, `winRatePercent`, `netProfit`, `netProfitPercent`, `grossProfit`, `grossLoss`, `profitFactor`, `totalFees`, `maxDrawdown`, `maxDrawdownPercent`, `endingEquity`, `buyAndHoldPercent`), `trades[]` (`exitReason`: `Signal`/`TakeProfit`/`StopLoss`), `openTrade`, `chart` (`candlesPerBar`, `bars[]` có `equity`, `markers[]` `Entry`/`Exit`). Tham số sai → 400 |
+
 ## Thêm endpoint mới
 
 Xem [extending.md → Thêm endpoint](extending.md#3-thêm-một-endpoint) và cập nhật bảng trong file này.

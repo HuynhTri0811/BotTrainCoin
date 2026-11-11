@@ -12,6 +12,7 @@ BotTrainCoin/
 ├── docs/                         # Tài liệu (file này)
 │   └── analysis/                 # Báo cáo phân tích, mỗi báo cáo một thư mục: README.md + data/ + scripts/ Python
 ├── data/                         # Dữ liệu cục bộ (CSV, backup .db) — bị .gitignore, không commit
+├── tools/tradingview/            # Bản Pine Script của chiến lược EMA để đối chiếu trên TradingView
 ├── src/
 │   ├── CryptoBot.Domain/         # Nghiệp vụ thuần túy, không phụ thuộc gì
 │   ├── CryptoBot.Application/    # Service điều phối + interface (port)
@@ -38,6 +39,7 @@ domain rất dễ đoán:
 | Chiến lược, tín hiệu | `Strategies/` | `Signals/` | `Bot/` | `pages/SignalsPage.tsx` |
 | Chỉ báo tự viết | `Indicators/` | `Indicators/` | `Indicators/` | (trong `features/market/CandleChart.tsx`) |
 | Paper futures + lệnh tự động | `Futures/` | `Futures/` | `PaperFutures/`, `AutoOrders/` | `features/futures/`, `features/auto/` |
+| Backtest | `Backtesting/` | `Backtesting/`, `MarketData/Backfill/` | `Backtesting/` | `pages/BacktestPage.tsx`, `features/backtest/` |
 | Giá trực tiếp, biên độ, ngày tương tự | `MarketData/` (công thức) | `LivePrices/` | `LivePrices/` | `features/live/` |
 | Dự đoán, độ chính xác | `Prediction/` | — | `Prediction/` | `features/prediction/` |
 | Báo cáo biến động hằng ngày | `MarketData/DailyMove/` (công thức, entity) | `Reports/` | `Reports/` | `features/reports/`, `pages/ReportsPage.tsx` |

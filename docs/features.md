@@ -25,7 +25,8 @@ Chế độ cố định của bot: `DecisionMode = SignalOnly`, `Environment = 
 15. [Trạng thái, health check, log](#15-trạng-thái-health-check-log)
 16. [Báo cáo biến động hằng ngày](#16-báo-cáo-biến-động-hằng-ngày)
 17. [Tin tức (RSS, mỗi 5 giờ)](#17-tin-tức-rss-mỗi-5-giờ)
-18. [Chưa làm / giới hạn đã biết](#18-chưa-làm--giới-hạn-đã-biết)
+18. [Backtest chiến lược EMA](#18-backtest-chiến-lược-ema)
+19. [Chưa làm / giới hạn đã biết](#19-chưa-làm--giới-hạn-đã-biết)
 
 ---
 
@@ -300,7 +301,7 @@ UI: trang **Lịch sử theo tháng** ([`HistoryPage.tsx`](../src/cryptobot-dash
 **Code:** [`src/cryptobot-dashboard`](../src/cryptobot-dashboard). Chi tiết thư mục ở
 [folder-structure.md](folder-structure.md#srccryptobot-dashboard--frontend).
 
-- Menu trái 7 trang: Biểu đồ, Giao dịch Paper, Dự đoán, Tín hiệu, Lịch sử theo tháng, Báo cáo ngày, Tin tức. Trang
+- Menu trái 8 trang: Biểu đồ, Giao dịch Paper, Dự đoán, Tín hiệu, Backtest, Lịch sử theo tháng, Báo cáo ngày, Tin tức. Trang
   hiện tại nằm trong `#hash` (tải lại hoặc gửi link vẫn mở đúng trang).
 - Nút chọn chiến lược (`BTCUSDT 1h`, `BTCUSDT 15m`, …) ở góc phải; các trang (trừ Lịch sử, Báo cáo ngày, Tin tức)
   dùng symbol/khung của chiến lược đang chọn.
@@ -384,7 +385,40 @@ UI: trang **Tin tức** ([`NewsPage.tsx`](../src/cryptobot-dashboard/src/pages/N
 - **Giới hạn:** feed chỉ giữ 20–60 bài mới nhất; nguồn đăng dày có thể đẩy bài ra khỏi feed trước lượt đồng bộ sau
   5 giờ, nên có thể lỡ một ít bài. Không dịch, không tóm tắt bằng AI, không đánh giá tin tốt/xấu.
 
-## 18. Chưa làm / giới hạn đã biết
+## 18. Backtest chiến lược EMA
+
+**Code:** [`Backtester`](../src/CryptoBot.Domain/Backtesting/Engine/Backtester.cs),
+[`BacktestSettings`](../src/CryptoBot.Domain/Backtesting/Settings/BacktestSettings.cs),
+[`BacktestStatistics`](../src/CryptoBot.Domain/Backtesting/Results/BacktestStatistics.cs),
+[`BacktestService`](../src/CryptoBot.Application/Backtesting/BacktestService.cs),
+[`CandleBackfillService`](../src/CryptoBot.Application/MarketData/Backfill/CandleBackfillService.cs),
+[`BacktestEndpoints`](../src/CryptoBot.Api/Endpoints/Backtesting/BacktestEndpoints.cs).
+UI: trang **Backtest** ([`BacktestPage.tsx`](../src/cryptobot-dashboard/src/pages/BacktestPage.tsx),
+[`features/backtest/`](../src/cryptobot-dashboard/src/features/backtest)).
+
+- **Tín hiệu giữ nguyên như bot:** mỗi nến gọi đúng `EmaCrossStrategy.Evaluate` với cửa sổ `LookbackCandles` nến,
+  bỏ qua cửa sổ có nến thiếu (`CandleWindow.HasGap`, dùng chung với `SignalEvaluationService`), trạng thái "đang giữ"
+  theo chuỗi tín hiệu. Đã đối chiếu: 60/60 tín hiệu bot đã ghi cho BTCUSDT 1h trùng với backtest cùng khoảng.
+- **Khớp lệnh (thận trọng):** chỉ Long, không đòn bẩy. Tín hiệu lúc nến đóng → khớp ở **giá mở nến kế tiếp**. TP/SL
+  tính từ giá vào thực tế, xét theo High/Low từng nến (cả nến vừa vào); nến chạm cả hai → tính **SL**; giá mở nhảy qua
+  mức → khớp ở giá mở. TP/SL **không đổi chuỗi BUY/SELL**: sau khi TP/SL đóng lệnh, lệnh mới chỉ mở ở BUY kế tiếp.
+- **Vốn và rủi ro:** vốn ban đầu, khối lượng theo % tiền mặt hoặc USDT cố định (không vượt tiền mặt sau phí),
+  TP %, SL % (bật/tắt riêng), phí % mỗi lần khớp. Tham số EMA mặc định là của chiến lược, đổi được khi chạy.
+- **Thống kê:** số lệnh đã đóng, thắng/thua (thắng = lãi sau phí), tỷ lệ thắng, lợi nhuận ròng sau phí, Max Drawdown
+  (tiền và %, theo tổng vốn ở giá đóng từng nến), profit factor, tổng phí, vốn cuối, mua-và-giữ cùng kỳ. Lệnh còn mở ở
+  nến cuối được báo riêng, không tính vào số lệnh và lợi nhuận ròng.
+- **Chart:** nến kèm mũi tên vào lệnh/thoát lệnh (SELL, TP, SL khác màu) và đường tổng vốn. Quá 3000 nến thì backend gộp
+  nến liên tiếp (OHLC đúng của cả nhóm) chỉ để hiển thị; thống kê vẫn tính trên từng nến gốc. Bảng lệnh xuất Excel.
+- **Tải lịch sử:** nút **Tải lịch sử từ Binance** tải nến cũ hơn nến sớm nhất đang có (không đụng phần đồng bộ thường),
+  tối đa 1000 request mỗi lần, một lần tải tại một thời điểm. Nến 1h từ 2020 (≈ 58 nghìn nến) mất khoảng 16 giây; chạy
+  backtest trên khoảng đó khoảng 4 giây.
+- **Giới hạn:** không trượt giá, độ sâu sổ lệnh, funding; không short; tối đa 400 nghìn nến mỗi lần chạy. Cửa sổ chứa
+  khoảng nến thiếu của Binance (bảo trì) bị bỏ qua giống bot, nên có vài nghìn nến không được đánh giá trên nhiều năm.
+  Kết quả quá khứ không bảo đảm cho tương lai.
+- Bản Pine Script tương đương để đối chiếu trên TradingView:
+  [`tools/tradingview/ema-cross-backtest.pine`](../tools/tradingview/ema-cross-backtest.pine).
+
+## 19. Chưa làm / giới hạn đã biết
 
 | Hạng mục | Hiện trạng |
 | --- | --- |
