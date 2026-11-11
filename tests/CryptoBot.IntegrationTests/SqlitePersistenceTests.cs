@@ -1,7 +1,9 @@
 using CryptoBot.Application.Abstractions;
+using CryptoBot.Application.Backtesting;
 using CryptoBot.Application.Futures;
 using CryptoBot.Application.News;
 using CryptoBot.Application.Signals;
+using CryptoBot.Domain.Backtesting;
 using CryptoBot.Domain.Futures;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.News;
@@ -96,6 +98,21 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
             var closed = await new CandleStore(db).GetAfterAsync(Key, T0, 10, closedOnly: true, default);
             Assert.Equal(T0 + TimeSpan.FromHours(1), Assert.Single(closed).OpenTimeUtc);
         }
+    }
+
+    [Fact]
+    public async Task Upsert_stops_tracking_the_batch_after_saving()
+    {
+        await using var db = NewContext();
+        var store = new CandleStore(db);
+
+        await store.UpsertAsync(Key, [MakeCandle(0, 10), MakeCandle(1, 20, closed: false)], default);
+        await store.UpsertAsync(Key, [MakeCandle(1, 21), MakeCandle(2, 30)], default);
+
+        // Tải lịch sử gọi hàng trăm lô qua cùng một context: không lô nào được giữ lại.
+        Assert.Empty(db.ChangeTracker.Entries());
+        var all = await store.GetLatestAsync(Key, null, 10, closedOnly: false, default);
+        Assert.Equal([10m, 21m, 30m], all.Select(candle => candle.Close));
     }
 
     [Fact]
@@ -224,6 +241,49 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
 
             db.DailyReports.Add(Report("BTCUSDT", 2));
             await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        }
+    }
+
+    [Fact]
+    public async Task Saved_backtest_lists_summaries_newest_first_and_keeps_content_and_note()
+    {
+        var settings = new BacktestSettings(1000m, PositionSizing.FixedAmount, 100m, null, 2.5m, 0.1m);
+        var statistics = new BacktestStatistics(3, 1, 2, 33.3333333333333333333333333m, -1.23456789m, -0.123456789m,
+            2m, 3.23456789m, 0.6183m, 0.6m, 4m, 0.4m, 998.76543211m, 12m);
+        SavedBacktest Saved(int strategyId, int minute) =>
+            new(T0.AddMinutes(minute), strategyId, "BTCUSDT", "1h", 9, 21, 300, T0, T0.AddDays(10), settings,
+                statistics, [1, 2, 3, 4]);
+
+        await using (var db = NewContext())
+        {
+            db.SavedBacktests.AddRange(Saved(1, 1), Saved(1, 2), Saved(2, 3));
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = NewContext())
+        {
+            var store = new BacktestStore(db);
+            var all = await store.ListAsync(null, 10, default);
+            Assert.Equal([T0.AddMinutes(3), T0.AddMinutes(2), T0.AddMinutes(1)],
+                all.Select(summary => summary.CreatedAtUtc));
+            Assert.Equal(settings, all[0].Settings);
+            Assert.Equal(statistics.NetProfit, all[0].NetProfit);
+            Assert.Equal(statistics.WinRatePercent, all[0].WinRatePercent);
+            Assert.Equal(2, (await store.ListAsync(1, 10, default)).Count);
+
+            var first = (await store.GetAsync(all[2].Id, default))!;
+            Assert.Equal([1, 2, 3, 4], first.Content);
+            Assert.True(await store.SetNoteAsync(first.Id, "phí maker", default));
+            Assert.True(await store.DeleteAsync(all[0].Id, default));
+            Assert.False(await store.DeleteAsync(all[0].Id, default));
+            Assert.False(await store.SetNoteAsync(999, "x", default));
+        }
+
+        await using (var db = NewContext())
+        {
+            var remaining = await new BacktestStore(db).ListAsync(null, 10, default);
+            Assert.Equal(2, remaining.Count);
+            Assert.Equal("phí maker", remaining[^1].Note);
         }
     }
 

@@ -73,6 +73,10 @@ public sealed class CandleStore(BotDbContext db) : ICandleStore
         }
 
         await db.SaveChangesAsync(ct);
+        // Thôi theo dõi nến của lô: tải lịch sử gọi hàng trăm lô qua cùng một DbContext, nếu giữ lại thì mỗi
+        // SaveChanges sau phải quét lại mọi nến trước đó.
+        foreach (var candle in existing.Values)
+            db.Entry(candle).State = EntityState.Detached;
         return new UpsertResult(inserted, updated, unchanged, conflicts);
     }
 

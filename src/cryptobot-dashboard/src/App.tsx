@@ -3,6 +3,7 @@ import { Alert, Layout, Menu, Segmented, Space, Spin, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api/client';
 import { StatusBar } from './components/StatusBar';
+import { BacktestPage } from './pages/BacktestPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { MarketPage } from './pages/MarketPage';
 import { NewsPage } from './pages/NewsPage';
@@ -16,6 +17,7 @@ const PAGES = [
   { key: 'trading', label: 'Giao dịch Paper' },
   { key: 'prediction', label: 'Dự đoán' },
   { key: 'signals', label: 'Tín hiệu' },
+  { key: 'backtest', label: 'Backtest' },
   { key: 'history', label: 'Lịch sử theo tháng' },
   { key: 'reports', label: 'Báo cáo ngày' },
   { key: 'news', label: 'Tin tức' },
@@ -92,6 +94,7 @@ export function App() {
                 {page === 'trading' && <TradingPage key={current.id} strategy={current} />}
                 {page === 'prediction' && <PredictionPage key={current.id} strategy={current} />}
                 {page === 'signals' && <SignalsPage key={current.id} strategy={current} />}
+                {page === 'backtest' && <BacktestPage key={current.id} strategy={current} />}
               </>
             )}
           </Space>

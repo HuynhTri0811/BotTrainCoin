@@ -1,0 +1,197 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0
+//@version=5
+//
+// CryptoBot – EMA Cross Backtest
+// ─────────────────────────────────────────────────────────────────────────────
+// Chuyển nguyên logic tín hiệu của bot sang TradingView:
+//   src/CryptoBot.Domain/Strategies/EmaCross/EmaCrossStrategy.cs
+//   src/CryptoBot.Domain/Strategies/Calculations/Ema.cs, Crossover.cs
+//   src/CryptoBot.Application/Signals/Evaluation/SignalEvaluationService.cs
+//
+// Logic tín hiệu giữ nguyên:
+//   • EMA nhanh/chậm tính trên ĐÚNG `LookbackCandles` nến đã đóng gần nhất, seed bằng SMA
+//     (giống Ema.LastTwo). KHÔNG dùng ta.ema vì ta.ema seed một lần ở đầu chart → giá trị khác bot.
+//   • BUY  : nến trước fast <= slow và nến này fast > slow, chỉ khi bot chưa "giữ".
+//   • SELL : nến trước fast >= slow và nến này fast < slow, chỉ khi bot đang "giữ".
+//   • Chưa đủ `LookbackCandles` nến → Hold (warm-up). Cửa sổ có nến thiếu → Hold.
+//   • Trạng thái "giữ" đi theo chuỗi tín hiệu như SignalEvaluationService (BUY gần nhất chưa có
+//     SELL), nên TP/SL KHÔNG làm thay đổi chuỗi tín hiệu BUY/SELL của bot.
+//
+// Phần thêm cho backtest: vào lệnh Long ở giá mở nến kế tiếp sau tín hiệu, khối lượng theo % vốn
+// hoặc USDT cố định, TP/SL theo %, phí 0.1% mỗi lần khớp, bảng thống kê và vẽ điểm vào/ra.
+// ─────────────────────────────────────────────────────────────────────────────
+strategy("CryptoBot EMA Cross Backtest",
+     shorttitle = "EMA Cross BT",
+     overlay = true,
+     initial_capital = 1000,
+     default_qty_type = strategy.percent_of_equity,
+     default_qty_value = 10,
+     commission_type = strategy.commission.percent,
+     commission_value = 0.1,
+     pyramiding = 0,
+     process_orders_on_close = false,
+     calc_on_every_tick = false,
+     max_bars_back = 5000)
+
+// ── Inputs ──────────────────────────────────────────────────────────────────
+GROUP_SIGNAL = "Tín hiệu (giữ nguyên theo bot)"
+fastPeriod      = input.int(9,   "EMA nhanh (FastPeriod)",        minval = 1,    group = GROUP_SIGNAL)
+slowPeriod      = input.int(21,  "EMA chậm (SlowPeriod)",         minval = 2,    group = GROUP_SIGNAL)
+lookbackCandles = input.int(300, "Cửa sổ nến (LookbackCandles)",  minval = 3, maxval = 4999, group = GROUP_SIGNAL)
+skipGapWindows  = input.bool(true, "Bỏ qua cửa sổ có nến thiếu (giống bot)", group = GROUP_SIGNAL)
+
+GROUP_MONEY = "Quản lý vốn và rủi ro"
+SIZE_PERCENT = "% tổng vốn"
+SIZE_FIXED   = "USDT cố định"
+sizeMode     = input.string(SIZE_PERCENT, "Khối lượng mỗi lệnh", options = [SIZE_PERCENT, SIZE_FIXED], group = GROUP_MONEY)
+sizePercent  = input.float(10.0,  "  % tổng vốn",   minval = 0.1, maxval = 100, step = 0.5, group = GROUP_MONEY)
+sizeUsdt     = input.float(100.0, "  USDT mỗi lệnh", minval = 1, step = 10, group = GROUP_MONEY)
+useTakeProfit = input.bool(true, "Bật chốt lời (TP)", inline = "tp", group = GROUP_MONEY)
+takeProfitPct = input.float(10.0, "%", minval = 0.1, step = 0.5, inline = "tp", group = GROUP_MONEY)
+useStopLoss   = input.bool(true, "Bật cắt lỗ (SL)",  inline = "sl", group = GROUP_MONEY)
+stopLossPct   = input.float(3.0, "%", minval = 0.1, step = 0.5, inline = "sl", group = GROUP_MONEY)
+// Vốn ban đầu và phí 0.1% đặt trong strategy(...) ở trên; đổi trong tab "Properties" của Strategy.
+
+GROUP_VIEW = "Hiển thị"
+showEmaLines    = input.bool(true, "Vẽ EMA nhanh/chậm", group = GROUP_VIEW)
+showSignalMarks = input.bool(true, "Vẽ tín hiệu BUY/SELL của bot", group = GROUP_VIEW)
+showRiskLines   = input.bool(true, "Vẽ đường TP/SL khi đang giữ lệnh", group = GROUP_VIEW)
+showStatsTable  = input.bool(true, "Bảng thống kê", group = GROUP_VIEW)
+
+// Giống EmaCrossParameters.Validate(): sai tham số thì dừng, không chạy với cấu hình hỏng.
+if fastPeriod < 1
+    runtime.error("FastPeriod phải >= 1.")
+if slowPeriod <= fastPeriod
+    runtime.error("SlowPeriod phải lớn hơn FastPeriod.")
+if lookbackCandles < slowPeriod + 1
+    runtime.error("LookbackCandles phải >= SlowPeriod + 1.")
+
+// ── EMA trên cửa sổ cố định (tương đương Ema.LastTwo) ──────────────────────
+// Bot: lấy `window` nến cuối, seed = SMA của `period` giá đầu cửa sổ, rồi lặp
+//      ema = alpha·close + keep·ema đến hết cửa sổ; trả (EMA nến trước, EMA nến cuối).
+// Lặp 300 lần mỗi nến trong Pine rất chậm, nên dùng công thức đóng tương đương (O(1) mỗi nến):
+//   steps   = window − period                        (số bước cập nhật sau seed)
+//   running = alpha·close + keep·running[1]           (tổng có trọng số trên toàn chart)
+//   last    = keep^steps     · seed + running    − keep^steps     · running[steps]
+//   prev    = keep^(steps−1) · seed + running[1] − keep^(steps−1) · running[steps]
+// với seed = SMA(period) kết thúc tại nến (t − steps) = nến thứ `period` của cửa sổ.
+// Đã kiểm tra bằng số so với vòng lặp decimal của bot: lệch < 1e-10, chuỗi tín hiệu trùng 100%.
+windowEma(int period, int window) =>
+    float alpha = 2.0 / (period + 1)
+    float keep = 1.0 - alpha
+    int steps = window - period
+    var float running = 0.0
+    running := alpha * close + keep * running
+    float seed = ta.sma(close, period)[steps]
+    float keepLast = math.pow(keep, steps)
+    float keepPrev = math.pow(keep, steps - 1)
+    float emaLast = keepLast * seed + running - keepLast * running[steps]
+    float emaPrev = keepPrev * seed + running[1] - keepPrev * running[steps]
+    [emaPrev, emaLast]
+
+[fastPrev, fastNow] = windowEma(fastPeriod, lookbackCandles)
+[slowPrev, slowNow] = windowEma(slowPeriod, lookbackCandles)
+
+// Warm-up: cần đủ `lookbackCandles` nến đã đóng (tính cả nến hiện tại).
+bool warmedUp = bar_index >= lookbackCandles - 1
+
+// HasGap: thời gian từ nến đầu đến nến cuối cửa sổ phải đúng bằng (số nến − 1) × khung thời gian.
+bool hasGap = false
+if skipGapWindows and warmedUp and not timeframe.ismonthly
+    hasGap := time - time[lookbackCandles - 1] != timeframe.in_seconds() * 1000 * (lookbackCandles - 1)
+
+bool canEvaluate = warmedUp and not hasGap and barstate.isconfirmed
+
+// Crossover.Up / Crossover.Down
+bool crossUp   = fastPrev <= slowPrev and fastNow > slowNow
+bool crossDown = fastPrev >= slowPrev and fastNow < slowNow
+
+// Trạng thái "đang giữ" theo chuỗi tín hiệu của bot (BUY gần nhất chưa có SELL).
+var bool botHolding = false
+bool buySignal  = false
+bool sellSignal = false
+if canEvaluate
+    if crossUp
+        buySignal := not botHolding          // OnCrossUp: đã giữ → Hold
+    else if crossDown
+        sellSignal := botHolding             // OnCrossDown: không giữ → Hold
+    if buySignal
+        botHolding := true
+    if sellSignal
+        botHolding := false
+
+// ── Lệnh giao dịch ─────────────────────────────────────────────────────────
+// Tín hiệu phát lúc nến đóng → lệnh khớp ở giá mở nến kế tiếp (process_orders_on_close = false).
+float orderQty = sizeMode == SIZE_PERCENT ? strategy.equity * sizePercent / 100 / close : sizeUsdt / close
+
+if buySignal and strategy.position_size == 0
+    strategy.entry("Long", strategy.long, qty = orderQty, comment = "BUY EMA" + str.tostring(fastPeriod) + "↑EMA" + str.tostring(slowPeriod))
+
+if sellSignal and strategy.position_size > 0
+    strategy.close("Long", comment = "SELL EMA cắt xuống")
+
+// TP/SL tính từ giá vào lệnh. Ở nến phát tín hiệu chưa biết giá khớp → tạm dùng giá đóng cửa;
+// từ nến khớp lệnh trở đi cập nhật theo giá vào thực tế (position_avg_price).
+float entryBase = strategy.position_size > 0 ? strategy.position_avg_price : close
+float takeProfitPrice = useTakeProfit ? entryBase * (1 + takeProfitPct / 100) : na
+float stopLossPrice   = useStopLoss   ? entryBase * (1 - stopLossPct / 100)   : na
+if (useTakeProfit or useStopLoss) and (strategy.position_size > 0 or buySignal)
+    strategy.exit("TP/SL", from_entry = "Long", limit = takeProfitPrice, stop = stopLossPrice,
+         comment_profit = "TP +" + str.tostring(takeProfitPct) + "%",
+         comment_loss   = "SL -" + str.tostring(stopLossPct) + "%")
+
+// ── Vẽ lên biểu đồ ─────────────────────────────────────────────────────────
+plot(showEmaLines and warmedUp ? fastNow : na, "EMA nhanh", color = color.new(color.orange, 0), linewidth = 2)
+plot(showEmaLines and warmedUp ? slowNow : na, "EMA chậm",  color = color.new(color.blue, 0),   linewidth = 2)
+
+// Mốc tín hiệu ở nến phát tín hiệu; mũi tên của Strategy (vào/ra lệnh) nằm ở nến khớp lệnh.
+plotshape(showSignalMarks and buySignal,  "Tín hiệu BUY",  shape.triangleup,   location.belowbar, color.new(color.teal, 0), size = size.small, text = "BUY",  textcolor = color.teal)
+plotshape(showSignalMarks and sellSignal, "Tín hiệu SELL", shape.triangledown, location.abovebar, color.new(color.red, 0),  size = size.small, text = "SELL", textcolor = color.red)
+
+bool inPosition = strategy.position_size > 0
+plot(showRiskLines and inPosition ? strategy.position_avg_price : na, "Giá vào", color = color.gray, style = plot.style_linebr)
+plot(showRiskLines and inPosition and useTakeProfit ? takeProfitPrice : na, "Chốt lời", color = color.green, style = plot.style_linebr)
+plot(showRiskLines and inPosition and useStopLoss ? stopLossPrice : na, "Cắt lỗ", color = color.red, style = plot.style_linebr)
+
+// ── Thống kê ───────────────────────────────────────────────────────────────
+// Max Drawdown theo equity tại giá đóng mỗi nến (gồm lãi/lỗ của lệnh đang mở).
+var float peakEquity = strategy.initial_capital
+var float maxDrawdownUsdt = 0.0
+var float maxDrawdownPct = 0.0
+peakEquity := math.max(peakEquity, strategy.equity)
+float drawdownNow = peakEquity - strategy.equity
+maxDrawdownUsdt := math.max(maxDrawdownUsdt, drawdownNow)
+maxDrawdownPct := math.max(maxDrawdownPct, peakEquity > 0 ? drawdownNow / peakEquity * 100 : 0)
+
+var int firstBarTime = time
+
+addRow(table statsTable, int row, string label, string value, color valueColor) =>
+    table.cell(statsTable, 0, row, label, text_color = color.white, text_halign = text.align_left, text_size = size.small)
+    table.cell(statsTable, 1, row, value, text_color = valueColor, text_halign = text.align_right, text_size = size.small)
+
+var table stats = table.new(position.top_right, 2, 12, bgcolor = color.new(#131722, 10), border_color = color.new(color.gray, 60), border_width = 1)
+
+if showStatsTable and barstate.islast
+    int closedCount = strategy.closedtrades
+    float winRate = closedCount > 0 ? strategy.wintrades * 100.0 / closedCount : 0.0
+    float netPct = strategy.netprofit / strategy.initial_capital * 100
+    float profitFactor = strategy.grossloss > 0 ? strategy.grossprofit / strategy.grossloss : na
+    float feesPaid = 0.0
+    if closedCount > 0
+        for tradeIndex = 0 to closedCount - 1
+            feesPaid += strategy.closedtrades.commission(tradeIndex)
+    color netColor = strategy.netprofit >= 0 ? color.lime : color.red
+
+    table.cell(stats, 0, 0, "BACKTEST EMA" + str.tostring(fastPeriod) + "/" + str.tostring(slowPeriod) + " · " + syminfo.ticker + " " + timeframe.period, text_color = color.white, text_size = size.small)
+    table.merge_cells(stats, 0, 0, 1, 0)
+    addRow(stats, 1,  "Thời gian test", str.format_time(firstBarTime, "dd/MM/yyyy", "UTC") + " → " + str.format_time(time, "dd/MM/yyyy", "UTC"), color.white)
+    addRow(stats, 2,  "Vốn ban đầu", str.tostring(strategy.initial_capital, "#,##0.00") + " USDT", color.white)
+    addRow(stats, 3,  "Vốn hiện tại", str.tostring(strategy.equity, "#,##0.00") + " USDT", color.white)
+    addRow(stats, 4,  "Tổng số lệnh (đã đóng)", str.tostring(closedCount), color.white)
+    addRow(stats, 5,  "Thắng / Thua", str.tostring(strategy.wintrades) + " / " + str.tostring(strategy.losstrades), color.white)
+    addRow(stats, 6,  "Tỷ lệ thắng", str.tostring(winRate, "0.00") + " %", winRate >= 50 ? color.lime : color.orange)
+    addRow(stats, 7,  "Lợi nhuận ròng (sau phí)", str.tostring(strategy.netprofit, "#,##0.00") + " USDT (" + str.tostring(netPct, "0.00") + " %)", netColor)
+    addRow(stats, 8,  "Tổng phí đã trả", str.tostring(feesPaid, "#,##0.00") + " USDT", color.white)
+    addRow(stats, 9,  "Profit factor", na(profitFactor) ? "—" : str.tostring(profitFactor, "0.00"), color.white)
+    addRow(stats, 10, "Max Drawdown", str.tostring(maxDrawdownUsdt, "#,##0.00") + " USDT (" + str.tostring(maxDrawdownPct, "0.00") + " %)", color.red)
+    addRow(stats, 11, "Lệnh đang mở", strategy.opentrades > 0 ? "1 · lãi/lỗ " + str.tostring(strategy.openprofit, "#,##0.00") + " USDT" : "0", color.white)
