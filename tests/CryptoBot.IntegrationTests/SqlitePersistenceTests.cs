@@ -75,6 +75,25 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Concurrent_upserts_of_the_same_range_do_not_insert_a_candle_twice()
+    {
+        // Hai bên ghi (ví dụ đồng bộ thường và tải lịch sử) cùng chèn một khoảng qua hai DbContext.
+        var batch = Enumerable.Range(0, 200).Select(hour => MakeCandle(hour, 10)).ToList();
+
+        async Task<UpsertResult> UpsertAsync()
+        {
+            await using var db = NewContext();
+            return await new CandleStore(db).UpsertAsync(Key, batch, default);
+        }
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => Task.Run(UpsertAsync)));
+
+        Assert.Equal(200, results.Sum(result => result.Inserted));
+        await using var check = NewContext();
+        Assert.Equal(200, await check.Candles.CountAsync());
+    }
+
+    [Fact]
     public async Task Upsert_updates_open_candle_and_keeps_closed_candle()
     {
         await using (var db = NewContext())

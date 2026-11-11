@@ -110,4 +110,31 @@ public class CandleBackfillServiceTests
         await Assert.ThrowsAsync<ArgumentException>(() =>
             CreateService().BackfillAsync(key, Hour(0), CancellationToken.None));
     }
+
+    [Fact]
+    public async Task Finishing_on_the_last_allowed_request_is_not_reported_as_the_limit()
+    {
+        // Lô 2 nến: 999 request đầu lấy nến 0–1997, request thứ 1000 chỉ còn nến 1998 nên đã xong.
+        _clock.UtcNow = Hour(4 * CandleBackfillService.MaxRequests);
+        AddKlines(0, 2 * CandleBackfillService.MaxRequests - 1);
+        StoreCandles(2 * CandleBackfillService.MaxRequests, 1, price: 100);
+
+        var result = await CreateService(batchSize: 2).BackfillAsync(Key, Hour(0), CancellationToken.None);
+
+        Assert.Equal(CandleBackfillService.MaxRequests, result!.Requests);
+        Assert.False(result.ReachedRequestLimit);
+    }
+
+    [Fact]
+    public async Task Running_out_of_requests_before_the_stored_candles_is_reported()
+    {
+        _clock.UtcNow = Hour(4 * CandleBackfillService.MaxRequests);
+        AddKlines(0, 3 * CandleBackfillService.MaxRequests);
+        StoreCandles(3 * CandleBackfillService.MaxRequests, 1, price: 100);
+
+        var result = await CreateService(batchSize: 2).BackfillAsync(Key, Hour(0), CancellationToken.None);
+
+        Assert.Equal(CandleBackfillService.MaxRequests, result!.Requests);
+        Assert.True(result.ReachedRequestLimit);
+    }
 }
