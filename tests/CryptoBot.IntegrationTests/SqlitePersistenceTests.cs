@@ -273,9 +273,10 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
 
             var first = (await store.GetAsync(all[2].Id, default))!;
             Assert.Equal([1, 2, 3, 4], first.Content);
-            first.SetNote("phí maker");
-            store.Remove((await store.GetAsync(all[0].Id, default))!);
-            await store.SaveAsync(default);
+            Assert.True(await store.SetNoteAsync(first.Id, "phí maker", default));
+            Assert.True(await store.DeleteAsync(all[0].Id, default));
+            Assert.False(await store.DeleteAsync(all[0].Id, default));
+            Assert.False(await store.SetNoteAsync(999, "x", default));
         }
 
         await using (var db = NewContext())

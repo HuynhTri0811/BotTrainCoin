@@ -23,11 +23,17 @@ public sealed class BacktestStore(BotDbContext db) : IBacktestStore
             .ToListAsync(ct);
 
     public Task<SavedBacktest?> GetAsync(long id, CancellationToken ct) =>
-        db.SavedBacktests.FirstOrDefaultAsync(saved => saved.Id == id, ct);
+        db.SavedBacktests.AsNoTracking().FirstOrDefaultAsync(saved => saved.Id == id, ct);
+
+    // Sửa/xóa thẳng trong SQL: không đọc cột nội dung nén chỉ để đổi một ghi chú.
+    public async Task<bool> SetNoteAsync(long id, string? note, CancellationToken ct) =>
+        await db.SavedBacktests.Where(saved => saved.Id == id)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(saved => saved.Note, note), ct) > 0;
+
+    public async Task<bool> DeleteAsync(long id, CancellationToken ct) =>
+        await db.SavedBacktests.Where(saved => saved.Id == id).ExecuteDeleteAsync(ct) > 0;
 
     public void Add(SavedBacktest backtest) => db.SavedBacktests.Add(backtest);
-
-    public void Remove(SavedBacktest backtest) => db.SavedBacktests.Remove(backtest);
 
     public Task SaveAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 }

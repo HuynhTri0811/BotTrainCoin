@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using CryptoBot.Application.Abstractions;
 using CryptoBot.Domain.Backtesting;
 
@@ -13,7 +14,11 @@ public sealed class BacktestHistoryService(IBacktestStore store, IClock clock)
 {
     public const int MaxListLimit = 500;
 
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    // Enum lưu dạng chữ để thêm/đổi thứ tự giá trị không làm sai lần chạy cũ. Bản cũ lưu dạng số vẫn đọc được.
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() },
+    };
 
     public async Task<SavedBacktestRun> SaveAsync(BacktestRun run, CancellationToken ct)
     {
@@ -34,24 +39,14 @@ public sealed class BacktestHistoryService(IBacktestStore store, IClock clock)
 
     /// <summary>Đặt ghi chú; null nếu không có lần chạy này.</summary>
     /// <exception cref="ArgumentException">Ghi chú quá dài.</exception>
-    public async Task<SavedBacktest?> SetNoteAsync(long id, string? note, CancellationToken ct)
+    public async Task<BacktestNote?> SetNoteAsync(long id, string? note, CancellationToken ct)
     {
-        if (await store.GetAsync(id, ct) is not { } saved)
-            return null;
-        saved.SetNote(note);
-        await store.SaveAsync(ct);
-        return saved;
+        var normalized = SavedBacktest.NormalizeNote(note);
+        return await store.SetNoteAsync(id, normalized, ct) ? new BacktestNote(normalized) : null;
     }
 
     /// <summary>Xóa; false nếu không có lần chạy này.</summary>
-    public async Task<bool> DeleteAsync(long id, CancellationToken ct)
-    {
-        if (await store.GetAsync(id, ct) is not { } saved)
-            return false;
-        store.Remove(saved);
-        await store.SaveAsync(ct);
-        return true;
-    }
+    public Task<bool> DeleteAsync(long id, CancellationToken ct) => store.DeleteAsync(id, ct);
 
     private static byte[] Compress(BacktestSnapshot snapshot)
     {

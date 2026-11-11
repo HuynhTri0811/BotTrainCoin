@@ -122,11 +122,15 @@ public sealed class SavedBacktest
 
     /// <summary>Đặt hoặc xóa ghi chú (chuỗi trống = xóa). Khoảng trắng đầu/cuối bị bỏ.</summary>
     /// <exception cref="ArgumentException">Ghi chú dài hơn <see cref="MaxNoteLength"/> ký tự.</exception>
-    public void SetNote(string? note)
+    public void SetNote(string? note) => Note = NormalizeNote(note);
+
+    /// <summary>Ghi chú sẽ được lưu: bỏ khoảng trắng đầu/cuối, chuỗi trống thành null.</summary>
+    /// <exception cref="ArgumentException">Ghi chú dài hơn <see cref="MaxNoteLength"/> ký tự.</exception>
+    public static string? NormalizeNote(string? note)
     {
         string? trimmed = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
         if (trimmed is { Length: > MaxNoteLength })
             throw new ArgumentException($"Ghi chú tối đa {MaxNoteLength} ký tự.", nameof(note));
-        Note = trimmed;
+        return trimmed;
     }
 }

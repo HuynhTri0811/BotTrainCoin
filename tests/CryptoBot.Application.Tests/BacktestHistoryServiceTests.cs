@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using CryptoBot.Application.Backtesting;
 using CryptoBot.Application.Signals;
 using CryptoBot.Domain.Backtesting;
@@ -61,6 +62,18 @@ public class BacktestHistoryServiceTests
         Assert.Equal(run.Chart.Markers, snapshot.Chart.Markers);
         Assert.Equal(_clock.UtcNow, reopened.Saved.CreatedAtUtc);
         Assert.Equal(run.Result.Statistics.NetProfit, reopened.Saved.NetProfit);
+    }
+
+    [Fact]
+    public async Task Enums_are_stored_by_name()
+    {
+        var saved = await CreateService().SaveAsync(await RunAsync(), CancellationToken.None);
+
+        await using var gzip = new GZipStream(new MemoryStream(saved.Saved.Content), CompressionMode.Decompress);
+        var json = await new StreamReader(gzip).ReadToEndAsync();
+
+        Assert.Contains("\"exitReason\":\"TakeProfit\"", json);
+        Assert.Contains("\"sizing\":\"PercentOfEquity\"", json);
     }
 
     [Fact]

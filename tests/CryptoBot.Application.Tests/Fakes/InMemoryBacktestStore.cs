@@ -28,7 +28,15 @@ internal sealed class InMemoryBacktestStore : IBacktestStore
         Saved.Add(backtest);
     }
 
-    public void Remove(SavedBacktest backtest) => Saved.Remove(backtest);
+    public Task<bool> SetNoteAsync(long id, string? note, CancellationToken ct)
+    {
+        var saved = Saved.FirstOrDefault(saved => saved.Id == id);
+        saved?.SetNote(note);
+        return Task.FromResult(saved is not null);
+    }
+
+    public Task<bool> DeleteAsync(long id, CancellationToken ct) =>
+        Task.FromResult(Saved.RemoveAll(saved => saved.Id == id) > 0);
 
     public Task SaveAsync(CancellationToken ct)
     {
