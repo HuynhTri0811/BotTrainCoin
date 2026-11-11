@@ -83,33 +83,46 @@ interface Props {
   /** Lần chạy đang hiển thị bên dưới (tô đậm dòng). */
   openedId: number | null;
   onOpen: (id: number) => void;
+  /** Ghi chú của một lần chạy vừa được lưu, để kết quả đang mở cập nhật theo. */
+  onNoteSaved: (id: number, note: string | null) => void;
+  /** Một lần chạy vừa bị xóa, để đóng kết quả nếu đang mở nó. */
+  onDeleted: (id: number) => void;
 }
 
 /** Lịch sử mọi lần backtest đã chạy: xem lại, so sánh, ghi chú, xóa, xuất Excel. */
-export function BacktestHistoryCard({ strategyId, openedId, onOpen }: Props) {
+export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved, onDeleted }: Props) {
   const queryClient = useQueryClient();
   const [onlyThisStrategy, setOnlyThisStrategy] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
   const [comparing, setComparing] = useState(false);
 
-  const history = useQuery({ queryKey: ['backtests'], queryFn: () => backtestApi.list() });
+  // Lọc ở API: lọc phía client trên 200 dòng mới nhất sẽ thiếu các lần chạy cũ của chiến lược này.
+  const filterId = onlyThisStrategy ? strategyId : undefined;
+  const history = useQuery({
+    queryKey: ['backtests', filterId ?? 'all'],
+    queryFn: () => backtestApi.list(filterId),
+  });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['backtests'] });
 
   const setNote = useMutation({
     mutationFn: ({ id, note }: { id: number; note: string }) => backtestApi.setNote(id, note),
-    onSuccess: refresh,
+    onSuccess: (saved, { id }) => {
+      onNoteSaved(id, saved.note);
+      refresh();
+    },
     onError: (error) => message.error(error.message),
   });
   const remove = useMutation({
     mutationFn: backtestApi.remove,
     onSuccess: (_, id) => {
       setSelected((current) => current.filter((selectedId) => selectedId !== id));
+      onDeleted(id);
       refresh();
     },
     onError: (error) => message.error(error.message),
   });
 
-  const rows = (history.data ?? []).filter((summary) => !onlyThisStrategy || summary.strategyId === strategyId);
+  const rows = history.data ?? [];
   const compared = (history.data ?? []).filter((summary) => selected.includes(summary.id));
 
   return (
@@ -118,7 +131,15 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen }: Props) {
       title={`Lịch sử backtest (${rows.length})`}
       extra={
         <Space wrap>
-          <Checkbox checked={onlyThisStrategy} onChange={(event) => setOnlyThisStrategy(event.target.checked)}>
+          <Checkbox
+            checked={onlyThisStrategy}
+            onChange={(event) => {
+              // Dòng đã chọn có thể không còn trong danh sách mới.
+              setSelected([]);
+              setComparing(false);
+              setOnlyThisStrategy(event.target.checked);
+            }}
+          >
             Chỉ chiến lược đang chọn
           </Checkbox>
           <Button size="small" disabled={selected.length < 2} onClick={() => setComparing((current) => !current)}>

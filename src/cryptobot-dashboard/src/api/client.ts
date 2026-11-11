@@ -861,7 +861,10 @@ export const backtestApi = {
   /** Chạy và lưu vào lịch sử. */
   run: (strategyId: number, request: BacktestRequest) =>
     postJson<BacktestResult>(`/api/strategies/${strategyId}/backtest`, request),
-  list: (limit = 200) => getJson<BacktestSummary[]>(`/api/backtests?limit=${limit}`),
+  list: (strategyId?: number, limit = 200) =>
+    getJson<BacktestSummary[]>(
+      `/api/backtests?limit=${limit}${strategyId === undefined ? '' : `&strategyId=${strategyId}`}`,
+    ),
   get: (id: number) => getJson<BacktestResult>(`/api/backtests/${id}`),
   setNote: (id: number, note: string) => sendJson<{ note: string | null }>('PUT', `/api/backtests/${id}/note`, { note }),
   remove: (id: number) => sendJson<null>('DELETE', `/api/backtests/${id}`),

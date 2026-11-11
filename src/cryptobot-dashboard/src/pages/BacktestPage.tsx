@@ -261,7 +261,13 @@ export function BacktestPage({ strategy }: { strategy: Strategy }) {
 
       {run.isError && <Alert type="error" showIcon title={errorText(run.error)} />}
 
-      <BacktestHistoryCard strategyId={strategy.id} openedId={shown?.id ?? null} onOpen={(id) => open.mutate(id)} />
+      <BacktestHistoryCard
+        strategyId={strategy.id}
+        openedId={shown?.id ?? null}
+        onOpen={(id) => open.mutate(id)}
+        onNoteSaved={(id, note) => setShown((current) => (current?.id === id ? { ...current, note } : current))}
+        onDeleted={(id) => setShown((current) => (current?.id === id ? null : current))}
+      />
 
       <div ref={resultRef} style={{ scrollMarginTop: 16 }}>
         {open.isPending && <Spin />}
