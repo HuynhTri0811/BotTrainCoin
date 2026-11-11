@@ -101,6 +101,21 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Upsert_stops_tracking_the_batch_after_saving()
+    {
+        await using var db = NewContext();
+        var store = new CandleStore(db);
+
+        await store.UpsertAsync(Key, [MakeCandle(0, 10), MakeCandle(1, 20, closed: false)], default);
+        await store.UpsertAsync(Key, [MakeCandle(1, 21), MakeCandle(2, 30)], default);
+
+        // Tải lịch sử gọi hàng trăm lô qua cùng một context: không lô nào được giữ lại.
+        Assert.Empty(db.ChangeTracker.Entries());
+        var all = await store.GetLatestAsync(Key, null, 10, closedOnly: false, default);
+        Assert.Equal([10m, 21m, 30m], all.Select(candle => candle.Close));
+    }
+
+    [Fact]
     public async Task Time_ordering_works_in_sql()
     {
         await using (var db = NewContext())

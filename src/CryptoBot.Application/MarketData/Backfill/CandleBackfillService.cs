@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using CryptoBot.Application.Abstractions;
 using CryptoBot.Domain.MarketData;
 using Microsoft.Extensions.Logging;
@@ -6,7 +7,8 @@ namespace CryptoBot.Application.MarketData;
 
 /// <summary>
 /// Tải nến cũ hơn nến sớm nhất đang có trong DB, để backtest có đủ lịch sử. Chỉ đi lùi về quá khứ:
-/// phần mới đã có <see cref="CandleSyncService"/> lo, nên hai bên không ghi cùng một khoảng nến.
+/// phần mới đã có <see cref="CandleSyncService"/> lo, nên hai bên không ghi cùng một khoảng nến. DB chưa có nến nào
+/// thì không tải: đồng bộ thường phải chạy lần đầu trước, nếu không hai bên có thể cùng chèn một nến.
 /// Dùng cùng kiểm tra nến (<see cref="CandleSeriesValidator"/>) và cùng upsert như đồng bộ thường.
 /// </summary>
 public sealed class CandleBackfillService(
@@ -18,16 +20,19 @@ public sealed class CandleBackfillService(
     /// <summary>Số request tối đa mỗi lần gọi (1000 × 1000 nến ≈ 11 năm nến 1h, ≈ 28 năm nến 15m).</summary>
     public const int MaxRequests = 1000;
 
-    // Một lần tải tại một thời điểm: hai lần tải chồng nhau sẽ cùng chèn một khoảng nến.
-    private static readonly SemaphoreSlim Gate = new(1, 1);
+    // Một lần tải tại một thời điểm cho mỗi khóa nến: hai lần tải chồng nhau sẽ cùng chèn một khoảng nến.
+    // Khóa nến khác nhau không đụng nhau nên chạy song song được.
+    private static readonly ConcurrentDictionary<CandleKey, SemaphoreSlim> Gates = new();
 
     /// <summary>
-    /// Tải nến từ <paramref name="fromUtc"/> đến ngay trước nến sớm nhất đã lưu (hoặc đến hiện tại nếu DB trống).
-    /// Trả null nếu đang có một lần tải khác chạy.
+    /// Tải nến từ <paramref name="fromUtc"/> đến ngay trước nến sớm nhất đã lưu.
+    /// Trả null nếu đang có một lần tải khác chạy cho cùng khóa nến.
     /// </summary>
+    /// <exception cref="ArgumentException">Khóa nến không thuộc sàn này, hoặc DB chưa có nến nào của khóa này.</exception>
     public async Task<CandleBackfillResult?> BackfillAsync(CandleKey key, DateTime fromUtc, CancellationToken ct)
     {
-        if (!await Gate.WaitAsync(0, ct))
+        var gate = Gates.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+        if (!await gate.WaitAsync(0, ct))
             return null;
 
         try
@@ -36,7 +41,7 @@ public sealed class CandleBackfillService(
         }
         finally
         {
-            Gate.Release();
+            gate.Release();
         }
     }
 
@@ -45,9 +50,10 @@ public sealed class CandleBackfillService(
         if (key.Exchange != client.Exchange)
             throw new ArgumentException($"Chỉ tải được nến {client.Exchange}, không phải {key.Exchange}.");
 
+        var end = (await store.GetAfterAsync(key, null, 1, closedOnly: false, ct)).FirstOrDefault()?.OpenTimeUtc
+                  ?? throw new ArgumentException(
+                      $"Chưa có nến {key.Symbol} {key.Interval.Code} nào; chờ đồng bộ nến chạy lần đầu rồi tải lịch sử.");
         var serverTime = await client.GetServerTimeAsync(ct);
-        var earliest = (await store.GetAfterAsync(key, null, 1, closedOnly: false, ct)).FirstOrDefault()?.OpenTimeUtc;
-        var end = earliest ?? key.Interval.OpenTimeAt(serverTime);
         var start = key.Interval.OpenTimeAt(fromUtc);
 
         var inserted = 0;

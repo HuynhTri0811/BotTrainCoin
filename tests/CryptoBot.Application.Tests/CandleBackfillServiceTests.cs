@@ -66,15 +66,40 @@ public class CandleBackfillServiceTests
     }
 
     [Fact]
-    public async Task Empty_store_downloads_up_to_the_running_candle()
+    public async Task Empty_store_is_rejected_so_it_never_races_the_regular_sync()
     {
         AddKlines(0, 101);
 
-        var result = await CreateService().BackfillAsync(Key, Hour(0), CancellationToken.None);
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            CreateService().BackfillAsync(Key, Hour(0), CancellationToken.None));
+        Assert.Empty(_store.Candles);
+    }
 
-        // Nến đang chạy (giờ 100) để đồng bộ thường lo.
-        Assert.Equal(100, result!.Inserted);
-        Assert.DoesNotContain(Hour(100), _store.Candles.Keys);
+    [Fact]
+    public async Task Backfills_for_different_keys_do_not_block_each_other()
+    {
+        AddKlines(0, 10);
+        StoreCandles(5, 5, price: 100);
+        // Khóa là tĩnh: service và store riêng cho ETHUSDT vẫn dùng chung khóa với service BTCUSDT.
+        var otherStore = new InMemoryCandleStore();
+        otherStore.Candles[Hour(9)] =
+            new Candle("Binance", "ETHUSDT", CandleInterval.H1, Hour(9), 1, 1, 1, 1, 1, true, T0);
+        var otherService = new CandleBackfillService(new FakeMarketDataClient(_clock), otherStore,
+            new MarketDataOptions(), NullLogger<CandleBackfillService>.Instance);
+        // Giữ lần tải BTCUSDT đứng ở request đầu tiên để các lần sau gọi khi nó còn đang chạy.
+        var gate = new TaskCompletionSource();
+        _client.BeforeKlines = () => gate.Task;
+        var service = CreateService();
+
+        var running = service.BackfillAsync(Key, Hour(0), CancellationToken.None);
+        var sameKey = await service.BackfillAsync(Key, Hour(0), CancellationToken.None);
+        var otherKey = await otherService.BackfillAsync(Key with { Symbol = "ETHUSDT" }, Hour(0),
+            CancellationToken.None);
+        gate.SetResult();
+
+        Assert.Null(sameKey);
+        Assert.NotNull(otherKey);
+        Assert.Equal(5, (await running)!.Inserted);
     }
 
     [Fact]
