@@ -18,10 +18,10 @@ Framework: xUnit 2.9, `using Xunit;` là global using trong mỗi project test.
 | --- | --- | --- | --- |
 | [`CryptoBot.Domain.Tests`](../tests/CryptoBot.Domain.Tests) | Domain | Công thức, entity, chiến lược, chỉ báo, dự đoán | Không cần fake. Helper [`TestCandles`](../tests/CryptoBot.Domain.Tests/TestCandles.cs) |
 | [`CryptoBot.Application.Tests`](../tests/CryptoBot.Application.Tests) | Application | Service: sync, đánh giá tín hiệu, paper futures, quy tắc tự động, registry, cache, golden | [`Fakes/`](../tests/CryptoBot.Application.Tests/Fakes/), mỗi fake một file: `FakeClock`, `InMemoryCandleStore`, `InMemorySignalStore`, `FakeMarketDataClient`… |
-| [`CryptoBot.IntegrationTests`](../tests/CryptoBot.IntegrationTests) | Infrastructure | EF Core mapping, converter, index duy nhất, migration thật; đọc RSS qua `HttpClient` với handler giả | File SQLite tạm trong `%TEMP%`, xóa sau test |
+| [`CryptoBot.IntegrationTests`](../tests/CryptoBot.IntegrationTests) | Infrastructure | EF Core mapping, converter, index duy nhất, migration thật; đọc RSS qua `HttpClient` với handler giả | Database tạm `cryptobot_test_*` trên container `cryptobot-postgres` (đổi bằng `CRYPTOBOT_TEST_DB`), xóa sau test |
 
 Quy tắc chọn chỗ: test ở **tầng thấp nhất** chứa logic. Công thức → Domain test. Điều phối nhiều port → Application
-test với fake. Chỉ những gì phụ thuộc SQLite thật (decimal round-trip, UTC, unique index, transaction) → Integration.
+test với fake. Chỉ những gì phụ thuộc PostgreSQL thật (decimal round-trip, UTC, unique index, ILIKE, transaction) → Integration.
 
 ## Đặt tên và bố cục
 
@@ -57,7 +57,7 @@ Ví dụ tốt có sẵn:
 | Service với fake + đồng hồ giả | [`PaperFuturesServiceTests`](../tests/CryptoBot.Application.Tests/PaperFuturesServiceTests.cs), [`AutoOrderServiceTests`](../tests/CryptoBot.Application.Tests/AutoOrderServiceTests.cs) |
 | Cache và tính một lần | [`SimilarDaysServiceTests`](../tests/CryptoBot.Application.Tests/SimilarDaysServiceTests.cs) |
 | Tua đồng hồ qua đúng ngưỡng (stale, hết hạn) | [`MarketDataStatusRegistryTests`](../tests/CryptoBot.Application.Tests/MarketDataStatusRegistryTests.cs), [`MarkPriceCacheTests`](../tests/CryptoBot.Application.Tests/MarkPriceCacheTests.cs) |
-| SQLite thật | [`SqlitePersistenceTests`](../tests/CryptoBot.IntegrationTests/SqlitePersistenceTests.cs) |
+| PostgreSQL thật | [`PostgresPersistenceTests`](../tests/CryptoBot.IntegrationTests/PostgresPersistenceTests.cs) |
 
 ## Golden test
 

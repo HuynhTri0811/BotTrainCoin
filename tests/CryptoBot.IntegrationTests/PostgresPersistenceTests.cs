@@ -10,19 +10,34 @@ using CryptoBot.Domain.News;
 using CryptoBot.Domain.Strategies;
 using CryptoBot.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace CryptoBot.IntegrationTests;
 
-/// <summary>Chạy trên file SQLite thật với migration thật.</summary>
-public sealed class SqlitePersistenceTests : IAsyncLifetime
+/// <summary>
+/// Chạy trên PostgreSQL thật với migration thật. Mỗi lớp test tạo một database tạm riêng rồi xóa khi xong.
+/// Cần container cryptobot-postgres đang chạy (<c>docker compose up -d</c>); đổi server bằng biến môi trường
+/// <c>CRYPTOBOT_TEST_DB</c> (chuỗi kết nối không có Database).
+/// </summary>
+public sealed class PostgresPersistenceTests : IAsyncLifetime
 {
     private static readonly DateTime T0 = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
     private static readonly CandleKey Key = new("Binance", "BTCUSDT", CandleInterval.H1);
 
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"cryptobot-test-{Guid.NewGuid():N}.db");
+    private static readonly string ServerConnection = Environment.GetEnvironmentVariable("CRYPTOBOT_TEST_DB")
+        ?? "Host=localhost;Port=5433;Username=cryptobot;Password=cryptobot";
+
+    private readonly string _database = $"cryptobot_test_{Guid.NewGuid():N}";
+
+    private string ConnectionString => new NpgsqlConnectionStringBuilder(ServerConnection)
+    {
+        Database = _database,
+        // Không giữ kết nối trong pool, để xóa được database khi xong.
+        Pooling = false,
+    }.ConnectionString;
 
     private BotDbContext NewContext() =>
-        new(new DbContextOptionsBuilder<BotDbContext>().UseSqlite($"Data Source={_path};Pooling=False").Options);
+        new(new DbContextOptionsBuilder<BotDbContext>().UseNpgsql(ConnectionString).Options);
 
     public async Task InitializeAsync()
     {
@@ -30,11 +45,13 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
         await db.Database.MigrateAsync();
     }
 
-    public Task DisposeAsync()
+    public async Task DisposeAsync()
     {
-        foreach (var path in new[] { _path, _path + "-wal", _path + "-shm" })
-            File.Delete(path);
-        return Task.CompletedTask;
+        await using var connection = new NpgsqlConnection(
+            new NpgsqlConnectionStringBuilder(ServerConnection) { Database = "postgres", Pooling = false }.ConnectionString);
+        await connection.OpenAsync();
+        await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_database}\" WITH (FORCE)", connection);
+        await drop.ExecuteNonQueryAsync();
     }
 
     private static Candle MakeCandle(int hour, decimal close, bool closed = true) =>

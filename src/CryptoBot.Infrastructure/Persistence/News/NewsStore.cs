@@ -22,10 +22,10 @@ public sealed class NewsStore(BotDbContext db) : INewsStore
             query = query.Where(article => article.Source == source);
         if (filter.Search is { } search)
         {
-            // Giữ nguyên %, _ người dùng gõ. LIKE của SQLite chỉ không phân biệt hoa thường với ký tự ASCII.
+            // Giữ nguyên %, _ người dùng gõ. ILIKE không phân biệt hoa thường, kể cả chữ có dấu.
             var pattern = $"%{search.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_")}%";
-            query = query.Where(article => EF.Functions.Like(article.Title, pattern, @"\") ||
-                                     EF.Functions.Like(article.Summary, pattern, @"\"));
+            query = query.Where(article => EF.Functions.ILike(article.Title, pattern, @"\") ||
+                                     EF.Functions.ILike(article.Summary, pattern, @"\"));
         }
         if (filter.FromUtc is { } from)
             query = query.Where(article => article.PublishedAtUtc >= from);

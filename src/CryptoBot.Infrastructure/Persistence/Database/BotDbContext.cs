@@ -21,10 +21,10 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
-        // Tiền/giá/lượng: chuỗi decimal invariant chính xác. Không SUM/ORDER BY các cột này trong SQL.
-        builder.Properties<decimal>().HaveConversion<DecimalInvariantStringConverter>().HaveColumnType("TEXT");
-        // Thời gian: Unix milliseconds UTC, so sánh/sắp xếp được trong SQLite.
-        builder.Properties<DateTime>().HaveConversion<UtcUnixMillisecondsConverter>();
+        // Tiền/giá/lượng: numeric không giới hạn độ chính xác, giữ đúng mọi chữ số của decimal.
+        builder.Properties<decimal>().HaveColumnType("numeric");
+        // Thời gian: timestamptz. Npgsql chỉ nhận DateTime UTC, đúng quy ước của app.
+        builder.Properties<DateTime>().HaveColumnType("timestamp with time zone");
     }
 
     protected override void OnModelCreating(ModelBuilder builder)
