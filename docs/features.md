@@ -415,6 +415,13 @@ UI: trang **Backtest** ([`BacktestPage.tsx`](../src/cryptobot-dashboard/src/page
 - **Giới hạn:** không trượt giá, độ sâu sổ lệnh, funding; không short; tối đa 400 nghìn nến mỗi lần chạy. Cửa sổ chứa
   khoảng nến thiếu của Binance (bảo trì) bị bỏ qua giống bot, nên có vài nghìn nến không được đánh giá trên nhiều năm.
   Kết quả quá khứ không bảo đảm cho tương lai.
+- **Lịch sử backtest:** mọi lần chạy được lưu tự động vào bảng `SavedBacktests`
+  ([`SavedBacktest`](../src/CryptoBot.Domain/Backtesting/History/SavedBacktest.cs),
+  [`BacktestHistoryService`](../src/CryptoBot.Application/Backtesting/History/BacktestHistoryService.cs)). Thông số và
+  con số chính là cột riêng để liệt kê nhanh; toàn bộ kết quả (lệnh, chart gộp) lưu dạng JSON nén gzip (≈ 250 KB một
+  lần chạy 1h nhiều năm, ≈ 700 KB với 15m). Card **Lịch sử backtest** trên trang: mở lại đầy đủ không cần chạy lại, so
+  sánh tối đa 4 lần cạnh nhau, sửa ghi chú tại chỗ, xóa, xuất Excel, lọc theo chiến lược đang chọn. Đường vốn từng nến
+  không lưu, chỉ lưu bản gộp trên chart.
 - Bản Pine Script tương đương để đối chiếu trên TradingView:
   [`tools/tradingview/ema-cross-backtest.pine`](../tools/tradingview/ema-cross-backtest.pine).
 

@@ -142,6 +142,19 @@ Tiền tố `/api/strategies/{id}/backtest`. Chỉ mô phỏng, không đặt l�
 | POST | `/history` | Body `{ "fromUtc" }` | Tải nến Binance từ `fromUtc` đến trước nến sớm nhất đã lưu: `inserted`, `requests`, `rejectedCandles`, `firstOpenTimeUtc`, `reachedRequestLimit` (true thì gọi lại để tải tiếp). 409 khi đang có lần tải khác, 503 khi sàn tạm lỗi |
 | POST | `/` | Body: `fromUtc?`, `toUtc?` (null = toàn bộ), `fastPeriod?`, `slowPeriod?`, `lookbackCandles?` (null = của chiến lược), `initialCapital`, `sizing` (`PercentOfEquity`/`FixedAmount`), `sizeValue`, `takeProfitPercent?`, `stopLossPercent?` (null = không dùng), `feePercent` | `parameters`, khoảng nến (`firstCandleUtc`, `lastCandleUtc`, `candleCount`, `warmupCandles`, `evaluatedCandles`, `skippedGapWindows`), `buySignals`, `sellSignals`, `statistics` (`totalTrades`, `wins`, `losses`, `winRatePercent`, `netProfit`, `netProfitPercent`, `grossProfit`, `grossLoss`, `profitFactor`, `totalFees`, `maxDrawdown`, `maxDrawdownPercent`, `endingEquity`, `buyAndHoldPercent`), `trades[]` (`exitReason`: `Signal`/`TakeProfit`/`StopLoss`), `openTrade`, `chart` (`candlesPerBar`, `bars[]` có `equity`, `markers[]` `Entry`/`Exit`). Tham số sai → 400 |
 
+Mỗi lần `POST /` được lưu vào lịch sử; kết quả trả về có thêm `id`, `createdAtUtc`, `note`, `settings`.
+
+### Lịch sử backtest
+
+Tiền tố `/api/backtests`.
+
+| Method | Đường dẫn | Tham số | Trả về |
+| --- | --- | --- | --- |
+| GET | `/` | `strategyId?`, `limit` (100, 1–500) | Các lần chạy mới → cũ: `id`, `createdAtUtc`, `strategyId`, `symbol`, `interval`, `parameters`, `firstCandleUtc`, `lastCandleUtc`, `settings`, `totalTrades`, `winRatePercent`, `netProfit`, `netProfitPercent`, `maxDrawdownPercent`, `note` |
+| GET | `/{id}` | — | Kết quả đầy đủ như `POST /api/strategies/{id}/backtest`, không chạy lại |
+| PUT | `/{id}/note` | Body `{ "note" }` (null/trống = xóa, tối đa 500 ký tự) | `{ "note" }` |
+| DELETE | `/{id}` | — | 204 |
+
 ## Thêm endpoint mới
 
 Xem [extending.md → Thêm endpoint](extending.md#3-thêm-một-endpoint) và cập nhật bảng trong file này.
