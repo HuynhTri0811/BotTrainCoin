@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Button, Card, Checkbox, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { backtestApi, type BacktestSettings, type BacktestSummary } from '../../api/client';
+import { backtestApi, type BacktestResult, type BacktestSettings, type BacktestSummary } from '../../api/client';
 import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
 import { excelVnDate, formatVn } from '../../time';
@@ -77,17 +77,12 @@ const compareRows: { label: string; value: (summary: BacktestSummary) => ReactNo
 interface Props {
   /** Chiến lược đang chọn trên dashboard, để lọc "chỉ chiến lược này". */
   strategyId: number;
-  /** Lần chạy đang hiển thị bên dưới (tô đậm dòng). */
-  openedId: number | null;
+  /** Bấm Xem: mở trang chi tiết của lần chạy. */
   onOpen: (id: number) => void;
-  /** Ghi chú của một lần chạy vừa được lưu, để kết quả đang mở cập nhật theo. */
-  onNoteSaved: (id: number, note: string | null) => void;
-  /** Một lần chạy vừa bị xóa, để đóng kết quả nếu đang mở nó. */
-  onDeleted: (id: number) => void;
 }
 
 /** Lịch sử mọi lần backtest đã chạy: xem lại, so sánh, ghi chú, xóa, xuất Excel. */
-export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved, onDeleted }: Props) {
+export function BacktestHistoryCard({ strategyId, onOpen }: Props) {
   const queryClient = useQueryClient();
   const [onlyThisStrategy, setOnlyThisStrategy] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
@@ -109,7 +104,8 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
   const setNote = useMutation({
     mutationFn: ({ id, note }: { id: number; note: string }) => backtestApi.setNote(id, note),
     onSuccess: (saved, { id }) => {
-      onNoteSaved(id, saved.note);
+      // Trang chi tiết đã mở trước đó (còn trong cache) hiện ghi chú mới.
+      queryClient.setQueryData<BacktestResult>(['backtest', id], (current) => current && { ...current, note: saved.note });
       refresh();
     },
     onError: (error) => message.error(error.message),
@@ -118,7 +114,7 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
     mutationFn: backtestApi.remove,
     onSuccess: (_, id) => {
       setSelected((current) => current.filter((selectedId) => selectedId !== id));
-      onDeleted(id);
+      queryClient.removeQueries({ queryKey: ['backtest', id] });
       refresh();
     },
     onError: (error) => message.error(error.message),
@@ -161,8 +157,8 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
     >
       <Space orientation="vertical" style={{ width: '100%' }}>
         <Typography.Text type="secondary">
-          Mọi lần chạy đều được lưu. Tick tối đa {MAX_COMPARE} dòng để so sánh, bấm vào ghi chú để sửa, bấm Xem để mở lại
-          đầy đủ kết quả mà không chạy lại.
+          Mọi lần chạy đều được lưu. Tick tối đa {MAX_COMPARE} dòng để so sánh, bấm vào ghi chú để sửa, bấm Xem để mở trang
+          chi tiết (thống kê, chart, danh sách lệnh) mà không chạy lại.
         </Typography.Text>
 
         {comparing && compared.length >= 2 && (
@@ -191,7 +187,6 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
           dataSource={rows}
           pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
           scroll={{ x: true }}
-          rowClassName={(summary) => (summary.id === openedId ? 'ant-table-row-selected' : '')}
           rowSelection={{
             selectedRowKeys: selected,
             onChange: (keys) => setSelected((keys as number[]).slice(0, MAX_COMPARE)),

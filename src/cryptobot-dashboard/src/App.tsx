@@ -3,6 +3,7 @@ import { Alert, Layout, Menu, Segmented, Space, Spin, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api/client';
 import { StatusBar } from './components/StatusBar';
+import { BacktestHistoryPage } from './pages/BacktestHistoryPage';
 import { BacktestPage } from './pages/BacktestPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { MarketPage } from './pages/MarketPage';
@@ -18,6 +19,7 @@ const PAGES = [
   { key: 'prediction', label: 'Dự đoán' },
   { key: 'signals', label: 'Tín hiệu' },
   { key: 'backtest', label: 'Backtest' },
+  { key: 'backtest-history', label: 'Lịch sử backtest' },
   { key: 'history', label: 'Lịch sử theo tháng' },
   { key: 'reports', label: 'Báo cáo ngày' },
   { key: 'news', label: 'Tin tức' },
@@ -25,19 +27,28 @@ const PAGES = [
 
 type Page = (typeof PAGES)[number]['key'];
 
+interface Route {
+  page: Page;
+  /** Số sau dấu `/`, ví dụ `#backtest-history/14` mở chi tiết lần chạy 14; null nếu không có. */
+  id: number | null;
+}
+
 /** Trang hiện tại nằm trong #hash để tải lại hoặc gửi link vẫn mở đúng trang. */
-function pageFromHash(): Page {
-  const hash = window.location.hash.slice(1);
-  return PAGES.find((page) => page.key === hash)?.key ?? 'market';
+function routeFromHash(): Route {
+  const [key, param] = window.location.hash.slice(1).split('/');
+  const page = PAGES.find((entry) => entry.key === key)?.key ?? 'market';
+  const id = Number(param);
+  return { page, id: param && Number.isInteger(id) && id > 0 ? id : null };
 }
 
 export function App() {
   const status = useQuery({ queryKey: ['status'], queryFn: api.status, refetchInterval: 10_000 });
-  const [page, setPage] = useState<Page>(pageFromHash);
+  const [route, setRoute] = useState<Route>(routeFromHash);
+  const { page } = route;
   const [selected, setSelected] = useState<number | null>(null);
 
   useEffect(() => {
-    const onHash = () => setPage(pageFromHash());
+    const onHash = () => setRoute(routeFromHash());
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
@@ -70,7 +81,8 @@ export function App() {
               <Typography.Title level={3} style={{ margin: 0 }}>
                 {PAGES.find((entry) => entry.key === page)?.label}
               </Typography.Title>
-              {usesStrategy && strategies.length > 1 && (
+              {/* Trang chi tiết một lần backtest đã cố định cặp/khung nến: không cần chọn chiến lược. */}
+              {usesStrategy && route.id == null && strategies.length > 1 && (
                 <Segmented
                   value={current?.id}
                   onChange={(value) => setSelected(value as number)}
@@ -95,6 +107,7 @@ export function App() {
                 {page === 'prediction' && <PredictionPage key={current.id} strategy={current} />}
                 {page === 'signals' && <SignalsPage key={current.id} strategy={current} />}
                 {page === 'backtest' && <BacktestPage key={current.id} strategy={current} />}
+                {page === 'backtest-history' && <BacktestHistoryPage strategyId={current.id} openedId={route.id} />}
               </>
             )}
           </Space>
