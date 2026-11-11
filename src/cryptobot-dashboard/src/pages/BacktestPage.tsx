@@ -26,7 +26,8 @@ import {
   type Strategy,
 } from '../api/client';
 import { BacktestResultView } from '../features/backtest/BacktestResultView';
-import { BACKTEST_HISTORY_PAGE, backtestDetailHash } from './BacktestHistoryPage';
+import { backtestQueryKey } from '../features/backtest/useBacktestMutations';
+import { backtestDetailHref, pageHref } from '../routes';
 import { formatVn } from '../time';
 
 /** Ngày `YYYY-MM-DD` trên ô nhập hiểu theo giờ Việt Nam (00:00 hoặc 23:59:59 của ngày đó). */
@@ -107,6 +108,8 @@ export function BacktestPage({ strategy }: { strategy: Strategy }) {
     mutationFn: (request) => backtestApi.run(strategy.id, request),
     onSuccess: (result) => {
       show(result);
+      // Trang chi tiết của lần vừa chạy dùng luôn kết quả này, không tải lại.
+      queryClient.setQueryData(backtestQueryKey(result.id), result);
       queryClient.invalidateQueries({ queryKey: ['backtests'] });
     },
   });
@@ -257,14 +260,14 @@ export function BacktestPage({ strategy }: { strategy: Strategy }) {
 
       <Typography.Text type="secondary">
         Mọi lần chạy được lưu tự động: xem lại, so sánh, ghi chú ở tab{' '}
-        <a href={`#${BACKTEST_HISTORY_PAGE}`}>Lịch sử backtest</a>.
+        <a href={pageHref('backtest-history')}>Lịch sử backtest</a>.
       </Typography.Text>
 
       <div ref={resultRef} style={{ scrollMarginTop: 16 }}>
         {shown && (
           <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
             <Flex justify="end">
-              <a href={`#${backtestDetailHash(shown.id)}`}>Mở trang chi tiết lần chạy #{shown.id} →</a>
+              <a href={backtestDetailHref(shown.id)}>Mở trang chi tiết lần chạy #{shown.id} →</a>
             </Flex>
             <BacktestResultView result={shown} />
           </Space>
