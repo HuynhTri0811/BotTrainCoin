@@ -79,6 +79,7 @@ Chi tiết thuật toán: [signal-functions.md](signal-functions.md).
 
 **Code:** [`ICustomIndicator`](../src/CryptoBot.Domain/Indicators/Contracts/ICustomIndicator.cs),
 [`MyRsiIndicator`](../src/CryptoBot.Domain/Indicators/Rsi/MyRsiIndicator.cs) (ví dụ đầy đủ),
+[`FlowRsiIndicator`](../src/CryptoBot.Domain/Indicators/FlowRsi/FlowRsiIndicator.cs),
 [`TemplateIndicator`](../src/CryptoBot.Domain/Indicators/Template/TemplateIndicator.cs) (khung trống),
 [`IndicatorRegistry`](../src/CryptoBot.Application/Indicators/Registry/IndicatorRegistry.cs),
 [`IndicatorService`](../src/CryptoBot.Application/Indicators/Computation/IndicatorService.cs).
@@ -96,7 +97,13 @@ Chi tiết thuật toán: [signal-functions.md](signal-functions.md).
   - Bật `TrendEmaPeriod` (ví dụ 50, hồi trong xu hướng, sửa ở PR #48): giá trên EMA và RSI cắt lên `PullbackLong`
     (40) → Long; giá dưới EMA và RSI cắt xuống `PullbackShort` (60) → Short. Lý do bỏ 30/70 khi có EMA: RSI dưới
     30 thì giá gần như luôn dưới EMA, nên bản cũ cho 0 tín hiệu.
-- Mặc định có 2 chỉ báo: `btc-1h-myrsi` (đảo chiều) và `eth-15m-myrsi-trend` (hồi trong xu hướng, EMA50).
+- **FlowRsi** (#180): RSI tính trên khối lượng mua/bán chủ động thay cho giá. Mỗi nến lấy chênh lệch
+  mua − bán chủ động (`2 × TakerBuyVolume − Volume`) làm "thay đổi", rồi tính RSI kiểu Wilder như RSI giá. Flow RSI
+  cắt lên `Oversold` (30) → Long (bên mua lấy lại thế), cắt xuống `Overbought` (70) → Short. Cửa sổ có nến thiếu
+  `TakerBuyVolume` (nến lưu trước khi bot lấy số liệu này) thì không tính, kèm lý do. Lý do tín hiệu ghi thêm tỷ trọng
+  mua chủ động của nến vừa đóng.
+- Mặc định có 3 chỉ báo: `btc-1h-myrsi` (đảo chiều), `eth-15m-myrsi-trend` (hồi trong xu hướng, EMA50) và
+  `btc-1h-flowrsi` (RSI mua/bán chủ động).
 
 ## 4. Paper Futures (Long/Short có đòn bẩy, tiền giả lập)
 
