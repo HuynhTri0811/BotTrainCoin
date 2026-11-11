@@ -25,8 +25,9 @@ import {
   type PositionSizing,
   type Strategy,
 } from '../api/client';
-import { BacktestHistoryCard } from '../features/backtest/BacktestHistoryCard';
 import { BacktestResultView } from '../features/backtest/BacktestResultView';
+import { backtestQueryKey } from '../features/backtest/useBacktestMutations';
+import { backtestDetailHref, pageHref } from '../routes';
 import { formatVn } from '../time';
 
 /** Ngày `YYYY-MM-DD` trên ô nhập hiểu theo giờ Việt Nam (00:00 hoặc 23:59:59 của ngày đó). */
@@ -95,7 +96,7 @@ export function BacktestPage({ strategy }: { strategy: Strategy }) {
     onError: (error) => message.error(errorText(error), 8),
   });
 
-  // Kết quả đang hiển thị: lần vừa chạy hoặc một lần mở lại từ lịch sử.
+  // Kết quả lần vừa chạy; các lần trước xem ở tab Lịch sử backtest.
   const [shown, setShown] = useState<BacktestResult | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const show = (result: BacktestResult) => {
@@ -107,14 +108,10 @@ export function BacktestPage({ strategy }: { strategy: Strategy }) {
     mutationFn: (request) => backtestApi.run(strategy.id, request),
     onSuccess: (result) => {
       show(result);
+      // Trang chi tiết của lần vừa chạy dùng luôn kết quả này, không tải lại.
+      queryClient.setQueryData(backtestQueryKey(result.id), result);
       queryClient.invalidateQueries({ queryKey: ['backtests'] });
     },
-  });
-
-  const open = useMutation({
-    mutationFn: backtestApi.get,
-    onSuccess: show,
-    onError: (error) => message.error(errorText(error)),
   });
 
   const submit = () => {
@@ -261,18 +258,17 @@ export function BacktestPage({ strategy }: { strategy: Strategy }) {
 
       {run.isError && <Alert type="error" showIcon title={errorText(run.error)} />}
 
-      <BacktestHistoryCard
-        strategyId={strategy.id}
-        openedId={shown?.id ?? null}
-        onOpen={(id) => open.mutate(id)}
-        onNoteSaved={(id, note) => setShown((current) => (current?.id === id ? { ...current, note } : current))}
-        onDeleted={(id) => setShown((current) => (current?.id === id ? null : current))}
-      />
+      <Typography.Text type="secondary">
+        Mọi lần chạy được lưu tự động: xem lại, so sánh, ghi chú ở tab{' '}
+        <a href={pageHref('backtest-history')}>Lịch sử backtest</a>.
+      </Typography.Text>
 
       <div ref={resultRef} style={{ scrollMarginTop: 16 }}>
-        {open.isPending && <Spin />}
         {shown && (
           <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+            <Flex justify="end">
+              <a href={backtestDetailHref(shown.id)}>Mở trang chi tiết lần chạy #{shown.id} →</a>
+            </Flex>
             <BacktestResultView result={shown} />
           </Space>
         )}

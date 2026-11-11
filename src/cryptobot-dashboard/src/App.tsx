@@ -3,6 +3,7 @@ import { Alert, Layout, Menu, Segmented, Space, Spin, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api/client';
 import { StatusBar } from './components/StatusBar';
+import { BacktestHistoryPage } from './pages/BacktestHistoryPage';
 import { BacktestPage } from './pages/BacktestPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { MarketPage } from './pages/MarketPage';
@@ -11,33 +12,16 @@ import { PredictionPage } from './pages/PredictionPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SignalsPage } from './pages/SignalsPage';
 import { TradingPage } from './pages/TradingPage';
-
-const PAGES = [
-  { key: 'market', label: 'Biểu đồ' },
-  { key: 'trading', label: 'Giao dịch Paper' },
-  { key: 'prediction', label: 'Dự đoán' },
-  { key: 'signals', label: 'Tín hiệu' },
-  { key: 'backtest', label: 'Backtest' },
-  { key: 'history', label: 'Lịch sử theo tháng' },
-  { key: 'reports', label: 'Báo cáo ngày' },
-  { key: 'news', label: 'Tin tức' },
-] as const;
-
-type Page = (typeof PAGES)[number]['key'];
-
-/** Trang hiện tại nằm trong #hash để tải lại hoặc gửi link vẫn mở đúng trang. */
-function pageFromHash(): Page {
-  const hash = window.location.hash.slice(1);
-  return PAGES.find((page) => page.key === hash)?.key ?? 'market';
-}
+import { PAGES, routeFromHash, type Route } from './routes';
 
 export function App() {
   const status = useQuery({ queryKey: ['status'], queryFn: api.status, refetchInterval: 10_000 });
-  const [page, setPage] = useState<Page>(pageFromHash);
+  const [route, setRoute] = useState<Route>(routeFromHash);
+  const { page } = route;
   const [selected, setSelected] = useState<number | null>(null);
 
   useEffect(() => {
-    const onHash = () => setPage(pageFromHash());
+    const onHash = () => setRoute(routeFromHash());
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
@@ -45,7 +29,11 @@ export function App() {
   const strategies = status.data?.strategies.filter((strategy) => strategy.enabled) ?? [];
   const current = strategies.find((strategy) => strategy.id === selected) ?? strategies[0];
   // Lịch sử theo tháng, báo cáo ngày và tin tức có danh sách riêng, không theo cặp/khung nến của chiến lược.
-  const usesStrategy = page !== 'history' && page !== 'reports' && page !== 'news';
+  // Lịch sử backtest chỉ dùng chiến lược cho bộ lọc, nên vẫn mở được khi chưa có chiến lược nào.
+  const usesStrategy = page !== 'history' && page !== 'reports' && page !== 'news' && page !== 'backtest-history';
+  // Trang chi tiết một lần backtest đã cố định cặp/khung nến: không cần chọn chiến lược.
+  const showStrategyPicker =
+    strategies.length > 1 && (usesStrategy || (page === 'backtest-history' && route.backtestId == null));
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -70,7 +58,7 @@ export function App() {
               <Typography.Title level={3} style={{ margin: 0 }}>
                 {PAGES.find((entry) => entry.key === page)?.label}
               </Typography.Title>
-              {usesStrategy && strategies.length > 1 && (
+              {showStrategyPicker && (
                 <Segmented
                   value={current?.id}
                   onChange={(value) => setSelected(value as number)}
@@ -88,6 +76,7 @@ export function App() {
             {page === 'history' && <HistoryPage />}
             {page === 'reports' && <ReportsPage />}
             {page === 'news' && <NewsPage />}
+            {page === 'backtest-history' && <BacktestHistoryPage strategyId={current?.id} openedId={route.backtestId} />}
             {usesStrategy && current && (
               <>
                 {page === 'market' && <MarketPage key={current.id} strategy={current} />}

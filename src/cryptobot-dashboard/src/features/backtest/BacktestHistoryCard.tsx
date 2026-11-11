@@ -1,11 +1,13 @@
 import { useState, type ReactNode } from 'react';
-import { Button, Card, Checkbox, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Button, Card, Checkbox, Popconfirm, Space, Table, Tag, Typography } from 'antd';
+import { useQuery } from '@tanstack/react-query';
 import { backtestApi, type BacktestSettings, type BacktestSummary } from '../../api/client';
 import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
 import { excelVnDate, formatVn } from '../../time';
 import { fmtPercent, fmtSigned, fmtSignedPercent, pnlColor } from '../futures/format';
+import { BacktestNote } from './BacktestNote';
+import { useBacktestMutations } from './useBacktestMutations';
 
 const amount = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 const MAX_COMPARE = 4;
@@ -75,26 +77,20 @@ const compareRows: { label: string; value: (summary: BacktestSummary) => ReactNo
 ];
 
 interface Props {
-  /** Chiến lược đang chọn trên dashboard, để lọc "chỉ chiến lược này". */
-  strategyId: number;
-  /** Lần chạy đang hiển thị bên dưới (tô đậm dòng). */
-  openedId: number | null;
+  /** Chiến lược đang chọn trên dashboard, để lọc "chỉ chiến lược này"; undefined thì ẩn bộ lọc. */
+  strategyId: number | undefined;
+  /** Bấm Xem: mở trang chi tiết của lần chạy. */
   onOpen: (id: number) => void;
-  /** Ghi chú của một lần chạy vừa được lưu, để kết quả đang mở cập nhật theo. */
-  onNoteSaved: (id: number, note: string | null) => void;
-  /** Một lần chạy vừa bị xóa, để đóng kết quả nếu đang mở nó. */
-  onDeleted: (id: number) => void;
 }
 
 /** Lịch sử mọi lần backtest đã chạy: xem lại, so sánh, ghi chú, xóa, xuất Excel. */
-export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved, onDeleted }: Props) {
-  const queryClient = useQueryClient();
+export function BacktestHistoryCard({ strategyId, onOpen }: Props) {
   const [onlyThisStrategy, setOnlyThisStrategy] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
   const [comparing, setComparing] = useState(false);
 
   // Lọc ở API: lọc phía client trên 200 dòng mới nhất sẽ thiếu các lần chạy cũ của chiến lược này.
-  const filterId = onlyThisStrategy ? strategyId : undefined;
+  const filterId = onlyThisStrategy && strategyId !== undefined ? strategyId : undefined;
   const history = useQuery({
     queryKey: ['backtests', filterId ?? 'all'],
     queryFn: () => backtestApi.list(filterId),
@@ -104,24 +100,8 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
     queryKey: ['backtests', filterId ?? 'all', 'count'],
     queryFn: () => backtestApi.count(filterId),
   });
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['backtests'] });
-
-  const setNote = useMutation({
-    mutationFn: ({ id, note }: { id: number; note: string }) => backtestApi.setNote(id, note),
-    onSuccess: (saved, { id }) => {
-      onNoteSaved(id, saved.note);
-      refresh();
-    },
-    onError: (error) => message.error(error.message),
-  });
-  const remove = useMutation({
-    mutationFn: backtestApi.remove,
-    onSuccess: (_, id) => {
-      setSelected((current) => current.filter((selectedId) => selectedId !== id));
-      onDeleted(id);
-      refresh();
-    },
-    onError: (error) => message.error(error.message),
+  const { setNote, remove } = useBacktestMutations({
+    onDeleted: (id) => setSelected((current) => current.filter((selectedId) => selectedId !== id)),
   });
 
   const rows = history.data ?? [];
@@ -136,17 +116,19 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
       title={`Lịch sử backtest (${countLabel})`}
       extra={
         <Space wrap>
-          <Checkbox
-            checked={onlyThisStrategy}
-            onChange={(event) => {
-              // Dòng đã chọn có thể không còn trong danh sách mới.
-              setSelected([]);
-              setComparing(false);
-              setOnlyThisStrategy(event.target.checked);
-            }}
-          >
-            Chỉ chiến lược đang chọn
-          </Checkbox>
+          {strategyId !== undefined && (
+            <Checkbox
+              checked={onlyThisStrategy}
+              onChange={(event) => {
+                // Dòng đã chọn có thể không còn trong danh sách mới.
+                setSelected([]);
+                setComparing(false);
+                setOnlyThisStrategy(event.target.checked);
+              }}
+            >
+              Chỉ chiến lược đang chọn
+            </Checkbox>
+          )}
           <Button size="small" disabled={selected.length < 2} onClick={() => setComparing((current) => !current)}>
             {comparing ? 'Ẩn so sánh' : `So sánh (${selected.length})`}
           </Button>
@@ -161,8 +143,8 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
     >
       <Space orientation="vertical" style={{ width: '100%' }}>
         <Typography.Text type="secondary">
-          Mọi lần chạy đều được lưu. Tick tối đa {MAX_COMPARE} dòng để so sánh, bấm vào ghi chú để sửa, bấm Xem để mở lại
-          đầy đủ kết quả mà không chạy lại.
+          Mọi lần chạy đều được lưu. Tick tối đa {MAX_COMPARE} dòng để so sánh, bấm vào ghi chú để sửa, bấm Xem để mở trang
+          chi tiết (thống kê, chart, danh sách lệnh) mà không chạy lại.
         </Typography.Text>
 
         {comparing && compared.length >= 2 && (
@@ -191,7 +173,6 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
           dataSource={rows}
           pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
           scroll={{ x: true }}
-          rowClassName={(summary) => (summary.id === openedId ? 'ant-table-row-selected' : '')}
           rowSelection={{
             selectedRowKeys: selected,
             onChange: (keys) => setSelected((keys as number[]).slice(0, MAX_COMPARE)),
@@ -269,19 +250,7 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
               dataIndex: 'note',
               width: 200,
               render: (note: string | null, summary) => (
-                <Typography.Text
-                  type={note ? undefined : 'secondary'}
-                  editable={{
-                    text: note ?? '',
-                    maxLength: 500,
-                    tooltip: 'Sửa ghi chú',
-                    onChange: (value) => {
-                      if (value !== (note ?? '')) setNote.mutate({ id: summary.id, note: value });
-                    },
-                  }}
-                >
-                  {note ?? 'thêm ghi chú'}
-                </Typography.Text>
+                <BacktestNote note={note} onSave={(value) => setNote.mutate({ id: summary.id, note: value })} />
               ),
             },
             {
