@@ -23,8 +23,10 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
-        var connectionString = config.GetConnectionString("Bot") ?? "Data Source=data/cryptobot.db";
-        services.AddDbContext<BotDbContext>(builder => builder.UseSqlite(connectionString));
+        // PostgreSQL trong container cryptobot-postgres (docker-compose.yml ở gốc repo).
+        var connectionString = config.GetConnectionString("Bot")
+                               ?? throw new InvalidOperationException("Thiếu ConnectionStrings:Bot (PostgreSQL).");
+        services.AddDbContext<BotDbContext>(builder => builder.UseNpgsql(connectionString));
 
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<ICandleStore, CandleStore>();
@@ -117,19 +119,11 @@ public static class DependencyInjection
         return services;
     }
 
-    /// <summary>Áp migration và bật WAL. Chỉ một tiến trình được gọi hàm này.</summary>
+    /// <summary>Áp migration. Chỉ một tiến trình được gọi hàm này.</summary>
     public static async Task InitializeDatabaseAsync(IServiceProvider services, CancellationToken ct)
     {
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
-
-        var dataSource = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(
-            db.Database.GetConnectionString()).DataSource;
-        var dir = Path.GetDirectoryName(Path.GetFullPath(dataSource));
-        if (!string.IsNullOrEmpty(dir))
-            Directory.CreateDirectory(dir);
-
         await db.Database.MigrateAsync(ct);
-        await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", ct);
     }
 }
