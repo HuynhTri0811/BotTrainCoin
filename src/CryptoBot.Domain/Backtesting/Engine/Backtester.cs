@@ -22,14 +22,19 @@ namespace CryptoBot.Domain.Backtesting;
 /// </summary>
 public static class Backtester
 {
+    // Kiểm tra hủy theo lô nến: đủ thường để dừng nhanh, không tốn công ở mỗi nến.
+    private const int CancellationCheckInterval = 1024;
+
     /// <summary>Chạy backtest.</summary>
     /// <param name="candles">Nến đã đóng, tăng dần theo thời gian. Nến đầu dùng làm warm-up cho cửa sổ.</param>
     /// <param name="interval">Khung nến, để phát hiện cửa sổ có nến thiếu.</param>
     /// <param name="strategy">Chiến lược ra quyết định BUY/SELL.</param>
     /// <param name="settings">Vốn, khối lượng, TP/SL, phí.</param>
+    /// <param name="cancellationToken">Dừng giữa chừng khi request bị hủy (vòng lặp nặng CPU, có thể vài chục giây).</param>
     /// <exception cref="ArgumentException">Khi <paramref name="settings"/> không hợp lệ.</exception>
+    /// <exception cref="OperationCanceledException">Khi <paramref name="cancellationToken"/> bị hủy.</exception>
     public static BacktestResult Run(IReadOnlyList<Candle> candles, CandleInterval interval, IStrategy strategy,
-        BacktestSettings settings)
+        BacktestSettings settings, CancellationToken cancellationToken = default)
     {
         if (settings.Validate() is { } error)
             throw new ArgumentException(error, nameof(settings));
@@ -46,6 +51,8 @@ public static class Backtester
 
         for (int index = 0; index < candles.Count; index++)
         {
+            if (index % CancellationCheckInterval == 0)
+                cancellationToken.ThrowIfCancellationRequested();
             Candle candle = candles[index];
 
             // 1. Lệnh chờ từ tín hiệu ở nến trước khớp ở giá mở nến này.

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using CryptoBot.Application.Abstractions;
 using CryptoBot.Application.Signals;
 using CryptoBot.Domain.Backtesting;
@@ -18,6 +19,12 @@ public sealed class BacktestService(IStrategyInstanceStore instances, ICandleSto
     /// <summary>Số cột tối đa trên chart kết quả.</summary>
     public const int MaxChartBars = 3000;
 
+    /// <summary>
+    /// Cửa sổ EMA lớn nhất cho phép khi backtest. Mỗi nến tính lại EMA trên cả cửa sổ, nên thời gian chạy tăng theo
+    /// (số nến × cửa sổ); nến warm-up đọc thêm cũng bằng cửa sổ và không tính vào <see cref="MaxCandles"/>.
+    /// </summary>
+    public const int MaxLookbackCandles = 1000;
+
     private const int PageSize = 50_000;
 
     /// <summary>Khoảng nến đã đóng có trong DB; null nếu không có instance.</summary>
@@ -33,7 +40,10 @@ public sealed class BacktestService(IStrategyInstanceStore instances, ICandleSto
     }
 
     /// <summary>Chạy backtest; null nếu không có instance.</summary>
-    /// <exception cref="ArgumentException">Tham số chiến lược/vốn sai, khoảng thời gian sai hoặc quá nhiều nến.</exception>
+    /// <exception cref="ArgumentException">
+    /// Chiến lược không phải EMA cross, tham số chiến lược/vốn sai, khoảng thời gian sai, không có nến hoặc quá nhiều nến.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">Request bị hủy; không có gì được trả về để lưu.</exception>
     public async Task<BacktestRun?> RunAsync(BacktestRequest request, CancellationToken ct)
     {
         if (await instances.GetAsync(request.StrategyId, ct) is not { } instance)
@@ -43,27 +53,30 @@ public sealed class BacktestService(IStrategyInstanceStore instances, ICandleSto
         if (request.Settings.Validate() is { } settingsError)
             throw new ArgumentException(settingsError);
 
-        var defaults = StrategyFactory.ParseEmaCross(instance.ParametersJson);
+        var defaults = ParseParameters(instance);
         var parameters = request.Overrides?.ApplyTo(defaults) ?? defaults;
         if (parameters.Validate() is { } parametersError)
             throw new ArgumentException(parametersError);
+        if (parameters.LookbackCandles > MaxLookbackCandles)
+            throw new ArgumentException($"LookbackCandles tối đa {MaxLookbackCandles:N0} khi backtest.");
         var strategy = new EmaCrossStrategy(parameters);
         var key = CandleKey.For(instance);
 
         var range = await LoadRangeAsync(key, request.FromUtc, request.ToUtc, ct);
+        // Không có nến thì không có gì để chạy hay lưu vào lịch sử.
+        if (range.Count == 0)
+            throw new ArgumentException("Không có nến nào trong khoảng đã chọn; hãy chọn khoảng khác hoặc tải thêm lịch sử.");
         // Nến trước khoảng chỉ để có đủ cửa sổ cho nến đầu, giống SignalEvaluationService.
-        var warmup = range.Count == 0
-            ? []
-            : await candles.GetLatestAsync(key, range[0].OpenTimeUtc, strategy.RequiredCandles - 1,
-                closedOnly: true, ct);
+        var warmup = await candles.GetLatestAsync(key, range[0].OpenTimeUtc, strategy.RequiredCandles - 1,
+            closedOnly: true, ct);
 
         var series = new List<Candle>(warmup.Count + range.Count);
         series.AddRange(warmup);
         series.AddRange(range);
-        var result = Backtester.Run(series, key.Interval, strategy, request.Settings);
+        var result = Backtester.Run(series, key.Interval, strategy, request.Settings, ct);
 
-        return new BacktestRun(instance, parameters, range.FirstOrDefault()?.OpenTimeUtc,
-            range.LastOrDefault()?.OpenTimeUtc, range.Count, warmup.Count, result,
+        return new BacktestRun(instance, parameters, range[0].OpenTimeUtc, range[^1].OpenTimeUtc, range.Count,
+            warmup.Count, result,
             BacktestChart.Build(range, result, MaxChartBars));
     }
 
@@ -90,6 +103,22 @@ public sealed class BacktestService(IStrategyInstanceStore instances, ICandleSto
             if (page.Count < PageSize)
                 return loaded;
             after = page[^1].OpenTimeUtc;
+        }
+    }
+
+    /// <summary>Tham số EMA cross của instance; lỗi loại chiến lược hoặc JSON hỏng thành <see cref="ArgumentException"/>.</summary>
+    private static EmaCrossParameters ParseParameters(StrategyInstance instance)
+    {
+        // Giống StrategyFactory.Create: chỉ chạy được EMA cross, không đọc tham số loại khác như EMA cross.
+        if (instance.StrategyType != StrategyTypes.EmaCross)
+            throw new ArgumentException($"Backtest chưa hỗ trợ loại chiến lược {instance.StrategyType}.");
+        try
+        {
+            return StrategyFactory.ParseEmaCross(instance.ParametersJson);
+        }
+        catch (JsonException ex)
+        {
+            throw new ArgumentException($"Tham số của chiến lược không đọc được: {ex.Message}", ex);
         }
     }
 }

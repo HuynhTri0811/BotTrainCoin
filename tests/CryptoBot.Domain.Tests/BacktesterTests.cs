@@ -201,4 +201,14 @@ public class BacktesterTests
         Assert.NotNull(settings.Validate());
         Assert.Throws<ArgumentException>(() => Run(TestCandles.FromCloses(UpThenDown), settings));
     }
+
+    [Fact]
+    public void Cancelled_token_stops_the_run()
+    {
+        using CancellationTokenSource cancelled = new();
+        cancelled.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => Backtester.Run(TestCandles.FromCloses(UpThenDown),
+            CandleInterval.H1, Strategy, Settings(), cancelled.Token));
+    }
 }
