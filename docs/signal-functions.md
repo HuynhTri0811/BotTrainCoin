@@ -21,7 +21,7 @@ Hai hàm này **thuần túy**: không gọi API, không đọc đồng hồ, kh
 
 ```mermaid
 flowchart TD
-    DB[(Nến đã đóng trong SQLite)] --> W{Ai gọi?}
+    DB[(Nến đã đóng trong PostgreSQL)] --> W{Ai gọi?}
     W -->|Worker mỗi 15s| SE[SignalEvaluationService]
     W -->|Mở chart| CQ[ChartQueryService]
     W -->|Chart chỉ báo / lệnh tự động| IS[IndicatorService]

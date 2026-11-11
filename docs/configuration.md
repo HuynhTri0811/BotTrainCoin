@@ -11,7 +11,7 @@ Cột "Mặc định" là giá trị trong code khi không khai báo; giá trị
 
 | Khóa | Hiện tại | Ghi chú |
 | --- | --- | --- |
-| `Bot` | `Data Source=data/cryptobot.db;Default Timeout=30` | Đường dẫn tương đối với thư mục chạy API. Thiếu thì dùng `Data Source=data/cryptobot.db` |
+| `Bot` | `Host=localhost;Port=5433;Database=cryptobot;Username=cryptobot;Password=cryptobot` | PostgreSQL trong container `cryptobot-postgres` ([`docker-compose.yml`](../docker-compose.yml)). Bắt buộc: thiếu thì API báo lỗi khi khởi động. Mật khẩu container đổi bằng biến môi trường `CRYPTOBOT_DB_PASSWORD` (nhớ đổi cả chuỗi này, ví dụ qua `ConnectionStrings__Bot`) |
 
 ## Serilog
 

@@ -12,11 +12,13 @@ BotTrainCoin/
 ├── docs/                         # Tài liệu (file này)
 │   └── analysis/                 # Báo cáo phân tích, mỗi báo cáo một thư mục: README.md + data/ + scripts/ Python
 ├── data/                         # Dữ liệu cục bộ (CSV, backup .db) — bị .gitignore, không commit
+├── docker-compose.yml            # PostgreSQL riêng của bot (container cryptobot-postgres, localhost:5433)
+├── tools/sqlite-to-postgres/     # Công cụ chạy một lần: chép dữ liệu SQLite cũ sang PostgreSQL (không nằm trong solution)
 ├── tools/tradingview/            # Bản Pine Script của chiến lược EMA để đối chiếu trên TradingView
 ├── src/
 │   ├── CryptoBot.Domain/         # Nghiệp vụ thuần túy, không phụ thuộc gì
 │   ├── CryptoBot.Application/    # Service điều phối + interface (port)
-│   ├── CryptoBot.Infrastructure/ # EF Core/SQLite, client sàn, đăng ký DI
+│   ├── CryptoBot.Infrastructure/ # EF Core/PostgreSQL, client sàn, đăng ký DI
 │   ├── CryptoBot.Api/            # ASP.NET Core: endpoint, worker, cấu hình
 │   └── cryptobot-dashboard/      # React + Vite
 └── tests/
@@ -296,7 +298,7 @@ tests/
 │   ├── Fakes/                    # Mỗi fake một file: FakeClock, InMemoryCandleStore, InMemorySignalStore, FakeMarketDataClient…
 │   ├── SignalGoldenTests.cs      # Khóa đầu ra hàm sinh tín hiệu
 │   └── Golden/signal_outputs.txt # Snapshot 3,026 dòng
-└── CryptoBot.IntegrationTests/   # Tham chiếu Infrastructure. SQLite file thật + migration thật
+└── CryptoBot.IntegrationTests/   # Tham chiếu Infrastructure. PostgreSQL thật + migration thật
 ```
 
 Chi tiết: [testing.md](testing.md).

@@ -4,13 +4,16 @@ Bot crypto chạy **chỉ trên tiền giả lập (Paper)**: tải nến Binanc
 mở/đóng lệnh Futures giả lập (tay hoặc tự động), và hiển thị mọi thứ trên một dashboard React.
 Live bị khóa: không có API key, không có đường nào tới tiền thật.
 
-- **Backend:** .NET 10, ASP.NET Core Minimal API, EF Core + SQLite, Serilog.
+- **Backend:** .NET 10, ASP.NET Core Minimal API, EF Core + PostgreSQL 17 (Docker), Serilog.
 - **Frontend:** React 19 + TypeScript, Vite, Ant Design 6, TanStack Query, Lightweight Charts.
 - **Dữ liệu:** Binance (Spot + USDⓈ-M Futures, REST công khai) và Bitfinex (nến ngày từ 2016).
 
 ## Chạy nhanh
 
 ```bash
+# PostgreSQL riêng của bot: container cryptobot-postgres ở localhost:5433 (cần Docker)
+docker compose up -d
+
 # Backend: http://localhost:5080 (migration tự chạy khi khởi động)
 dotnet run --project src/CryptoBot.Api --launch-profile http
 
@@ -18,13 +21,15 @@ dotnet run --project src/CryptoBot.Api --launch-profile http
 npm --prefix src/cryptobot-dashboard install
 npm --prefix src/cryptobot-dashboard run dev
 
-# Toàn bộ test
+# Toàn bộ test (integration test cần container PostgreSQL ở trên)
 dotnet test
 ```
 
 Production: `npm --prefix src/cryptobot-dashboard run build` xuất bản build vào `src/CryptoBot.Api/wwwroot`,
 API phục vụ luôn file tĩnh.
-Database SQLite nằm ở `src/CryptoBot.Api/data/cryptobot.db`, tự tạo khi chạy lần đầu.
+Database PostgreSQL `cryptobot` nằm trong container `cryptobot-postgres` (volume `cryptobot-pgdata`), bảng tự tạo
+khi API chạy lần đầu. Xem bằng pgAdmin: *Register → Server*, host `localhost`, port `5433`, user/password `cryptobot`.
+Dữ liệu SQLite cũ chép sang bằng [`tools/sqlite-to-postgres`](tools/sqlite-to-postgres/Program.cs).
 
 ## Dashboard có gì
 
