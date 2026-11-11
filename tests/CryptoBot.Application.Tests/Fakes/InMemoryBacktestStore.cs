@@ -8,16 +8,23 @@ internal sealed class InMemoryBacktestStore : IBacktestStore
     public readonly List<SavedBacktest> Saved = [];
     public int Saves;
 
-    public Task<IReadOnlyList<BacktestSummary>> ListAsync(int? strategyInstanceId, int limit, CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<BacktestSummary>>(Saved
-            .Where(saved => strategyInstanceId is null || saved.StrategyInstanceId == strategyInstanceId)
+    public Task<IReadOnlyList<BacktestSummary>> ListAsync(int? strategyInstanceId, int limit, int offset,
+        CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<BacktestSummary>>(ForInstance(strategyInstanceId)
             .OrderByDescending(saved => saved.CreatedAtUtc).ThenByDescending(saved => saved.Id)
+            .Skip(offset)
             .Take(limit)
             .Select(saved => new BacktestSummary(saved.Id, saved.CreatedAtUtc, saved.StrategyInstanceId, saved.Symbol,
                 saved.Interval, saved.FastPeriod, saved.SlowPeriod, saved.LookbackCandles, saved.FirstCandleUtc,
                 saved.LastCandleUtc, saved.Settings, saved.TotalTrades, saved.WinRatePercent, saved.NetProfit,
                 saved.NetProfitPercent, saved.MaxDrawdownPercent, saved.Note))
             .ToList());
+
+    public Task<int> CountAsync(int? strategyInstanceId, CancellationToken ct) =>
+        Task.FromResult(ForInstance(strategyInstanceId).Count());
+
+    private IEnumerable<SavedBacktest> ForInstance(int? strategyInstanceId) =>
+        Saved.Where(saved => strategyInstanceId is null || saved.StrategyInstanceId == strategyInstanceId);
 
     public Task<SavedBacktest?> GetAsync(long id, CancellationToken ct) =>
         Task.FromResult(Saved.FirstOrDefault(saved => saved.Id == id));

@@ -31,8 +31,14 @@ public sealed class BacktestHistoryService(IBacktestStore store, IClock clock)
         return new SavedBacktestRun(saved, snapshot);
     }
 
-    public Task<IReadOnlyList<BacktestSummary>> ListAsync(int? strategyInstanceId, int limit, CancellationToken ct) =>
-        store.ListAsync(strategyInstanceId, Math.Clamp(limit, 1, MaxListLimit), ct);
+    /// <summary>Một trang lần chạy, mới → cũ; đọc hết bằng cách tăng <paramref name="offset"/> theo trang.</summary>
+    public Task<IReadOnlyList<BacktestSummary>> ListAsync(int? strategyInstanceId, int limit, int offset,
+        CancellationToken ct) =>
+        store.ListAsync(strategyInstanceId, Math.Clamp(limit, 1, MaxListLimit), Math.Max(offset, 0), ct);
+
+    /// <summary>Tổng số lần chạy, để biết danh sách đang hiện có đủ chưa.</summary>
+    public Task<int> CountAsync(int? strategyInstanceId, CancellationToken ct) =>
+        store.CountAsync(strategyInstanceId, ct);
 
     public async Task<SavedBacktestRun?> GetAsync(long id, CancellationToken ct) =>
         await store.GetAsync(id, ct) is { } saved ? new SavedBacktestRun(saved, Decompress(saved.Content)) : null;

@@ -854,6 +854,9 @@ export interface BacktestResult {
   chart: { candlesPerBar: number; bars: BacktestBar[]; markers: BacktestMarker[] };
 }
 
+/** Số dòng tối đa mỗi lần gọi `/api/backtests` (BacktestHistoryService.MaxListLimit). */
+const BACKTEST_PAGE_LIMIT = 500;
+
 export const backtestApi = {
   coverage: (strategyId: number) => getJson<BacktestCoverage>(`/api/strategies/${strategyId}/backtest/coverage`),
   history: (strategyId: number, fromUtc: string) =>
@@ -861,10 +864,22 @@ export const backtestApi = {
   /** Chạy và lưu vào lịch sử. */
   run: (strategyId: number, request: BacktestRequest) =>
     postJson<BacktestResult>(`/api/strategies/${strategyId}/backtest`, request),
-  list: (strategyId?: number, limit = 200) =>
+  list: (strategyId?: number, limit = 200, offset = 0) =>
     getJson<BacktestSummary[]>(
-      `/api/backtests?limit=${limit}${strategyId === undefined ? '' : `&strategyId=${strategyId}`}`,
+      `/api/backtests?limit=${limit}&offset=${offset}${strategyId === undefined ? '' : `&strategyId=${strategyId}`}`,
     ),
+  /** Tổng số lần chạy: `list` chỉ trả một trang. */
+  count: (strategyId?: number) =>
+    getJson<{ total: number }>(`/api/backtests/count${strategyId === undefined ? '' : `?strategyId=${strategyId}`}`),
+  /** Mọi lần chạy, đọc theo trang tối đa của API (dùng cho Xuất Excel). */
+  listAll: async (strategyId?: number) => {
+    const all: BacktestSummary[] = [];
+    for (;;) {
+      const page = await backtestApi.list(strategyId, BACKTEST_PAGE_LIMIT, all.length);
+      all.push(...page);
+      if (page.length < BACKTEST_PAGE_LIMIT) return all;
+    }
+  },
   get: (id: number) => getJson<BacktestResult>(`/api/backtests/${id}`),
   setNote: (id: number, note: string) => sendJson<{ note: string | null }>('PUT', `/api/backtests/${id}/note`, { note }),
   remove: (id: number) => sendJson<null>('DELETE', `/api/backtests/${id}`),

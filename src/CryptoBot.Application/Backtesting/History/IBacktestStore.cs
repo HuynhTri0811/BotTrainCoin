@@ -4,8 +4,15 @@ namespace CryptoBot.Application.Backtesting;
 
 public interface IBacktestStore
 {
-    /// <summary>Tối đa <paramref name="limit"/> lần chạy mới nhất (lọc theo instance nếu có), mới → cũ, không đọc nội dung.</summary>
-    Task<IReadOnlyList<BacktestSummary>> ListAsync(int? strategyInstanceId, int limit, CancellationToken ct);
+    /// <summary>
+    /// Tối đa <paramref name="limit"/> lần chạy (lọc theo instance nếu có), mới → cũ, bỏ qua <paramref name="offset"/>
+    /// lần chạy đầu; không đọc nội dung.
+    /// </summary>
+    Task<IReadOnlyList<BacktestSummary>> ListAsync(int? strategyInstanceId, int limit, int offset,
+        CancellationToken ct);
+
+    /// <summary>Tổng số lần chạy (lọc theo instance nếu có).</summary>
+    Task<int> CountAsync(int? strategyInstanceId, CancellationToken ct);
 
     /// <summary>Lần chạy kèm nội dung; null nếu không có.</summary>
     Task<SavedBacktest?> GetAsync(long id, CancellationToken ct);

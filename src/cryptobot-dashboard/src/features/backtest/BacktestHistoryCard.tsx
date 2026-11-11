@@ -102,6 +102,11 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
     queryKey: ['backtests', filterId ?? 'all'],
     queryFn: () => backtestApi.list(filterId),
   });
+  // Danh sách chỉ có 200 dòng mới nhất; tổng số cho biết còn bao nhiêu chưa hiện.
+  const total = useQuery({
+    queryKey: ['backtests', filterId ?? 'all', 'count'],
+    queryFn: () => backtestApi.count(filterId),
+  });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['backtests'] });
 
   const setNote = useMutation({
@@ -123,12 +128,15 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
   });
 
   const rows = history.data ?? [];
+  const totalCount = total.data?.total;
+  const countLabel =
+    totalCount === undefined || totalCount === rows.length ? `${rows.length}` : `${rows.length} mới nhất / ${totalCount}`;
   const compared = (history.data ?? []).filter((summary) => selected.includes(summary.id));
 
   return (
     <Card
       size="small"
-      title={`Lịch sử backtest (${rows.length})`}
+      title={`Lịch sử backtest (${countLabel})`}
       extra={
         <Space wrap>
           <Checkbox
@@ -146,7 +154,10 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
             {comparing ? 'Ẩn so sánh' : `So sánh (${selected.length})`}
           </Button>
           <ExportExcelButton
-            onExport={async () => ({ count: await downloadExcel('lich-su-backtest', 'Backtest', rows, excelColumns) })}
+            // Xuất mọi lần chạy, không chỉ các dòng đang hiện.
+            onExport={async () => ({
+              count: await downloadExcel('lich-su-backtest', 'Backtest', await backtestApi.listAll(filterId), excelColumns),
+            })}
           />
         </Space>
       }
