@@ -90,6 +90,23 @@ public static class BacktestEndpoints
                 ? Results.Ok(ToDto(saved))
                 : Results.NotFound(new { error = "Không có lần backtest này." }));
 
+        // Nến thật quanh một lệnh (không gộp như chart tổng) kèm EMA. tradeIndex theo thứ tự trades; bằng số lệnh
+        // đã đóng = lệnh còn mở ở cuối kỳ.
+        api.MapGet("/{backtestId:long}/trades/{tradeIndex:int}/chart", async (long backtestId, int tradeIndex,
+            BacktestTradeChartService tradeCharts, CancellationToken ct) =>
+        {
+            try
+            {
+                return await tradeCharts.GetAsync(backtestId, tradeIndex, ct) is { } chart
+                    ? Results.Ok(new BacktestTradeChartDto(chart.CandlesPerBar, chart.Bars.Select(ToDto).ToList()))
+                    : Results.NotFound(new { error = "Không có lần backtest hoặc lệnh này." });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        });
+
         api.MapPut("/{backtestId:long}/note", async (long backtestId, BacktestNoteDto body,
             BacktestHistoryService history, CancellationToken ct) =>
         {
@@ -144,12 +161,14 @@ public static class BacktestEndpoints
                     open.MarkPrice, open.UnrealizedPnl)
                 : null,
             new BacktestChartDto(snapshot.Chart.CandlesPerBar,
-                snapshot.Chart.Bars.Select(bar => new BacktestBarDto(ToUnixSeconds(bar.OpenTimeUtc), bar.Open,
-                    bar.High, bar.Low, bar.Close, bar.Equity)).ToList(),
+                snapshot.Chart.Bars.Select(ToDto).ToList(),
                 snapshot.Chart.Markers.Select(marker => new BacktestMarkerDto(ToUnixSeconds(marker.BarOpenTimeUtc),
                     marker.IsEntry ? "Entry" : "Exit", marker.Price, marker.ExitReason?.ToString(),
                     marker.NetPnl)).ToList()));
     }
+
+    private static BacktestBarDto ToDto(BacktestChartBar bar) => new(ToUnixSeconds(bar.OpenTimeUtc), bar.Open,
+        bar.High, bar.Low, bar.Close, bar.Equity, bar.EmaFast, bar.EmaSlow);
 
     private static long ToUnixSeconds(DateTime utc) => new DateTimeOffset(utc, TimeSpan.Zero).ToUnixTimeSeconds();
 }

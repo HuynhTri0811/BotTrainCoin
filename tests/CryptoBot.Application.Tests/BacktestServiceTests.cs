@@ -203,4 +203,22 @@ public class BacktestServiceTests
         typeof(StrategyInstance).GetProperty(nameof(StrategyInstance.Id))!.SetValue(instance, id);
         _instances.Instances.Add(instance);
     }
+
+    [Fact]
+    public async Task Chart_bars_carry_the_ema_the_bot_used_for_its_signals()
+    {
+        AddCandles(UpThenDown);
+
+        var run = await CreateService().RunAsync(new BacktestRequest(1, null, null, null, Settings),
+            CancellationToken.None);
+
+        var bars = run!.Chart.Bars;
+        // Cửa sổ 4 nến: 3 cột đầu chưa đủ nến nên chưa có EMA.
+        Assert.All(bars.Take(3), bar => Assert.Null(bar.EmaFast));
+        var expected = new EmaCrossStrategy(new EmaCrossParameters(2, 3, 4)).ComputeAt(UpThenDown.AsSpan(0, 4))!.Value;
+        Assert.Equal(expected.Fast, bars[3].EmaFast);
+        Assert.Equal(expected.Slow, bars[3].EmaSlow);
+        // BUY ở nến 3: EMA nhanh vừa vượt EMA chậm.
+        Assert.True(bars[3].EmaFast > bars[3].EmaSlow);
+    }
 }

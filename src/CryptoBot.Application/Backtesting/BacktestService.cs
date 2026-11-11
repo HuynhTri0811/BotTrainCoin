@@ -77,7 +77,7 @@ public sealed class BacktestService(IStrategyInstanceStore instances, ICandleSto
 
         return new BacktestRun(instance, parameters, range[0].OpenTimeUtc, range[^1].OpenTimeUtc, range.Count,
             warmup.Count, result,
-            BacktestChart.Build(range, result, MaxChartBars));
+            BacktestChart.Build(series, warmup.Count, result, strategy, MaxChartBars));
     }
 
     /// <summary>Nến đã đóng có OpenTime trong [from, to], tăng dần, đọc theo trang.</summary>
