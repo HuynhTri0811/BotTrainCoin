@@ -46,7 +46,7 @@ public sealed class SignalEvaluationService(
             var start = Math.Max(0, index - strategy.RequiredCandles + 1);
             var window = new ListSlice<Candle>(series, start, index - start + 1);
 
-            var decision = HasGap(window, interval)
+            var decision = CandleWindow.HasGap(window, interval)
                 ? StrategyDecision.Hold("Cửa sổ nến có khoảng thiếu; bỏ qua đánh giá.")
                 : strategy.Evaluate(new StrategyContext(window, hasPosition, HasPendingEntry: false, instance.Version));
 
@@ -73,8 +73,4 @@ public sealed class SignalEvaluationService(
 
         return new EvaluationResult(pending.Count, created);
     }
-
-    private static bool HasGap(IReadOnlyList<Candle> window, CandleInterval interval) =>
-        window.Count > 1 &&
-        window[^1].OpenTimeUtc - window[0].OpenTimeUtc != interval.Duration * (window.Count - 1);
 }
