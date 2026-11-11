@@ -301,7 +301,7 @@ UI: trang **Lịch sử theo tháng** ([`HistoryPage.tsx`](../src/cryptobot-dash
 **Code:** [`src/cryptobot-dashboard`](../src/cryptobot-dashboard). Chi tiết thư mục ở
 [folder-structure.md](folder-structure.md#srccryptobot-dashboard--frontend).
 
-- Menu trái 8 trang: Biểu đồ, Giao dịch Paper, Dự đoán, Tín hiệu, Backtest, Lịch sử theo tháng, Báo cáo ngày, Tin tức. Trang
+- Menu trái 9 trang: Biểu đồ, Giao dịch Paper, Dự đoán, Tín hiệu, Backtest, Lịch sử backtest, Lịch sử theo tháng, Báo cáo ngày, Tin tức. Trang
   hiện tại nằm trong `#hash` (tải lại hoặc gửi link vẫn mở đúng trang).
 - Nút chọn chiến lược (`BTCUSDT 1h`, `BTCUSDT 15m`, …) ở góc phải; các trang (trừ Lịch sử, Báo cáo ngày, Tin tức)
   dùng symbol/khung của chiến lược đang chọn.
@@ -423,7 +423,8 @@ UI: trang **Backtest** ([`BacktestPage.tsx`](../src/cryptobot-dashboard/src/page
   ([`SavedBacktest`](../src/CryptoBot.Domain/Backtesting/History/SavedBacktest.cs),
   [`BacktestHistoryService`](../src/CryptoBot.Application/Backtesting/History/BacktestHistoryService.cs)). Thông số và
   con số chính là cột riêng để liệt kê nhanh; toàn bộ kết quả (lệnh, chart gộp) lưu dạng JSON nén gzip (≈ 250 KB một
-  lần chạy 1h nhiều năm, ≈ 700 KB với 15m; enum lưu dạng chữ). Card **Lịch sử backtest** trên trang: mở lại đầy đủ không cần chạy lại, so
+  lần chạy 1h nhiều năm, ≈ 700 KB với 15m; enum lưu dạng chữ). Tab **Lịch sử backtest** riêng ([`BacktestHistoryPage.tsx`](../src/cryptobot-dashboard/src/pages/BacktestHistoryPage.tsx)):
+  bấm Xem mở trang chi tiết `#backtest-history/{id}` (thống kê, chart, danh sách lệnh, sửa ghi chú, xóa) không cần chạy lại, so
   sánh tối đa 4 lần cạnh nhau, sửa ghi chú tại chỗ, xóa, lọc theo chiến lược đang chọn. Bảng hiện 200 lần mới nhất (tiêu đề ghi
   "200 mới nhất / tổng" khi còn nhiều hơn); Xuất Excel tải đủ mọi lần chạy. Đường vốn từng nến
   không lưu, chỉ lưu bản gộp trên chart.
