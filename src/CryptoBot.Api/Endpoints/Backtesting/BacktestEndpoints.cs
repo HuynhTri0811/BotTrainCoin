@@ -51,8 +51,9 @@ public static class BacktestEndpoints
             }
         });
 
+        // Mọi lần chạy được lưu vào lịch sử để mở lại và so sánh.
         api.MapPost("/", async (int id, BacktestRequestDto body, IStrategyInstanceStore instances,
-            BacktestService backtests, CancellationToken ct) =>
+            BacktestService backtests, BacktestHistoryService history, CancellationToken ct) =>
         {
             if (await instances.GetAsync(id, ct) is not { } instance)
                 return Results.NotFound(new { error = "Không có chiến lược này." });
@@ -61,9 +62,9 @@ public static class BacktestEndpoints
 
             try
             {
-                return await backtests.RunAsync(request, ct) is { } run
-                    ? Results.Ok(ToDto(run))
-                    : Results.NotFound(new { error = "Không có chiến lược này." });
+                if (await backtests.RunAsync(request, ct) is not { } run)
+                    return Results.NotFound(new { error = "Không có chiến lược này." });
+                return Results.Ok(ToDto(await history.SaveAsync(run, ct)));
             }
             catch (ArgumentException ex)
             {
@@ -72,31 +73,77 @@ public static class BacktestEndpoints
         });
     }
 
-    private static BacktestDto ToDto(BacktestRun run)
+    /// <summary>Lịch sử các lần backtest đã lưu, cho mọi chiến lược.</summary>
+    public static void MapBacktestHistoryEndpoints(this IEndpointRouteBuilder app)
     {
-        var result = run.Result;
-        var statistics = result.Statistics;
+        var api = app.MapGroup("/api/backtests");
+
+        api.MapGet("/", async (int? strategyId, int? limit, BacktestHistoryService history, CancellationToken ct) =>
+            (await history.ListAsync(strategyId, limit ?? 100, ct)).Select(ToDto));
+
+        api.MapGet("/{backtestId:long}", async (long backtestId, BacktestHistoryService history,
+            CancellationToken ct) =>
+            await history.GetAsync(backtestId, ct) is { } saved
+                ? Results.Ok(ToDto(saved))
+                : Results.NotFound(new { error = "Không có lần backtest này." }));
+
+        api.MapPut("/{backtestId:long}/note", async (long backtestId, BacktestNoteDto body,
+            BacktestHistoryService history, CancellationToken ct) =>
+        {
+            try
+            {
+                return await history.SetNoteAsync(backtestId, body.Note, ct) is { } saved
+                    ? Results.Ok(new BacktestNoteDto(saved.Note))
+                    : Results.NotFound(new { error = "Không có lần backtest này." });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        });
+
+        api.MapDelete("/{backtestId:long}", async (long backtestId, BacktestHistoryService history,
+            CancellationToken ct) =>
+            await history.DeleteAsync(backtestId, ct)
+                ? Results.NoContent()
+                : Results.NotFound(new { error = "Không có lần backtest này." }));
+    }
+
+    private static BacktestSettingsDto ToDto(BacktestSettings settings) => new(settings.InitialCapital,
+        settings.Sizing.ToString(), settings.SizeValue, settings.TakeProfitPercent, settings.StopLossPercent,
+        settings.FeePercent);
+
+    private static BacktestSummaryDto ToDto(BacktestSummary summary) => new(summary.Id, summary.CreatedAtUtc,
+        summary.StrategyInstanceId, summary.Symbol, summary.Interval,
+        new EmaCrossParameters(summary.FastPeriod, summary.SlowPeriod, summary.LookbackCandles),
+        summary.FirstCandleUtc, summary.LastCandleUtc, ToDto(summary.Settings), summary.TotalTrades,
+        summary.WinRatePercent, summary.NetProfit, summary.NetProfitPercent, summary.MaxDrawdownPercent, summary.Note);
+
+    private static BacktestDto ToDto(SavedBacktestRun savedRun)
+    {
+        var saved = savedRun.Saved;
+        var snapshot = savedRun.Snapshot;
+        var statistics = snapshot.Statistics;
         return new BacktestDto(
-            run.Instance.Id, run.Instance.Symbol, run.Instance.Interval, run.Parameters,
-            run.FirstCandleUtc, run.LastCandleUtc, run.CandleCount, run.WarmupCandles,
-            result.EvaluatedCandles, result.SkippedGapWindows,
-            result.Signals.Count(signal => signal.Action == SignalAction.Buy),
-            result.Signals.Count(signal => signal.Action == SignalAction.Sell),
+            saved.Id, saved.CreatedAtUtc, saved.Note,
+            saved.StrategyInstanceId, saved.Symbol, saved.Interval, snapshot.Parameters, ToDto(snapshot.Settings),
+            snapshot.FirstCandleUtc, snapshot.LastCandleUtc, snapshot.CandleCount, snapshot.WarmupCandles,
+            snapshot.EvaluatedCandles, snapshot.SkippedGapWindows, snapshot.BuySignals, snapshot.SellSignals,
             new BacktestStatisticsDto(statistics.TotalTrades, statistics.Wins, statistics.Losses,
                 statistics.WinRatePercent, statistics.NetProfit, statistics.NetProfitPercent, statistics.GrossProfit,
                 statistics.GrossLoss, statistics.ProfitFactor, statistics.TotalFees, statistics.MaxDrawdown,
                 statistics.MaxDrawdownPercent, statistics.EndingEquity, statistics.BuyAndHoldPercent),
-            result.Trades.Select(trade => new BacktestTradeDto(trade.EntryTimeUtc, trade.EntryPrice,
+            snapshot.Trades.Select(trade => new BacktestTradeDto(trade.EntryTimeUtc, trade.EntryPrice,
                 trade.ExitTimeUtc, trade.ExitPrice, trade.Quantity, trade.Fees, trade.NetPnl, trade.ReturnPercent,
                 trade.ExitReason.ToString())).ToList(),
-            result.OpenTrade is { } open
+            snapshot.OpenTrade is { } open
                 ? new BacktestOpenTradeDto(open.EntryTimeUtc, open.EntryPrice, open.Quantity, open.EntryFee,
                     open.MarkPrice, open.UnrealizedPnl)
                 : null,
-            new BacktestChartDto(run.Chart.CandlesPerBar,
-                run.Chart.Bars.Select(bar => new BacktestBarDto(ToUnixSeconds(bar.OpenTimeUtc), bar.Open, bar.High,
-                    bar.Low, bar.Close, bar.Equity)).ToList(),
-                run.Chart.Markers.Select(marker => new BacktestMarkerDto(ToUnixSeconds(marker.BarOpenTimeUtc),
+            new BacktestChartDto(snapshot.Chart.CandlesPerBar,
+                snapshot.Chart.Bars.Select(bar => new BacktestBarDto(ToUnixSeconds(bar.OpenTimeUtc), bar.Open,
+                    bar.High, bar.Low, bar.Close, bar.Equity)).ToList(),
+                snapshot.Chart.Markers.Select(marker => new BacktestMarkerDto(ToUnixSeconds(marker.BarOpenTimeUtc),
                     marker.IsEntry ? "Entry" : "Exit", marker.Price, marker.ExitReason?.ToString(),
                     marker.NetPnl)).ToList()));
     }
