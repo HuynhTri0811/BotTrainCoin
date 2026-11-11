@@ -80,7 +80,7 @@ public class BacktestServiceTests
 
         // Cửa sổ 9 nến: chỉ đủ cửa sổ từ nến 8, sau các giao cắt.
         var run = await CreateService().RunAsync(
-            new BacktestRequest(1, null, null, new EmaCrossParameters(2, 3, 9), Settings), CancellationToken.None);
+            new BacktestRequest(1, null, null, new EmaCrossOverrides(2, 3, 9), Settings), CancellationToken.None);
 
         Assert.Equal(9, run!.Parameters.LookbackCandles);
         Assert.Empty(run.Result.Signals);
@@ -125,8 +125,29 @@ public class BacktestServiceTests
         await Assert.ThrowsAsync<ArgumentException>(() => service.RunAsync(
             new BacktestRequest(1, Hour(5), Hour(1), null, Settings), CancellationToken.None));
         await Assert.ThrowsAsync<ArgumentException>(() => service.RunAsync(
-            new BacktestRequest(1, null, null, new EmaCrossParameters(5, 3, 10), Settings), CancellationToken.None));
+            new BacktestRequest(1, null, null, new EmaCrossOverrides(5, 3, 10), Settings), CancellationToken.None));
         await Assert.ThrowsAsync<ArgumentException>(() => service.RunAsync(
             new BacktestRequest(1, null, null, null, Settings with { InitialCapital = 0 }), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Candle_limit_holds_even_when_the_range_ends_inside_a_page()
+    {
+        // Một nến quá giới hạn trong khoảng, và một nến sau ToUtc cùng trang: trước đây trả về sớm không báo lỗi.
+        AddCandles(Enumerable.Repeat(10m, BacktestService.MaxCandles + 2).ToArray());
+
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateService().RunAsync(
+            new BacktestRequest(1, null, Hour(BacktestService.MaxCandles), null, Settings), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Overrides_left_null_keep_the_instance_parameters()
+    {
+        AddCandles(UpThenDown);
+
+        var run = await CreateService().RunAsync(
+            new BacktestRequest(1, null, null, new EmaCrossOverrides(1, null, null), Settings), CancellationToken.None);
+
+        Assert.Equal(new EmaCrossParameters(1, 3, 4), run!.Parameters);
     }
 }

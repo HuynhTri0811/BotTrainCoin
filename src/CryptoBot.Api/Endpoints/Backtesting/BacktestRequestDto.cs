@@ -1,6 +1,5 @@
 using CryptoBot.Application.Backtesting;
 using CryptoBot.Domain.Backtesting;
-using CryptoBot.Domain.Strategies;
 
 namespace CryptoBot.Api.Endpoints;
 
@@ -23,16 +22,14 @@ public sealed record BacktestRequestDto(
 {
     /// <summary>Đổi sang request của Application; null nếu <see cref="Sizing"/> không hợp lệ.</summary>
     /// <param name="strategyId">Instance lấy từ đường dẫn.</param>
-    /// <param name="defaults">Tham số của instance, dùng cho phần không gửi lên.</param>
-    public BacktestRequest? ToRequest(int strategyId, EmaCrossParameters defaults)
+    public BacktestRequest? ToRequest(int strategyId)
     {
         if (!Enum.TryParse<PositionSizing>(Sizing, ignoreCase: true, out var sizing) || !Enum.IsDefined(sizing)
             || int.TryParse(Sizing, out _))
             return null;
 
-        var parameters = new EmaCrossParameters(FastPeriod ?? defaults.FastPeriod, SlowPeriod ?? defaults.SlowPeriod,
-            LookbackCandles ?? defaults.LookbackCandles);
-        return new BacktestRequest(strategyId, FromUtc?.UtcDateTime, ToUtc?.UtcDateTime, parameters,
+        return new BacktestRequest(strategyId, FromUtc?.UtcDateTime, ToUtc?.UtcDateTime,
+            new EmaCrossOverrides(FastPeriod, SlowPeriod, LookbackCandles),
             new BacktestSettings(InitialCapital, sizing, SizeValue, TakeProfitPercent, StopLossPercent, FeePercent));
     }
 }

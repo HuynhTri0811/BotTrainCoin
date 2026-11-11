@@ -52,12 +52,10 @@ public static class BacktestEndpoints
         });
 
         // Mọi lần chạy được lưu vào lịch sử để mở lại và so sánh.
-        api.MapPost("/", async (int id, BacktestRequestDto body, IStrategyInstanceStore instances,
-            BacktestService backtests, BacktestHistoryService history, CancellationToken ct) =>
+        api.MapPost("/", async (int id, BacktestRequestDto body, BacktestService backtests,
+            BacktestHistoryService history, CancellationToken ct) =>
         {
-            if (await instances.GetAsync(id, ct) is not { } instance)
-                return Results.NotFound(new { error = "Không có chiến lược này." });
-            if (body.ToRequest(id, StrategyFactory.ParseEmaCross(instance.ParametersJson)) is not { } request)
+            if (body.ToRequest(id) is not { } request)
                 return Results.BadRequest(new { error = QueryEnum.Error<PositionSizing>(body.Sizing ?? "") });
 
             try

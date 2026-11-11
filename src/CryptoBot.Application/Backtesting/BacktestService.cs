@@ -43,7 +43,8 @@ public sealed class BacktestService(IStrategyInstanceStore instances, ICandleSto
         if (request.Settings.Validate() is { } settingsError)
             throw new ArgumentException(settingsError);
 
-        var parameters = request.Parameters ?? StrategyFactory.ParseEmaCross(instance.ParametersJson);
+        var defaults = StrategyFactory.ParseEmaCross(instance.ParametersJson);
+        var parameters = request.Overrides?.ApplyTo(defaults) ?? defaults;
         if (parameters.Validate() is { } parametersError)
             throw new ArgumentException(parametersError);
         var strategy = new EmaCrossStrategy(parameters);
@@ -79,12 +80,13 @@ public sealed class BacktestService(IStrategyInstanceStore instances, ICandleSto
             {
                 if (toUtc is { } to && candle.OpenTimeUtc > to)
                     return loaded;
+                // Kiểm tra từng nến: trả về sớm ở ToUtc cũng không được vượt giới hạn.
+                if (loaded.Count == MaxCandles)
+                    throw new ArgumentException(
+                        $"Khoảng thời gian có hơn {MaxCandles:N0} nến; hãy chọn khoảng ngắn hơn.");
                 loaded.Add(candle);
             }
 
-            if (loaded.Count > MaxCandles)
-                throw new ArgumentException(
-                    $"Khoảng thời gian có hơn {MaxCandles:N0} nến; hãy chọn khoảng ngắn hơn.");
             if (page.Count < PageSize)
                 return loaded;
             after = page[^1].OpenTimeUtc;
