@@ -1,0 +1,24 @@
+# PostgreSQL riêng của CryptoBot. Chạy: docker compose up -d
+# Cổng 5433 trên máy (5432 có thể đang được project khác dùng). Dữ liệu nằm trong volume cryptobot-pgdata.
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: cryptobot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cryptobot
+      POSTGRES_USER: cryptobot
+      # Chỉ dùng cho máy local (cổng chỉ mở trên 127.0.0.1). Đổi bằng biến môi trường CRYPTOBOT_DB_PASSWORD.
+      POSTGRES_PASSWORD: ${CRYPTOBOT_DB_PASSWORD:-cryptobot}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - cryptobot-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cryptobot -d cryptobot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  cryptobot-pgdata:
