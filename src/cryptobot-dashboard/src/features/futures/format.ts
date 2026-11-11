@@ -8,6 +8,12 @@ export const fmtSigned = (value: number | null | undefined) =>
 export const pnlColor = (value: number | null | undefined) =>
   value == null || value === 0 ? undefined : value > 0 ? '#16a34a' : '#dc2626';
 
+const percent2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** `12.34%`. */
+export const fmtPercent = (value: number) => `${percent2.format(value)}%`;
+/** `+12.34%` / `-12.34%`. */
+export const fmtSignedPercent = (value: number) => `${value > 0 ? '+' : ''}${percent2.format(value)}%`;
+
 const price2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /** Giá hiển thị 2 chữ số lẻ (mark price của sàn có tới 8 chữ số lẻ). */
 export const fmtPrice2 = (value: number | null | undefined) => (value == null ? '—' : price2.format(value));

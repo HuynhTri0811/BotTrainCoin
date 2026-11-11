@@ -150,4 +150,57 @@ public class BacktestServiceTests
 
         Assert.Equal(new EmaCrossParameters(1, 3, 4), run!.Parameters);
     }
+
+    [Fact]
+    public async Task Lookback_above_the_backtest_limit_is_rejected()
+    {
+        AddCandles(UpThenDown);
+
+        var error = await Assert.ThrowsAsync<ArgumentException>(() => CreateService().RunAsync(
+            new BacktestRequest(1, null, null,
+                new EmaCrossOverrides(null, null, BacktestService.MaxLookbackCandles + 1), Settings),
+            CancellationToken.None));
+        Assert.Contains("LookbackCandles", error.Message);
+    }
+
+    [Fact]
+    public async Task Other_strategy_types_and_broken_parameters_are_rejected_as_bad_input()
+    {
+        AddCandles(UpThenDown);
+        AddInstance(2, "Rsi", StrategyFactory.Serialize(new EmaCrossParameters(2, 3, 4)));
+        AddInstance(3, StrategyTypes.EmaCross, "{not json");
+
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateService().RunAsync(
+            new BacktestRequest(2, null, null, null, Settings), CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateService().RunAsync(
+            new BacktestRequest(3, null, null, null, Settings), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Range_without_candles_is_rejected_so_nothing_is_saved()
+    {
+        AddCandles(UpThenDown);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateService().RunAsync(
+            new BacktestRequest(1, Hour(50), null, null, Settings), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Cancelled_request_stops_the_run()
+    {
+        AddCandles(UpThenDown);
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => CreateService().RunAsync(
+            new BacktestRequest(1, null, null, null, Settings), cancelled.Token));
+    }
+
+    private void AddInstance(int id, string strategyType, string parametersJson)
+    {
+        var instance = new StrategyInstance($"test-{id}", strategyType, parametersJson, "Binance", "BTCUSDT", "1h",
+            true);
+        typeof(StrategyInstance).GetProperty(nameof(StrategyInstance.Id))!.SetValue(instance, id);
+        _instances.Instances.Add(instance);
+    }
 }

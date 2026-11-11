@@ -5,12 +5,9 @@ import { backtestApi, type BacktestSettings, type BacktestSummary } from '../../
 import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
 import { excelVnDate, formatVn } from '../../time';
-import { fmtSigned, pnlColor } from '../futures/format';
+import { fmtPercent, fmtSigned, fmtSignedPercent, pnlColor } from '../futures/format';
 
-const percent = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const amount = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
-const fmtPercent = (value: number) => `${percent.format(value)}%`;
-const fmtSignedPercent = (value: number) => `${value > 0 ? '+' : ''}${percent.format(value)}%`;
 const MAX_COMPARE = 4;
 
 /** `1000 USDT · 10% vốn` hoặc `1000 USDT · 100 USDT/lệnh`. */
@@ -102,6 +99,11 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
     queryKey: ['backtests', filterId ?? 'all'],
     queryFn: () => backtestApi.list(filterId),
   });
+  // Danh sách chỉ có 200 dòng mới nhất; tổng số cho biết còn bao nhiêu chưa hiện.
+  const total = useQuery({
+    queryKey: ['backtests', filterId ?? 'all', 'count'],
+    queryFn: () => backtestApi.count(filterId),
+  });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['backtests'] });
 
   const setNote = useMutation({
@@ -123,12 +125,15 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
   });
 
   const rows = history.data ?? [];
+  const totalCount = total.data?.total;
+  const countLabel =
+    totalCount === undefined || totalCount === rows.length ? `${rows.length}` : `${rows.length} mới nhất / ${totalCount}`;
   const compared = (history.data ?? []).filter((summary) => selected.includes(summary.id));
 
   return (
     <Card
       size="small"
-      title={`Lịch sử backtest (${rows.length})`}
+      title={`Lịch sử backtest (${countLabel})`}
       extra={
         <Space wrap>
           <Checkbox
@@ -146,7 +151,10 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
             {comparing ? 'Ẩn so sánh' : `So sánh (${selected.length})`}
           </Button>
           <ExportExcelButton
-            onExport={async () => ({ count: await downloadExcel('lich-su-backtest', 'Backtest', rows, excelColumns) })}
+            // Xuất mọi lần chạy, không chỉ các dòng đang hiện.
+            onExport={async () => ({
+              count: await downloadExcel('lich-su-backtest', 'Backtest', await backtestApi.listAll(filterId), excelColumns),
+            })}
           />
         </Space>
       }

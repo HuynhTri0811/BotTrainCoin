@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using CryptoBot.Application.Abstractions;
 using CryptoBot.Domain.MarketData;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,11 @@ namespace CryptoBot.Infrastructure.Persistence;
 /// </summary>
 public sealed class CandleStore(BotDbContext db) : ICandleStore
 {
+    // Mỗi khóa nến chỉ một lần upsert tại một thời điểm, cho mọi bên ghi (đồng bộ thường, nến 1d, tải lịch sử) và
+    // mọi DbContext: upsert đọc nến đã có rồi mới chèn, hai lần chạy song song cùng khoảng sẽ cùng chèn một nến và
+    // đụng unique index. Static vì mỗi request/worker có CandleStore riêng.
+    private static readonly ConcurrentDictionary<CandleKey, SemaphoreSlim> WriteGates = new();
+
     /// <summary>OpenTime của nến mới nhất đã lưu (kể cả nến đang chạy); null nếu chưa có nến nào.</summary>
     public async Task<DateTime?> GetLatestOpenTimeAsync(CandleKey key, CancellationToken ct) =>
         await ForKey(key)
@@ -37,6 +43,21 @@ public sealed class CandleStore(BotDbContext db) : ICandleStore
         if (candles.Count == 0)
             return new UpsertResult(0, 0, 0, []);
 
+        var gate = WriteGates.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(ct);
+        try
+        {
+            return await UpsertLockedAsync(key, candles, ct);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private async Task<UpsertResult> UpsertLockedAsync(CandleKey key, IReadOnlyList<Candle> candles,
+        CancellationToken ct)
+    {
         // Đọc một lần cả khoảng thời gian của lô, có tracking để SaveChanges ghi lại các nến được sửa.
         var from = candles.Min(candle => candle.OpenTimeUtc);
         var to = candles.Max(candle => candle.OpenTimeUtc);

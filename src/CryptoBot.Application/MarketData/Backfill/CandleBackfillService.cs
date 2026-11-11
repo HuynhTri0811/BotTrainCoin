@@ -7,8 +7,8 @@ namespace CryptoBot.Application.MarketData;
 
 /// <summary>
 /// Tải nến cũ hơn nến sớm nhất đang có trong DB, để backtest có đủ lịch sử. Chỉ đi lùi về quá khứ:
-/// phần mới đã có <see cref="CandleSyncService"/> lo, nên hai bên không ghi cùng một khoảng nến. DB chưa có nến nào
-/// thì không tải: đồng bộ thường phải chạy lần đầu trước, nếu không hai bên có thể cùng chèn một nến.
+/// phần mới đã có <see cref="CandleSyncService"/> lo. DB chưa có nến nào thì không tải: đồng bộ thường phải chạy
+/// lần đầu trước. Nếu khoảng ghi có chồng nhau, upsert vẫn chạy lần lượt theo khóa nến nên không chèn trùng.
 /// Dùng cùng kiểm tra nến (<see cref="CandleSeriesValidator"/>) và cùng upsert như đồng bộ thường.
 /// </summary>
 public sealed class CandleBackfillService(
@@ -20,8 +20,8 @@ public sealed class CandleBackfillService(
     /// <summary>Số request tối đa mỗi lần gọi (1000 × 1000 nến ≈ 11 năm nến 1h, ≈ 28 năm nến 15m).</summary>
     public const int MaxRequests = 1000;
 
-    // Một lần tải tại một thời điểm cho mỗi khóa nến: hai lần tải chồng nhau sẽ cùng chèn một khoảng nến.
-    // Khóa nến khác nhau không đụng nhau nên chạy song song được.
+    // Một lần tải tại một thời điểm cho mỗi khóa nến, để lần thứ hai trả 409 ngay thay vì tải lại cùng khoảng.
+    // Việc không chèn trùng nến với các bên ghi khác do khóa trong ICandleStore.UpsertAsync lo.
     private static readonly ConcurrentDictionary<CandleKey, SemaphoreSlim> Gates = new();
 
     /// <summary>
@@ -59,12 +59,18 @@ public sealed class CandleBackfillService(
         var inserted = 0;
         var rejected = 0;
         var requests = 0;
+        // Đã tải tới nến sớm nhất đã lưu hoặc sàn hết nến. Cờ này, không phải start, quyết định "còn tiếp":
+        // lần thoát ở request cuối không tăng start nên start < end vẫn đúng dù đã xong.
+        var finished = false;
         while (start < end && requests < MaxRequests)
         {
             var klines = await client.GetKlinesAsync(key.Symbol, key.Interval, start, options.BatchSize, ct);
             requests++;
             if (klines.Count == 0)
+            {
+                finished = true;
                 break;
+            }
 
             // Chỉ giữ phần trước nến sớm nhất đã có: không đụng tới nến đồng bộ thường đã lưu.
             var candles = klines
@@ -83,12 +89,15 @@ public sealed class CandleBackfillService(
             }
 
             if (klines.Count < options.BatchSize || candles.Count < klines.Count)
+            {
+                finished = true;
                 break;
+            }
             start = klines[^1].OpenTimeUtc + key.Interval.Duration;
         }
 
         var first = (await store.GetAfterAsync(key, null, 1, closedOnly: false, ct)).FirstOrDefault()?.OpenTimeUtc;
-        var reachedLimit = requests >= MaxRequests && start < end;
+        var reachedLimit = !finished && start < end;
         logger.LogInformation("Backfill {Key} từ {From:O}: +{Inserted} nến, {Requests} request, sớm nhất {First:O}",
             key, fromUtc, inserted, requests, first);
         return new CandleBackfillResult(inserted, requests, rejected, first, reachedLimit);

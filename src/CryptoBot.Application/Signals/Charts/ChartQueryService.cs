@@ -21,7 +21,7 @@ public sealed class ChartQueryService(IStrategyInstanceStore instances, ICandleS
         limit = Math.Clamp(limit, 1, MaxLimit);
         var strategy = StrategyFactory.Create(instance);
         var parameters = StrategyFactory.ParseEmaCross(instance.ParametersJson);
-        var key = new CandleKey(instance.Exchange, instance.Symbol, CandleInterval.Parse(instance.Interval));
+        var key = CandleKey.For(instance);
 
         var visible = await candles.GetLatestAsync(key, null, limit, closedOnly: false, ct);
         if (visible.Count == 0)

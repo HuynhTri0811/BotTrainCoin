@@ -85,8 +85,8 @@ public class BacktestHistoryServiceTests
         _clock.UtcNow = _clock.UtcNow.AddMinutes(5);
         await service.SaveAsync(run, CancellationToken.None);
 
-        var all = await service.ListAsync(null, 50, CancellationToken.None);
-        var other = await service.ListAsync(2, 50, CancellationToken.None);
+        var all = await service.ListAsync(null, 50, 0, CancellationToken.None);
+        var other = await service.ListAsync(2, 50, 0, CancellationToken.None);
 
         Assert.Equal([2L, 1L], all.Select(summary => summary.Id));
         Assert.Equal(Settings, all[0].Settings);

@@ -6,12 +6,12 @@ namespace CryptoBot.Infrastructure.Persistence;
 
 public sealed class BacktestStore(BotDbContext db) : IBacktestStore
 {
-    public async Task<IReadOnlyList<BacktestSummary>> ListAsync(int? strategyInstanceId, int limit,
+    public async Task<IReadOnlyList<BacktestSummary>> ListAsync(int? strategyInstanceId, int limit, int offset,
         CancellationToken ct) =>
         // Chỉ chọn các cột tóm tắt: không đọc cột nội dung nén (vài trăm KB mỗi dòng).
-        await db.SavedBacktests.AsNoTracking()
-            .Where(saved => strategyInstanceId == null || saved.StrategyInstanceId == strategyInstanceId)
+        await ForInstance(strategyInstanceId)
             .OrderByDescending(saved => saved.CreatedAtUtc).ThenByDescending(saved => saved.Id)
+            .Skip(offset)
             .Take(limit)
             .Select(saved => new BacktestSummary(saved.Id, saved.CreatedAtUtc, saved.StrategyInstanceId,
                 saved.Symbol, saved.Interval, saved.FastPeriod, saved.SlowPeriod, saved.LookbackCandles,
@@ -21,6 +21,9 @@ public sealed class BacktestStore(BotDbContext db) : IBacktestStore
                 saved.TotalTrades, saved.WinRatePercent, saved.NetProfit, saved.NetProfitPercent,
                 saved.MaxDrawdownPercent, saved.Note))
             .ToListAsync(ct);
+
+    public Task<int> CountAsync(int? strategyInstanceId, CancellationToken ct) =>
+        ForInstance(strategyInstanceId).CountAsync(ct);
 
     public Task<SavedBacktest?> GetAsync(long id, CancellationToken ct) =>
         db.SavedBacktests.AsNoTracking().FirstOrDefaultAsync(saved => saved.Id == id, ct);
@@ -36,4 +39,7 @@ public sealed class BacktestStore(BotDbContext db) : IBacktestStore
     public void Add(SavedBacktest backtest) => db.SavedBacktests.Add(backtest);
 
     public Task SaveAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
+
+    private IQueryable<SavedBacktest> ForInstance(int? strategyInstanceId) => db.SavedBacktests.AsNoTracking()
+        .Where(saved => strategyInstanceId == null || saved.StrategyInstanceId == strategyInstanceId);
 }

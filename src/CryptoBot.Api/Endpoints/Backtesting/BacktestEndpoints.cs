@@ -32,7 +32,7 @@ public static class BacktestEndpoints
             if (from >= clock.UtcNow)
                 return Results.BadRequest(new { error = "Ngày bắt đầu phải ở quá khứ." });
 
-            var key = new CandleKey(instance.Exchange, instance.Symbol, CandleInterval.Parse(instance.Interval));
+            var key = CandleKey.For(instance);
             try
             {
                 return await backfill.BackfillAsync(key, from, ct) is { } result
@@ -76,8 +76,13 @@ public static class BacktestEndpoints
     {
         var api = app.MapGroup("/api/backtests");
 
-        api.MapGet("/", async (int? strategyId, int? limit, BacktestHistoryService history, CancellationToken ct) =>
-            (await history.ListAsync(strategyId, limit ?? 100, ct)).Select(ToDto));
+        api.MapGet("/", async (int? strategyId, int? limit, int? offset, BacktestHistoryService history,
+            CancellationToken ct) =>
+            (await history.ListAsync(strategyId, limit ?? 100, offset ?? 0, ct)).Select(ToDto));
+
+        // Tổng số lần chạy: danh sách chỉ trả một trang, số này cho biết còn bao nhiêu chưa hiện.
+        api.MapGet("/count", async (int? strategyId, BacktestHistoryService history, CancellationToken ct) =>
+            new BacktestCountDto(await history.CountAsync(strategyId, ct)));
 
         api.MapGet("/{backtestId:long}", async (long backtestId, BacktestHistoryService history,
             CancellationToken ct) =>

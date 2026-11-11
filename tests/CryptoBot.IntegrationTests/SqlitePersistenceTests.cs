@@ -75,6 +75,25 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Concurrent_upserts_of_the_same_range_do_not_insert_a_candle_twice()
+    {
+        // Hai bên ghi (ví dụ đồng bộ thường và tải lịch sử) cùng chèn một khoảng qua hai DbContext.
+        var batch = Enumerable.Range(0, 200).Select(hour => MakeCandle(hour, 10)).ToList();
+
+        async Task<UpsertResult> UpsertAsync()
+        {
+            await using var db = NewContext();
+            return await new CandleStore(db).UpsertAsync(Key, batch, default);
+        }
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => Task.Run(UpsertAsync)));
+
+        Assert.Equal(200, results.Sum(result => result.Inserted));
+        await using var check = NewContext();
+        Assert.Equal(200, await check.Candles.CountAsync());
+    }
+
+    [Fact]
     public async Task Upsert_updates_open_candle_and_keeps_closed_candle()
     {
         await using (var db = NewContext())
@@ -263,13 +282,17 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
         await using (var db = NewContext())
         {
             var store = new BacktestStore(db);
-            var all = await store.ListAsync(null, 10, default);
+            var all = await store.ListAsync(null, 10, 0, default);
             Assert.Equal([T0.AddMinutes(3), T0.AddMinutes(2), T0.AddMinutes(1)],
                 all.Select(summary => summary.CreatedAtUtc));
             Assert.Equal(settings, all[0].Settings);
             Assert.Equal(statistics.NetProfit, all[0].NetProfit);
             Assert.Equal(statistics.WinRatePercent, all[0].WinRatePercent);
-            Assert.Equal(2, (await store.ListAsync(1, 10, default)).Count);
+            Assert.Equal(2, (await store.ListAsync(1, 10, 0, default)).Count);
+            Assert.Equal([T0.AddMinutes(2)],
+                (await store.ListAsync(null, 1, 1, default)).Select(summary => summary.CreatedAtUtc));
+            Assert.Equal(3, await store.CountAsync(null, default));
+            Assert.Equal(2, await store.CountAsync(1, default));
 
             var first = (await store.GetAsync(all[2].Id, default))!;
             Assert.Equal([1, 2, 3, 4], first.Content);
@@ -281,7 +304,7 @@ public sealed class SqlitePersistenceTests : IAsyncLifetime
 
         await using (var db = NewContext())
         {
-            var remaining = await new BacktestStore(db).ListAsync(null, 10, default);
+            var remaining = await new BacktestStore(db).ListAsync(null, 10, 0, default);
             Assert.Equal(2, remaining.Count);
             Assert.Equal("phí maker", remaining[^1].Note);
         }

@@ -3,13 +3,10 @@ import type { BacktestExitReason, BacktestResult, BacktestTrade } from '../../ap
 import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
 import { excelVnDate, formatVn } from '../../time';
-import { fmtPrice2, fmtSigned, fmtUsdt, pnlColor } from '../futures/format';
+import { fmtPercent, fmtPrice2, fmtSigned, fmtSignedPercent, fmtUsdt, pnlColor } from '../futures/format';
 import { BacktestChart, EXIT_COLORS } from './BacktestChart';
 import { fmtSizing, fmtStops } from './BacktestHistoryCard';
 
-const percent = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmtPercent = (value: number) => `${percent.format(value)}%`;
-const fmtSignedPercent = (value: number) => `${value > 0 ? '+' : ''}${percent.format(value)}%`;
 const quantity = new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 });
 
 const EXIT_LABELS: Record<BacktestExitReason, string> = {

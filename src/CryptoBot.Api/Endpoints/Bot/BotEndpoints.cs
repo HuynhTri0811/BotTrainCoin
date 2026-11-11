@@ -22,8 +22,7 @@ public static class BotEndpoints
         {
             var instances = await store.GetAllAsync(ct);
             var feeds = instances
-                .Select(instance => new { Key = new CandleKey(instance.Exchange, instance.Symbol,
-                    CandleInterval.Parse(instance.Interval)) })
+                .Select(instance => new { Key = CandleKey.For(instance) })
                 .DistinctBy(item => item.Key)
                 .Select(item => registry.Get(item.Key.ToString(), item.Key.Interval) is { } status
                     ? new FeedStatusDto(status.Key, status.IsStale, status.LastSuccessAtUtc, status.LastAttemptAtUtc,

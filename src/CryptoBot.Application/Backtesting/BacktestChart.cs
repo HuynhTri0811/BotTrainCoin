@@ -21,7 +21,6 @@ public sealed record BacktestChart(
 
         var perBar = (candles.Count + maxBars - 1) / maxBars;
         var equity = result.Equity.ToDictionary(point => point.CandleOpenTimeUtc, point => point.Equity);
-        var barTimeByCandle = new Dictionary<DateTime, DateTime>(candles.Count);
         var bars = new List<BacktestChartBar>((candles.Count + perBar - 1) / perBar);
 
         for (var start = 0; start < candles.Count; start += perBar)
@@ -34,7 +33,6 @@ public sealed record BacktestChart(
             {
                 high = Math.Max(high, candles[index].High);
                 low = Math.Min(low, candles[index].Low);
-                barTimeByCandle[candles[index].OpenTimeUtc] = first.OpenTimeUtc;
             }
 
             var last = candles[end];
@@ -45,15 +43,36 @@ public sealed record BacktestChart(
         var markers = new List<BacktestChartMarker>(result.Trades.Count * 2 + 1);
         foreach (var trade in result.Trades)
         {
-            if (barTimeByCandle.TryGetValue(trade.EntryTimeUtc, out var entryBar))
+            if (BarTimeOf(trade.EntryTimeUtc) is { } entryBar)
                 markers.Add(new BacktestChartMarker(entryBar, true, trade.EntryPrice, null, null));
-            if (barTimeByCandle.TryGetValue(trade.ExitTimeUtc, out var exitBar))
+            if (BarTimeOf(trade.ExitTimeUtc) is { } exitBar)
                 markers.Add(new BacktestChartMarker(exitBar, false, trade.ExitPrice, trade.ExitReason, trade.NetPnl));
         }
 
-        if (result.OpenTrade is { } open && barTimeByCandle.TryGetValue(open.EntryTimeUtc, out var openBar))
+        if (result.OpenTrade is { } open && BarTimeOf(open.EntryTimeUtc) is { } openBar)
             markers.Add(new BacktestChartMarker(openBar, true, open.EntryPrice, null, null));
 
         return new BacktestChart(perBar, bars, markers);
+
+        // Cột chứa nến có OpenTime này; null nếu nến không thuộc khoảng (ví dụ nến warm-up).
+        // Tìm nhị phân trên nến đã sắp tăng dần: chỉ vài trăm marker, không cần bảng cho mọi nến.
+        DateTime? BarTimeOf(DateTime openTimeUtc)
+        {
+            var low = 0;
+            var high = candles.Count - 1;
+            while (low <= high)
+            {
+                var middle = low + (high - low) / 2;
+                var compared = candles[middle].OpenTimeUtc.CompareTo(openTimeUtc);
+                if (compared == 0)
+                    return bars[middle / perBar].OpenTimeUtc;
+                if (compared < 0)
+                    low = middle + 1;
+                else
+                    high = middle - 1;
+            }
+
+            return null;
+        }
     }
 }
