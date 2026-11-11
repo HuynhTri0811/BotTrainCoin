@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
-import { Alert, Button, Card, Flex, Popconfirm, Space, Spin, Typography, message } from 'antd';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { backtestApi, type BacktestResult } from '../../api/client';
+import { useEffect, useState } from 'react';
+import { Alert, Button, Card, Flex, Popconfirm, Space, Spin, Typography } from 'antd';
+import { useQuery } from '@tanstack/react-query';
+import { ApiError, backtestApi } from '../../api/client';
+import { BacktestNote } from './BacktestNote';
 import { BacktestResultView } from './BacktestResultView';
+import { backtestQueryKey, useBacktestMutations } from './useBacktestMutations';
 
 interface Props {
   id: number;
@@ -10,34 +12,32 @@ interface Props {
   onBack: () => void;
 }
 
+const isNotFound = (error: Error) => error instanceof ApiError && error.status === 404;
+
 /** Trang chi tiết một lần backtest đã lưu: thống kê, chart, danh sách lệnh, sửa ghi chú, xóa. */
 export function BacktestDetail({ id, onBack }: Props) {
-  const queryClient = useQueryClient();
-  const detail = useQuery({ queryKey: ['backtest', id], queryFn: () => backtestApi.get(id) });
+  // Đã xóa: tắt query để bỏ cache xong không tải lại lần chạy vừa xóa trong lúc chờ quay về danh sách.
+  const [deleted, setDeleted] = useState(false);
+  const detail = useQuery({
+    queryKey: backtestQueryKey(id),
+    queryFn: () => backtestApi.get(id),
+    enabled: !deleted,
+    // Lần chạy đã lưu không đổi (ghi chú được cập nhật thẳng vào cache), không cần tải lại khi focus.
+    staleTime: Infinity,
+    // Không có lần chạy này thì báo ngay, không thử lại.
+    retry: (failureCount, error) => !isNotFound(error) && failureCount < 1,
+  });
+  const { setNote, remove } = useBacktestMutations({
+    onDeleted: () => {
+      setDeleted(true);
+      onBack();
+    },
+  });
 
   // Mở từ giữa danh sách dài: đưa về đầu trang chi tiết.
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [id]);
-
-  const setNote = useMutation({
-    mutationFn: (note: string) => backtestApi.setNote(id, note),
-    onSuccess: (saved) => {
-      queryClient.setQueryData<BacktestResult>(['backtest', id], (current) => current && { ...current, note: saved.note });
-      queryClient.invalidateQueries({ queryKey: ['backtests'] });
-    },
-    onError: (error) => message.error(error.message),
-  });
-  const remove = useMutation({
-    mutationFn: () => backtestApi.remove(id),
-    onSuccess: () => {
-      queryClient.removeQueries({ queryKey: ['backtest', id] });
-      queryClient.invalidateQueries({ queryKey: ['backtests'] });
-      message.success(`Đã xóa lần chạy #${id}.`);
-      onBack();
-    },
-    onError: (error) => message.error(error.message),
-  });
 
   const result = detail.data;
   return (
@@ -47,24 +47,10 @@ export function BacktestDetail({ id, onBack }: Props) {
           <Flex wrap gap={12} align="center">
             <Button onClick={onBack}>← Lịch sử backtest</Button>
             <Typography.Text strong>Lần chạy #{id}</Typography.Text>
-            {result && (
-              <Typography.Text
-                type={result.note ? undefined : 'secondary'}
-                editable={{
-                  text: result.note ?? '',
-                  maxLength: 500,
-                  tooltip: 'Sửa ghi chú',
-                  onChange: (value) => {
-                    if (value !== (result.note ?? '')) setNote.mutate(value);
-                  },
-                }}
-              >
-                {result.note ?? 'thêm ghi chú'}
-              </Typography.Text>
-            )}
+            {result && <BacktestNote note={result.note} onSave={(note) => setNote.mutate({ id, note })} />}
           </Flex>
           {result && (
-            <Popconfirm title={`Xóa lần chạy #${id}?`} okText="Xóa" cancelText="Giữ" onConfirm={() => remove.mutate()}>
+            <Popconfirm title={`Xóa lần chạy #${id}?`} okText="Xóa" cancelText="Giữ" onConfirm={() => remove.mutate(id)}>
               <Button danger loading={remove.isPending}>
                 Xóa
               </Button>
@@ -73,8 +59,14 @@ export function BacktestDetail({ id, onBack }: Props) {
         </Flex>
       </Card>
 
-      {detail.isPending && <Spin />}
-      {detail.isError && <Alert type="error" showIcon title={detail.error.message} />}
+      {detail.isLoading && <Spin />}
+      {detail.isError && (
+        <Alert
+          type="error"
+          showIcon
+          title={isNotFound(detail.error) ? `Không có lần backtest #${id} (có thể đã bị xóa).` : detail.error.message}
+        />
+      )}
       {result && (
         <>
           <BacktestResultView result={result} />

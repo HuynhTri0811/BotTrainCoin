@@ -109,7 +109,10 @@ export const API_MAX_LIMIT = {
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${url}`);
+  if (!res.ok) {
+    const text = `${res.status} ${res.statusText} — ${url}`;
+    throw new ApiError(text, [text], res.status);
+  }
   return (await res.json()) as T;
 }
 
@@ -200,6 +203,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly details: string[] = [],
+    /** Mã HTTP, ví dụ 404 khi không có bản ghi. */
+    public readonly status?: number,
   ) {
     super(message);
   }
@@ -216,7 +221,7 @@ async function sendJson<T>(method: 'POST' | 'PUT' | 'DELETE', url: string, body?
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const details: string[] = data?.errors ?? (data?.error ? [data.error] : []);
-    throw new ApiError(details[0] ?? `${res.status} ${res.statusText}`, details);
+    throw new ApiError(details[0] ?? `${res.status} ${res.statusText}`, details, res.status);
   }
   return data as T;
 }
