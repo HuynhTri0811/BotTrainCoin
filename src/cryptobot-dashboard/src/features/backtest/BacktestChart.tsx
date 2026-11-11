@@ -3,30 +3,36 @@ import {
   CandlestickSeries,
   ColorType,
   createChart,
-  createSeriesMarkers,
   CrosshairMode,
   LineSeries,
   TickMarkType,
-  type SeriesMarker,
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts';
-import type { BacktestResult } from '../../api/client';
+import type { BacktestBar, BacktestSettings, StrategyParameters } from '../../api/client';
 import { formatVnTick, formatVnUnix } from '../../time';
+import { addEmaLines, addTradeOverlay, type OverlayTrade } from './tradeOverlay';
 
-const PRICE_HEIGHT = 420;
+export { EXIT_COLORS } from './tradeOverlay';
+
 const EQUITY_HEIGHT = 160;
-const MAX_LABELLED_MARKERS = 200;
+const MAX_LABELLED_TRADES = 100;
 
-export const EXIT_COLORS = { TakeProfit: '#16a34a', StopLoss: '#dc2626', Signal: '#d97706' } as const;
-const ENTRY_COLOR = '#2563eb';
-const EXIT_TEXT = { TakeProfit: 'TP', StopLoss: 'SL', Signal: 'SELL' } as const;
+interface Props {
+  bars: BacktestBar[];
+  trades: OverlayTrade[];
+  settings: BacktestSettings;
+  parameters: StrategyParameters;
+  /** Khung tổng vốn bên dưới (chart tổng); chart chi tiết một lệnh thì không có. */
+  showEquity?: boolean;
+  priceHeight?: number;
+}
 
 /**
- * Nến của khoảng backtest kèm điểm vào (mũi tên xanh dưới nến) và thoát lệnh (mũi tên trên nến: TP xanh lá,
- * SL đỏ, SELL cam), cùng đường tổng vốn ở khung dưới. Dữ liệu dài đã được backend gộp thành tối đa 3000 cột.
+ * Nến kèm EMA nhanh/chậm, đường giá vào và mức chốt lời/cắt lỗ của từng lệnh, mũi tên vào/ra có giá và lãi/lỗ.
+ * Chart tổng dùng cột đã gộp (tối đa 3000 cột); chart chi tiết một lệnh dùng nến thật.
  */
-export function BacktestChart({ result }: { result: BacktestResult }) {
+export function BacktestChart({ bars, trades, settings, parameters, showEquity = false, priceHeight = 420 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,42 +63,24 @@ export function BacktestChart({ result }: { result: BacktestResult }) {
       borderVisible: false,
     });
     candles.setData(
-      result.chart.bars.map((bar) => ({
-        time: bar.time as UTCTimestamp,
-        open: bar.open,
-        high: bar.high,
-        low: bar.low,
-        close: bar.close,
-      })),
+      bars.map((bar) => ({ time: bar.time as UTCTimestamp, open: bar.open, high: bar.high, low: bar.low, close: bar.close })),
     );
 
+    addEmaLines(chart, bars, parameters);
     // Nhiều lệnh thì bỏ chữ, chỉ giữ mũi tên có màu: chữ chồng lên nhau che mất nến.
-    const showText = result.chart.markers.length <= MAX_LABELLED_MARKERS;
-    const markers: SeriesMarker<Time>[] = result.chart.markers.map((marker) =>
-      marker.kind === 'Entry'
-        ? { time: marker.time as UTCTimestamp, position: 'belowBar', color: ENTRY_COLOR, shape: 'arrowUp', text: showText ? 'BUY' : '' }
-        : {
-            time: marker.time as UTCTimestamp,
-            position: 'aboveBar',
-            color: EXIT_COLORS[marker.exitReason ?? 'Signal'],
-            shape: 'arrowDown',
-            text: showText ? EXIT_TEXT[marker.exitReason ?? 'Signal'] : '',
-          },
-    );
-    markers.sort((first, second) => (first.time as number) - (second.time as number));
-    createSeriesMarkers(candles, markers);
+    addTradeOverlay(chart, candles, bars, trades, settings, trades.length <= MAX_LABELLED_TRADES);
 
-    const equity = chart.addSeries(
-      LineSeries,
-      { color: '#7c3aed', lineWidth: 2, title: 'Tổng vốn', priceLineVisible: false },
-      1,
-    );
-    equity.setData(
-      result.chart.bars
-        .filter((bar) => bar.equity !== null)
-        .map((bar) => ({ time: bar.time as UTCTimestamp, value: bar.equity! })),
-    );
-    chart.panes()[1]?.setHeight(EQUITY_HEIGHT);
+    if (showEquity) {
+      const equity = chart.addSeries(
+        LineSeries,
+        { color: '#7c3aed', lineWidth: 2, title: 'Tổng vốn', priceLineVisible: false },
+        1,
+      );
+      equity.setData(
+        bars.filter((bar) => bar.equity !== null).map((bar) => ({ time: bar.time as UTCTimestamp, value: bar.equity! })),
+      );
+      chart.panes()[1]?.setHeight(EQUITY_HEIGHT);
+    }
 
     // autoSize đo kích thước bất đồng bộ; fit sau frame kế tiếp để dùng đúng chiều rộng.
     const frame = requestAnimationFrame(() => chart.timeScale().fitContent());
@@ -100,7 +88,7 @@ export function BacktestChart({ result }: { result: BacktestResult }) {
       cancelAnimationFrame(frame);
       chart.remove();
     };
-  }, [result]);
+  }, [bars, trades, settings, parameters, showEquity]);
 
-  return <div ref={containerRef} style={{ width: '100%', height: PRICE_HEIGHT + EQUITY_HEIGHT }} />;
+  return <div ref={containerRef} style={{ width: '100%', height: priceHeight + (showEquity ? EQUITY_HEIGHT : 0) }} />;
 }

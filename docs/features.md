@@ -414,8 +414,14 @@ UI: trang **Backtest** ([`BacktestPage.tsx`](../src/cryptobot-dashboard/src/page
 - **Thống kê:** số lệnh đã đóng, thắng/thua (thắng = lãi sau phí), tỷ lệ thắng, lợi nhuận ròng sau phí, Max Drawdown
   (tiền và %, theo tổng vốn ở giá đóng từng nến), profit factor, tổng phí, vốn cuối, mua-và-giữ cùng kỳ. Lệnh còn mở ở
   nến cuối được báo riêng, không tính vào số lệnh và lợi nhuận ròng.
-- **Chart:** nến kèm mũi tên vào lệnh/thoát lệnh (SELL, TP, SL khác màu) và đường tổng vốn. Quá 3000 nến thì backend gộp
-  nến liên tiếp (OHLC đúng của cả nhóm) chỉ để hiển thị; thống kê vẫn tính trên từng nến gốc. Bảng lệnh xuất Excel.
+- **Chart:** nến kèm EMA nhanh/chậm (tính đúng quy tắc cửa sổ của bot tại nến cuối mỗi cột), mũi tên vào lệnh/thoát
+  lệnh (SELL, TP, SL khác màu) ghi giá và lãi/lỗ, và trong lúc giữ lệnh: đường giá vào, đường đứt mức chốt lời (xanh)
+  và cắt lỗ (đỏ) tính từ giá vào. Khung dưới là tổng vốn. Quá 3000 nến thì backend gộp nến liên tiếp (OHLC đúng của
+  cả nhóm) chỉ để hiển thị; thống kê vẫn tính trên từng nến gốc. Lần chạy lưu trước khi có EMA không có hai đường EMA.
+- **Chi tiết một lệnh** (#184): bấm một dòng trong Danh sách lệnh để mở chart nến **thật** của lệnh đó ngay dưới dòng
+  ([`BacktestTradeChartService`](../src/CryptoBot.Application/Backtesting/History/BacktestTradeChartService.cs)):
+  từ 30 nến trước lúc mua đến 30 nến sau lúc bán, kèm EMA, giá vào và mức TP/SL, để thấy rõ EMA cắt lên → BUY, cắt
+  xuống → SELL. Bảng lệnh xuất Excel.
 - **Tải lịch sử:** nút **Tải lịch sử từ Binance** tải nến cũ hơn nến sớm nhất đang có (không đụng phần đồng bộ thường),
   tối đa 1000 request mỗi lần, một lần tải tại một thời điểm cho mỗi cặp và khung nến. Mọi bên ghi nến (đồng bộ
   thường, nến 1d, tải lịch sử) upsert lần lượt theo cặp và khung nến (`CandleStore`), nên không chèn trùng nến. DB chưa có nến nào thì phải chờ

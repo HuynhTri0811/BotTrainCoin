@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Alert, Card, Col, Descriptions, Row, Statistic, Table, Tag, Typography } from 'antd';
 import type { BacktestExitReason, BacktestResult, BacktestTrade } from '../../api/client';
 import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
@@ -5,6 +6,8 @@ import { ExportExcelButton } from '../../components/ExportExcelButton';
 import { excelVnDate, formatVn } from '../../time';
 import { fmtPercent, fmtPrice2, fmtSigned, fmtSignedPercent, fmtUsdt, pnlColor } from '../futures/format';
 import { BacktestChart, EXIT_COLORS } from './BacktestChart';
+import { BacktestTradeDetail } from './BacktestTradeDetail';
+import { EMA_FAST_COLOR, EMA_SLOW_COLOR, ENTRY_COLOR, SL_COLOR, TP_COLOR, toOverlayTrades } from './tradeOverlay';
 import { fmtSizing, fmtStops } from './BacktestHistoryCard';
 
 const quantity = new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 });
@@ -31,6 +34,8 @@ const excelColumns: ExcelColumn<BacktestTrade>[] = [
 export function BacktestResultView({ result }: { result: BacktestResult }) {
   const stats = result.statistics;
   const name = `EMA${result.parameters.fastPeriod}/${result.parameters.slowPeriod} · ${result.symbol} ${result.interval}`;
+  const overlayTrades = useMemo(() => toOverlayTrades(result.trades, result.openTrade), [result.trades, result.openTrade]);
+  const hasEma = result.chart.bars.some((bar) => bar.emaFast != null);
 
   if (result.candleCount === 0)
     return <Alert type="warning" showIcon title="Không có nến nào trong khoảng thời gian đã chọn." />;
@@ -120,11 +125,28 @@ export function BacktestResultView({ result }: { result: BacktestResult }) {
           )
         }
       >
-        <BacktestChart result={result} />
+        <BacktestChart
+          bars={result.chart.bars}
+          trades={overlayTrades}
+          settings={result.settings}
+          parameters={result.parameters}
+          showEquity
+        />
         <Typography.Text type="secondary">
-          <span style={{ color: '#2563eb' }}>▲ vào lệnh</span> · <span style={{ color: EXIT_COLORS.Signal }}>▼ SELL</span> ·{' '}
-          <span style={{ color: EXIT_COLORS.TakeProfit }}>▼ chốt lời</span> · <span style={{ color: EXIT_COLORS.StopLoss }}>▼ cắt lỗ</span>.
-          Khung dưới: tổng vốn. Kéo/cuộn chuột trên biểu đồ để phóng to một đoạn.
+          <span style={{ color: ENTRY_COLOR }}>▲ vào lệnh</span> · <span style={{ color: EXIT_COLORS.Signal }}>▼ SELL</span> ·{' '}
+          <span style={{ color: EXIT_COLORS.TakeProfit }}>▼ chốt lời</span> · <span style={{ color: EXIT_COLORS.StopLoss }}>▼ cắt lỗ</span>{' '}
+          (kèm giá và lãi/lỗ). Trong lúc giữ lệnh: <span style={{ color: ENTRY_COLOR }}>— giá vào</span>
+          {result.settings.takeProfitPercent != null && <span style={{ color: TP_COLOR }}> · - - mức chốt lời</span>}
+          {result.settings.stopLossPercent != null && <span style={{ color: SL_COLOR }}> · - - mức cắt lỗ</span>}.
+          {hasEma ? (
+            <>
+              {' '}<span style={{ color: EMA_FAST_COLOR }}>— EMA{result.parameters.fastPeriod}</span> ·{' '}
+              <span style={{ color: EMA_SLOW_COLOR }}>— EMA{result.parameters.slowPeriod}</span>.
+            </>
+          ) : (
+            ' Lần chạy này lưu trước khi chart có EMA; chạy lại để thấy đường EMA.'
+          )}{' '}
+          Khung dưới: tổng vốn. Kéo/cuộn chuột để phóng to; bấm một lệnh ở bảng dưới để xem nến thật của lệnh đó.
         </Typography.Text>
       </Card>
 
@@ -145,6 +167,13 @@ export function BacktestResultView({ result }: { result: BacktestResult }) {
           dataSource={result.trades}
           pagination={{ pageSize: 20, showSizeChanger: false, hideOnSinglePage: true }}
           scroll={{ x: true }}
+          // Bấm một dòng để xem chart nến thật của lệnh đó ngay bên dưới dòng.
+          expandable={{
+            expandRowByClick: true,
+            expandedRowRender: (trade) => (
+              <BacktestTradeDetail result={result} trade={trade} tradeIndex={result.trades.indexOf(trade)} />
+            ),
+          }}
           columns={[
             { title: 'Vào lúc', dataIndex: 'entryTimeUtc', render: formatVn },
             { title: 'Giá vào', dataIndex: 'entryPrice', align: 'right', render: fmtPrice2 },

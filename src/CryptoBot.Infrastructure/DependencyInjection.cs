@@ -55,6 +55,8 @@ public static class DependencyInjection
         // Lịch sử backtest: mọi lần chạy được lưu để mở lại và so sánh.
         services.AddScoped<IBacktestStore, BacktestStore>();
         services.AddScoped<BacktestHistoryService>();
+        // Nến thật quanh một lệnh của lần chạy đã lưu (chart chi tiết lệnh).
+        services.AddScoped<BacktestTradeChartService>();
 
         // Chỉ báo tự viết: class có [Indicator] trong CryptoBot.Domain + cấu hình "Indicators".
         services.AddSingleton(sp => new IndicatorRegistry(
