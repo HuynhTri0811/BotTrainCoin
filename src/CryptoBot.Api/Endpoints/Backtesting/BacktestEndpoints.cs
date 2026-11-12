@@ -51,6 +51,17 @@ public static class BacktestEndpoints
             }
         });
 
+        // Gợi ý cho form: chỉ báo tự viết làm tín hiệu Futures, phí/trượt giá/ký quỹ của Paper Futures.
+        api.MapGet("/options", async (int id, BacktestOptionsService options, CancellationToken ct) =>
+            await options.GetAsync(id, ct) is { } found
+                ? Results.Ok(new BacktestOptionsDto(
+                    found.Indicators.Select(choice => new BacktestIndicatorChoiceDto(choice.Type, choice.Description,
+                        choice.Parameters, choice.PresetName)).ToList(),
+                    new BacktestFuturesDefaultsDto(found.Futures.FeePercent, found.Futures.SlippagePercent,
+                        found.Futures.MaintenanceMarginPercent, found.Futures.MaxLeverage, found.Futures.Margin,
+                        found.Futures.Leverage, found.Futures.StopLossPercent, found.Futures.TakeProfitPercent)))
+                : Results.NotFound(new { error = "Không có chiến lược này." }));
+
         // Mọi lần chạy được lưu vào lịch sử để mở lại và so sánh.
         api.MapPost("/", async (int id, BacktestRequestDto body, BacktestService backtests,
             BacktestHistoryService history, CancellationToken ct) =>
