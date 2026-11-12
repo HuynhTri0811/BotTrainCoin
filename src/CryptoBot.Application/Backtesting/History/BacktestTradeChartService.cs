@@ -20,9 +20,6 @@ public sealed class BacktestTradeChartService(
     /// <summary>Số cột tối đa; lệnh giữ rất lâu thì gộp nến giống chart tổng.</summary>
     public const int MaxBars = 1500;
 
-    /// <summary>Số nến tối đa đọc từ DB cho một lệnh.</summary>
-    public const int MaxCandles = 50_000;
-
     /// <summary>
     /// Chart của lệnh thứ <paramref name="tradeIndex"/> (theo thứ tự trong kết quả; bằng số lệnh đã đóng = lệnh còn
     /// mở ở cuối kỳ). Null nếu không có lần chạy hoặc không có lệnh ở vị trí đó.
@@ -50,7 +47,8 @@ public sealed class BacktestTradeChartService(
         var strategy = new EmaCrossStrategy(snapshot.Parameters);
         var step = key.Interval.Duration;
         var from = entry - step * ContextCandles;
-        var span = Math.Min(MaxCandles, (int)((exit - from).Ticks / step.Ticks) + 1 + ContextCandles);
+        // Lệnh luôn nằm trong khoảng của lần chạy (tối đa BacktestService.MaxCandles nến), nên đọc đủ tới sau lúc ra.
+        var span = (int)((exit - from).Ticks / step.Ticks) + 1 + ContextCandles;
 
         var warmup = await candles.GetLatestAsync(key, from, strategy.RequiredCandles - 1, closedOnly: true, ct);
         var window = await candles.GetAfterAsync(key, from.AddTicks(-1), span, closedOnly: true, ct);

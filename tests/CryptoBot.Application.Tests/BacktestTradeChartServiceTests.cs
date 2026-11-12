@@ -61,6 +61,31 @@ public class BacktestTradeChartServiceTests
     }
 
     [Fact]
+    public async Task Trade_held_longer_than_fifty_thousand_candles_still_reaches_its_exit()
+    {
+        // BUY ở nến 43 rồi giá chỉ tăng: lệnh còn mở tới nến cuối, giữ hơn 60.000 nến.
+        const int length = 60_100;
+        for (var index = Closes.Length; index < length; index++)
+        {
+            var close = 16m + index * 0.001m;
+            _candles.Candles[Hour(index)] = new Candle("Binance", "BTCUSDT", CandleInterval.H1, Hour(index), close,
+                close, close, close, 1, true, T0);
+        }
+
+        var run = await new BacktestService(_instances, _candles).RunAsync(
+            new BacktestRequest(1, null, null, null, Settings), CancellationToken.None);
+        var id = (await History().SaveAsync(run!, CancellationToken.None)).Saved.Id;
+        var openTradeIndex = run!.Result.Trades.Count;
+
+        var chart = await CreateService().GetAsync(id, openTradeIndex, CancellationToken.None);
+
+        // Cột cuối chứa nến cuối của lần chạy, nơi lệnh còn mở được định giá.
+        var lastBar = chart!.Bars[^1];
+        Assert.True(lastBar.OpenTimeUtc + TimeSpan.FromHours(chart.CandlesPerBar) > Hour(length - 1));
+        Assert.True(chart.Bars.Count <= BacktestTradeChartService.MaxBars);
+    }
+
+    [Fact]
     public async Task Ema_is_left_out_where_the_window_spans_missing_candles()
     {
         var id = await SaveRunAsync();
