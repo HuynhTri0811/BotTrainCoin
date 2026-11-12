@@ -66,8 +66,9 @@ public static class BacktestEndpoints
         api.MapPost("/", async (int id, BacktestRequestDto body, BacktestService backtests,
             BacktestHistoryService history, CancellationToken ct) =>
         {
-            if (body.ToRequest(id) is not { } request)
-                return Results.BadRequest(new { error = QueryEnum.Error<PositionSizing>(body.Sizing ?? "") });
+            var (request, error) = body.ToRequest(id);
+            if (request is null)
+                return Results.BadRequest(new { error });
 
             try
             {
@@ -176,10 +177,10 @@ public static class BacktestEndpoints
                 statistics.MaxDrawdownPercent, statistics.EndingEquity, statistics.BuyAndHoldPercent),
             snapshot.Trades.Select(trade => new BacktestTradeDto(trade.EntryTimeUtc, trade.EntryPrice,
                 trade.ExitTimeUtc, trade.ExitPrice, trade.Quantity, trade.Fees, trade.NetPnl, trade.ReturnPercent,
-                trade.ExitReason.ToString())).ToList(),
+                trade.ExitReason.ToString(), trade.Side.ToString())).ToList(),
             snapshot.OpenTrade is { } open
                 ? new BacktestOpenTradeDto(open.EntryTimeUtc, open.EntryPrice, open.Quantity, open.EntryFee,
-                    open.MarkPrice, open.UnrealizedPnl)
+                    open.MarkPrice, open.UnrealizedPnl, open.Side.ToString())
                 : null,
             new BacktestChartDto(snapshot.Chart.CandlesPerBar, snapshot.Chart.Bars.Select(ToDto).ToList()));
     }
