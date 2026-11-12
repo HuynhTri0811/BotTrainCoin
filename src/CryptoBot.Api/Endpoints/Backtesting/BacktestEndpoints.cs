@@ -165,7 +165,9 @@ public static class BacktestEndpoints
         var statistics = snapshot.Statistics;
         return new BacktestDto(
             saved.Id, saved.CreatedAtUtc, saved.Note,
-            saved.StrategyInstanceId, saved.Symbol, saved.Interval, snapshot.Parameters, ToDto(snapshot.Settings),
+            saved.StrategyInstanceId, saved.Symbol, saved.Interval, snapshot.Parameters,
+            new BacktestSignalDto(snapshot.SignalOrEmaCross.Type, snapshot.SignalOrEmaCross.Parameters),
+            ToDto(snapshot.Settings),
             snapshot.FirstCandleUtc, snapshot.LastCandleUtc, snapshot.CandleCount, snapshot.WarmupCandles,
             snapshot.EvaluatedCandles, snapshot.SkippedGapWindows, snapshot.BuySignals, snapshot.SellSignals,
             new BacktestStatisticsDto(statistics.TotalTrades, statistics.Wins, statistics.Losses,

@@ -1,6 +1,7 @@
 using CryptoBot.Application.Backtesting;
 using CryptoBot.Application.Signals;
 using CryptoBot.Domain.Backtesting;
+using CryptoBot.Domain.Futures;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Strategies;
 
@@ -220,5 +221,89 @@ public class BacktestServiceTests
         Assert.Equal(expected.Slow, bars[3].EmaSlow);
         // BUY ở nến 3: EMA nhanh vừa vượt EMA chậm.
         Assert.True(bars[3].EmaFast > bars[3].EmaSlow);
+    }
+
+    // 1x: lệnh Long ở ví dụ EMA lỗ một nửa, vẫn còn tiền để mở Short.
+    private static readonly BacktestSettings FuturesBoth = Settings with
+    {
+        Futures = new FuturesBacktestSettings(1, BacktestDirection.Both, true, 0m, 0.4m),
+    };
+
+    /// <summary>Giá dao động mạnh để RSI cắt qua cả mức quá bán lẫn quá mua nhiều lần.</summary>
+    private static decimal[] Waves(int count) => Enumerable.Range(0, count)
+        .Select(index => Math.Round(100m + 20m * (decimal)Math.Sin(index / 4.0), 4))
+        .ToArray();
+
+    private static readonly Dictionary<string, string?> SmallRsi = new()
+    {
+        ["Period"] = "5",
+        ["LookbackCandles"] = "20",
+    };
+
+    [Fact]
+    public async Task Futures_ema_cross_opens_short_on_the_downward_cross()
+    {
+        AddCandles(UpThenDown);
+
+        var run = await CreateService().RunAsync(new BacktestRequest(1, null, null, null, FuturesBoth),
+            CancellationToken.None);
+
+        var trade = Assert.Single(run!.Result.Trades);
+        Assert.Equal(PositionSide.Long, trade.Side);
+        Assert.Equal(PositionSide.Short, run.Result.OpenTrade!.Side);
+        Assert.Equal(StrategyTypes.EmaCross, run.Signal.Type);
+        Assert.Equal(new EmaCrossParameters(2, 3, 4), run.Parameters);
+        Assert.Contains(run.Chart.Bars, bar => bar.EmaFast is not null);
+    }
+
+    [Fact]
+    public async Task Futures_can_trade_a_custom_indicator_on_the_instance_candles()
+    {
+        AddCandles(Waves(200));
+
+        var run = await CreateService().RunAsync(
+            new BacktestRequest(1, Hour(30), null, null, FuturesBoth, "myrsi", SmallRsi), CancellationToken.None);
+
+        Assert.NotNull(run);
+        Assert.Equal("MyRsi", run.Signal.Type);
+        Assert.Equal("5", run.Signal.Parameters["Period"]);
+        Assert.Equal("70", run.Signal.Parameters["Overbought"]);
+        Assert.Equal(20, run.Signal.RequiredCandles);
+        Assert.Null(run.Parameters);
+        Assert.Equal(19, run.WarmupCandles);
+        Assert.Contains(run.Result.Trades, trade => trade.Side == PositionSide.Long);
+        Assert.Contains(run.Result.Trades, trade => trade.Side == PositionSide.Short);
+        Assert.All(run.Chart.Bars, bar => Assert.Null(bar.EmaFast));
+    }
+
+    [Fact]
+    public async Task Indicator_runs_do_not_need_an_ema_instance()
+    {
+        AddCandles(Waves(60));
+        AddInstance(2, "Rsi", "{not json");
+
+        var run = await CreateService().RunAsync(
+            new BacktestRequest(2, null, null, null, FuturesBoth, "MyRsi", SmallRsi), CancellationToken.None);
+
+        Assert.Equal("MyRsi", run!.Signal.Type);
+    }
+
+    [Fact]
+    public async Task Indicators_need_futures_and_a_known_type()
+    {
+        AddCandles(Waves(60));
+        var service = CreateService();
+
+        var spot = await Assert.ThrowsAsync<ArgumentException>(() => service.RunAsync(
+            new BacktestRequest(1, null, null, null, Settings, "MyRsi", SmallRsi), CancellationToken.None));
+        var unknown = await Assert.ThrowsAsync<ArgumentException>(() => service.RunAsync(
+            new BacktestRequest(1, null, null, null, FuturesBoth, "Nope"), CancellationToken.None));
+        var badParameter = await Assert.ThrowsAsync<ArgumentException>(() => service.RunAsync(
+            new BacktestRequest(1, null, null, null, FuturesBoth, "MyRsi",
+                new Dictionary<string, string?> { ["Period"] = "abc" }), CancellationToken.None));
+
+        Assert.Contains("Futures", spot.Message);
+        Assert.Contains("Không có chỉ báo loại 'Nope'", unknown.Message);
+        Assert.Contains("Period", badParameter.Message);
     }
 }
