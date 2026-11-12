@@ -2,6 +2,7 @@ import {
   createSeriesMarkers,
   LineSeries,
   LineStyle,
+  type AutoscaleInfo,
   type IChartApi,
   type ISeriesApi,
   type LineData,
@@ -55,29 +56,47 @@ function barIndexAt(times: number[], unix: number): number {
 /**
  * Dữ liệu cho một series có đoạn hiện, đoạn ẩn. Lightweight Charts 5 nối mọi điểm (khoảng trống không làm đứt
  * đường) và tô đoạn i → i+1 bằng màu của điểm i, nên đoạn i → i+1 chỉ hiện khi `connects(i)`; điểm không có giá trị
- * lấy giá của điểm có giá trị gần nhất phía trước (hoặc phía sau) để đoạn ẩn nằm ngang.
+ * lấy giá của điểm có giá trị gần nhất phía trước (hoặc phía sau) để đoạn ẩn nằm ngang. `shown` đánh dấu điểm đang
+ * hiện, dùng để tính thang giá.
  */
 function lineData(
   times: number[],
   values: (number | null)[],
   connects: (index: number) => boolean,
-): LineData[] {
+): { data: LineData[]; shown: boolean[] } {
   const filled = [...values];
   for (let index = 1; index < filled.length; index++) filled[index] ??= filled[index - 1];
   for (let index = filled.length - 2; index >= 0; index--) filled[index] ??= filled[index + 1];
 
   const drawsToNext = times.map((_, index) => index + 1 < times.length && connects(index));
-  return times.map((time, index) => ({
+  const shown = times.map((_, index) => drawsToNext[index] || (index > 0 && drawsToNext[index - 1]));
+  const data = times.map((time, index) => ({
     time: time as UTCTimestamp,
     value: filled[index] ?? 0,
     ...(drawsToNext[index] ? {} : { color: HIDDEN }),
   }));
+  return { data, shown };
 }
 
-/** Thêm một series đường từ `lineData`. */
+/** Khoảng giá của các điểm đang hiện trong vùng đang xem; null nếu không có (thang giá theo nến). */
+function visibleRange(chart: IChartApi, data: LineData[], shown: boolean[]): AutoscaleInfo | null {
+  const range = chart.timeScale().getVisibleLogicalRange();
+  const from = Math.max(0, Math.floor(range?.from ?? 0));
+  const to = Math.min(data.length - 1, Math.ceil(range?.to ?? data.length - 1));
+  let minValue = Infinity;
+  let maxValue = -Infinity;
+  for (let index = from; index <= to; index++) {
+    if (!shown[index]) continue;
+    minValue = Math.min(minValue, data[index].value);
+    maxValue = Math.max(maxValue, data[index].value);
+  }
+  return minValue <= maxValue ? { priceRange: { minValue, maxValue } } : null;
+}
+
+/** Thêm một series đường từ `lineData`; điểm ẩn không được tính vào thang giá. */
 function addLine(
   chart: IChartApi,
-  data: LineData[],
+  line: { data: LineData[]; shown: boolean[] },
   options: { color: string; lineStyle?: LineStyle; title?: string },
 ) {
   chart
@@ -87,8 +106,9 @@ function addLine(
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerVisible: false,
+      autoscaleInfoProvider: () => visibleRange(chart, line.data, line.shown),
     })
-    .setData(data);
+    .setData(line.data);
 }
 
 /** Hai đường EMA nhanh/chậm; bỏ qua cột chưa có EMA (warm-up hoặc lần chạy cũ). */
