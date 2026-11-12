@@ -806,15 +806,6 @@ export interface BacktestTradeChart {
   bars: BacktestBar[];
 }
 
-export interface BacktestMarker {
-  /** Trùng `time` của cột chứa nến khớp lệnh. */
-  time: number;
-  kind: 'Entry' | 'Exit';
-  price: number;
-  exitReason: BacktestExitReason | null;
-  netPnl: number | null;
-}
-
 export interface BacktestSettings {
   initialCapital: number;
   sizing: PositionSizing;
@@ -864,8 +855,8 @@ export interface BacktestResult {
   statistics: BacktestStatistics;
   trades: BacktestTrade[];
   openTrade: BacktestOpenTrade | null;
-  /** Mỗi cột gộp `candlesPerBar` nến liên tiếp khi khoảng thời gian dài. */
-  chart: { candlesPerBar: number; bars: BacktestBar[]; markers: BacktestMarker[] };
+  /** Mỗi cột gộp `candlesPerBar` nến liên tiếp khi khoảng thời gian dài. Điểm vào/ra lấy từ `trades`/`openTrade`. */
+  chart: { candlesPerBar: number; bars: BacktestBar[] };
 }
 
 /** Số dòng tối đa mỗi lần gọi `/api/backtests` (BacktestHistoryService.MaxListLimit). */

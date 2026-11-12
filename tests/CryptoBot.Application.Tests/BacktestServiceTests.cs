@@ -55,7 +55,6 @@ public class BacktestServiceTests
         Assert.Equal(14m, trade.EntryPrice);
         Assert.Equal(7m, trade.ExitPrice);
         Assert.Equal(10, run.Chart.Bars.Count);
-        Assert.Equal(2, run.Chart.Markers.Count);
     }
 
     [Fact]

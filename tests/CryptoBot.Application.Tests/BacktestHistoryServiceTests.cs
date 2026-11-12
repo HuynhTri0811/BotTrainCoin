@@ -59,7 +59,7 @@ public class BacktestHistoryServiceTests
         Assert.Equal(2, snapshot.BuySignals);
         Assert.Equal(2, snapshot.SellSignals);
         Assert.Equal(run.Chart.Bars, snapshot.Chart.Bars);
-        Assert.Equal(run.Chart.Markers, snapshot.Chart.Markers);
+        Assert.Equal(run.Chart.Bars, snapshot.Chart.Bars);
         Assert.Equal(_clock.UtcNow, reopened.Saved.CreatedAtUtc);
         Assert.Equal(run.Result.Statistics.NetProfit, reopened.Saved.NetProfit);
     }

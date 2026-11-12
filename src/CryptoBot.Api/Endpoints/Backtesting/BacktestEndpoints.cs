@@ -160,11 +160,7 @@ public static class BacktestEndpoints
                 ? new BacktestOpenTradeDto(open.EntryTimeUtc, open.EntryPrice, open.Quantity, open.EntryFee,
                     open.MarkPrice, open.UnrealizedPnl)
                 : null,
-            new BacktestChartDto(snapshot.Chart.CandlesPerBar,
-                snapshot.Chart.Bars.Select(ToDto).ToList(),
-                snapshot.Chart.Markers.Select(marker => new BacktestMarkerDto(ToUnixSeconds(marker.BarOpenTimeUtc),
-                    marker.IsEntry ? "Entry" : "Exit", marker.Price, marker.ExitReason?.ToString(),
-                    marker.NetPnl)).ToList()));
+            new BacktestChartDto(snapshot.Chart.CandlesPerBar, snapshot.Chart.Bars.Select(ToDto).ToList()));
     }
 
     private static BacktestBarDto ToDto(BacktestChartBar bar) => new(ToUnixSeconds(bar.OpenTimeUtc), bar.Open,
