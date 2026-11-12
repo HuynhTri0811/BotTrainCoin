@@ -52,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<ChartQueryService>();
         // Backtest chiến lược trên nến đã lưu (chỉ đọc DB).
         services.AddScoped<BacktestService>();
+        services.AddScoped<BacktestOptionsService>();
         // Lịch sử backtest: mọi lần chạy được lưu để mở lại và so sánh.
         services.AddScoped<IBacktestStore, BacktestStore>();
         services.AddScoped<BacktestHistoryService>();

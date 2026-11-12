@@ -6,15 +6,16 @@ import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/
 import { ExportExcelButton } from '../../components/ExportExcelButton';
 import { excelVnDate, formatVn } from '../../time';
 import { fmtPercent, fmtSigned, fmtSignedPercent, pnlColor } from '../futures/format';
+import { fmtMode, fmtSignal } from './describe';
 import { BacktestNote } from './BacktestNote';
 import { useBacktestMutations } from './useBacktestMutations';
 
 const amount = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 const MAX_COMPARE = 4;
 
-/** `1000 USDT · 10% vốn` hoặc `1000 USDT · 100 USDT/lệnh`. */
+/** `1000 USDT · 10% vốn` hoặc `1000 USDT · 100 USDT/lệnh`; Futures ghi rõ là margin. */
 export const fmtSizing = (settings: BacktestSettings) =>
-  `${amount.format(settings.initialCapital)} USDT · ${
+  `${amount.format(settings.initialCapital)} USDT · ${settings.futures ? 'margin ' : ''}${
     settings.sizing === 'PercentOfEquity' ? `${amount.format(settings.sizeValue)}% vốn` : `${amount.format(settings.sizeValue)} USDT/lệnh`
   }`;
 
@@ -24,8 +25,7 @@ export const fmtStops = (settings: BacktestSettings) =>
     settings.stopLossPercent == null ? 'không' : `${amount.format(settings.stopLossPercent)}%`
   }`;
 
-const ema = (summary: BacktestSummary) =>
-  `EMA${summary.parameters.fastPeriod}/${summary.parameters.slowPeriod} · ${summary.parameters.lookbackCandles}`;
+const signal = (summary: BacktestSummary) => fmtSignal(summary.signal, summary.parameters);
 
 const period = (summary: BacktestSummary) =>
   `${formatVn(summary.firstCandleUtc).slice(-10)} → ${formatVn(summary.lastCandleUtc).slice(-10)}`;
@@ -35,9 +35,8 @@ const excelColumns: ExcelColumn<BacktestSummary>[] = [
   { header: 'Lúc chạy', value: (summary) => excelVnDate(summary.createdAtUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
   { header: 'Cặp', value: (summary) => summary.symbol, width: 10 },
   { header: 'Khung', value: (summary) => summary.interval, width: 7 },
-  { header: 'EMA nhanh', value: (summary) => summary.parameters.fastPeriod, width: 10 },
-  { header: 'EMA chậm', value: (summary) => summary.parameters.slowPeriod, width: 10 },
-  { header: 'Cửa sổ', value: (summary) => summary.parameters.lookbackCandles, width: 8 },
+  { header: 'Kiểu', value: (summary) => fmtMode(summary.settings), width: 24 },
+  { header: 'Tín hiệu', value: signal, width: 40 },
   { header: 'Từ nến', value: (summary) => excelVnDate(summary.firstCandleUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
   { header: 'Đến nến', value: (summary) => excelVnDate(summary.lastCandleUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
   { header: 'Vốn ban đầu', value: (summary) => summary.settings.initialCapital, format: EXCEL_FORMAT.amount, width: 12 },
@@ -57,7 +56,8 @@ const excelColumns: ExcelColumn<BacktestSummary>[] = [
 const compareRows: { label: string; value: (summary: BacktestSummary) => ReactNode }[] = [
   { label: 'Lúc chạy', value: (summary) => formatVn(summary.createdAtUtc) },
   { label: 'Cặp · khung', value: (summary) => `${summary.symbol} ${summary.interval}` },
-  { label: 'EMA · cửa sổ', value: ema },
+  { label: 'Kiểu', value: (summary) => fmtMode(summary.settings) },
+  { label: 'Tín hiệu', value: signal },
   { label: 'Khoảng nến', value: period },
   { label: 'Vốn · khối lượng', value: (summary) => fmtSizing(summary.settings) },
   { label: 'TP · SL', value: (summary) => fmtStops(summary.settings) },
@@ -192,8 +192,11 @@ export function BacktestHistoryCard({ strategyId, onOpen }: Props) {
               key: 'strategy',
               render: (_, summary) => (
                 <Space orientation="vertical" size={0}>
-                  <Tag>{`${summary.symbol} ${summary.interval}`}</Tag>
-                  <Typography.Text type="secondary">{ema(summary)}</Typography.Text>
+                  <Space size={4}>
+                    <Tag>{`${summary.symbol} ${summary.interval}`}</Tag>
+                    <Tag color={summary.settings.futures ? 'purple' : undefined}>{fmtMode(summary.settings)}</Tag>
+                  </Space>
+                  <Typography.Text type="secondary">{signal(summary)}</Typography.Text>
                 </Space>
               ),
             },

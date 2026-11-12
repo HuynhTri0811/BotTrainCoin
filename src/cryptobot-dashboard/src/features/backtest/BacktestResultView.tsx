@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Alert, Card, Col, Descriptions, Row, Statistic, Table, Tag, Typography } from 'antd';
-import type { BacktestExitReason, BacktestResult, BacktestTrade } from '../../api/client';
+import type { BacktestExitReason, BacktestResult, BacktestTrade, TradeSide } from '../../api/client';
 import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
 import { excelVnDate, formatVn } from '../../time';
@@ -12,26 +12,33 @@ import {
   EMA_SLOW_COLOR,
   ENTRY_COLOR,
   EXIT_COLORS,
+  LIQUIDATION_COLOR,
+  SHORT_COLOR,
   SL_COLOR,
   TP_COLOR,
+  sideColor,
   toOverlayTrades,
 } from './tradeOverlay';
 import { fmtSizing, fmtStops } from './BacktestHistoryCard';
+import { fmtMode, fmtSignal, isEmaCross, signalName } from './describe';
 
 const quantity = new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 });
 
-const EXIT_LABELS: Record<BacktestExitReason, string> = {
-  Signal: 'SELL (EMA cắt xuống)',
+/** Nhãn lý do thoát; Spot đóng lệnh khi bot phát SELL, Futures khi tín hiệu đảo chiều. */
+const exitLabels = (futures: boolean): Record<BacktestExitReason, string> => ({
+  Signal: futures ? 'Tín hiệu đảo chiều' : 'SELL (EMA cắt xuống)',
   TakeProfit: 'Chốt lời',
   StopLoss: 'Cắt lỗ',
-};
+  Liquidation: 'Thanh lý',
+});
 
-const excelColumns: ExcelColumn<BacktestTrade>[] = [
+const excelColumns = (labels: Record<BacktestExitReason, string>): ExcelColumn<BacktestTrade>[] => [
+  { header: 'Chiều', value: (trade) => trade.side, width: 7 },
   { header: 'Vào lúc', value: (trade) => excelVnDate(trade.entryTimeUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
   { header: 'Giá vào', value: (trade) => trade.entryPrice, format: EXCEL_FORMAT.price, width: 12 },
   { header: 'Ra lúc', value: (trade) => excelVnDate(trade.exitTimeUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
   { header: 'Giá ra', value: (trade) => trade.exitPrice, format: EXCEL_FORMAT.price, width: 12 },
-  { header: 'Lý do thoát', value: (trade) => EXIT_LABELS[trade.exitReason], width: 20 },
+  { header: 'Lý do thoát', value: (trade) => labels[trade.exitReason], width: 20 },
   { header: 'Số coin', value: (trade) => trade.quantity, format: '0.000000', width: 12 },
   { header: 'Phí (USDT)', value: (trade) => trade.fees, format: EXCEL_FORMAT.amount, width: 11 },
   { header: 'Lãi/lỗ sau phí (USDT)', value: (trade) => trade.netPnl, format: EXCEL_FORMAT.signedAmount, width: 18 },
@@ -41,7 +48,9 @@ const excelColumns: ExcelColumn<BacktestTrade>[] = [
 /** Bảng thống kê, chart điểm vào/ra và danh sách lệnh của một lần backtest. */
 export function BacktestResultView({ result }: { result: BacktestResult }) {
   const stats = result.statistics;
-  const name = `EMA${result.parameters.fastPeriod}/${result.parameters.slowPeriod} · ${result.symbol} ${result.interval}`;
+  const futures = result.settings.futures;
+  const labels = exitLabels(futures != null);
+  const name = `${signalName(result.signal, result.parameters)} · ${fmtMode(result.settings)} · ${result.symbol} ${result.interval}`;
   const overlayTrades = useMemo(() => toOverlayTrades(result.trades, result.openTrade), [result.trades, result.openTrade]);
   const hasEma = result.chart.bars.some((bar) => bar.emaFast != null);
 
@@ -96,8 +105,12 @@ export function BacktestResultView({ result }: { result: BacktestResult }) {
           </Col>
         </Row>
         <Descriptions size="small" column={{ xs: 1, md: 2 }} style={{ marginTop: 16 }}>
+          <Descriptions.Item label="Kiểu · tín hiệu">
+            {fmtMode(result.settings)} · {fmtSignal(result.signal, result.parameters)}
+          </Descriptions.Item>
           <Descriptions.Item label="Vốn · rủi ro">
             {fmtSizing(result.settings)} · {fmtStops(result.settings)} · phí {result.settings.feePercent}%
+            {futures && ` · trượt giá ${futures.slippagePercent}% · ký quỹ duy trì ${futures.maintenanceMarginPercent}%`}
           </Descriptions.Item>
           {result.note && <Descriptions.Item label="Ghi chú">{result.note}</Descriptions.Item>}
           <Descriptions.Item label="Khoảng nến">
@@ -106,14 +119,15 @@ export function BacktestResultView({ result }: { result: BacktestResult }) {
           <Descriptions.Item label="Số nến">
             {result.candleCount.toLocaleString('vi-VN')} (thêm {result.warmupCandles} nến warm-up phía trước)
           </Descriptions.Item>
-          <Descriptions.Item label="Tín hiệu của bot">
-            {result.buySignals} BUY · {result.sellSignals} SELL
+          <Descriptions.Item label={futures ? 'Tín hiệu' : 'Tín hiệu của bot'}>
+            {futures ? `${result.buySignals} Long · ${result.sellSignals} Short` : `${result.buySignals} BUY · ${result.sellSignals} SELL`}
           </Descriptions.Item>
           <Descriptions.Item label="Nến bỏ qua vì cửa sổ thiếu nến">
             {result.skippedGapWindows.toLocaleString('vi-VN')}
           </Descriptions.Item>
           {result.openTrade && (
             <Descriptions.Item label="Lệnh còn mở ở nến cuối">
+              {futures && <SideTag side={result.openTrade.side} />}
               Vào {formatVn(result.openTrade.entryTimeUtc)} @ {fmtPrice2(result.openTrade.entryPrice)} · tạm tính{' '}
               <span style={{ color: pnlColor(result.openTrade.unrealizedPnl) }}>
                 {fmtSigned(result.openTrade.unrealizedPnl)} USDT
@@ -141,12 +155,27 @@ export function BacktestResultView({ result }: { result: BacktestResult }) {
           showEquity
         />
         <Typography.Text type="secondary">
-          <span style={{ color: ENTRY_COLOR }}>▲ vào lệnh</span> · <span style={{ color: EXIT_COLORS.Signal }}>▼ SELL</span> ·{' '}
-          <span style={{ color: EXIT_COLORS.TakeProfit }}>▼ chốt lời</span> · <span style={{ color: EXIT_COLORS.StopLoss }}>▼ cắt lỗ</span>{' '}
-          (kèm giá và lãi/lỗ). Trong lúc giữ lệnh: <span style={{ color: ENTRY_COLOR }}>— giá vào</span>
+          {futures ? (
+            <>
+              <span style={{ color: ENTRY_COLOR }}>▲ LONG</span> · <span style={{ color: SHORT_COLOR }}>▼ SHORT</span>; mũi tên
+              thoát ngược chiều: <span style={{ color: EXIT_COLORS.Signal }}>đóng khi đảo chiều</span> ·{' '}
+              <span style={{ color: EXIT_COLORS.TakeProfit }}>chốt lời</span> · <span style={{ color: EXIT_COLORS.StopLoss }}>cắt lỗ</span> ·{' '}
+              <span style={{ color: EXIT_COLORS.Liquidation }}>thanh lý</span> (kèm giá và lãi/lỗ trên margin). Trong lúc giữ lệnh:{' '}
+              <span style={{ color: ENTRY_COLOR }}>— giá vào Long</span> · <span style={{ color: SHORT_COLOR }}>— giá vào Short</span>
+            </>
+          ) : (
+            <>
+              <span style={{ color: ENTRY_COLOR }}>▲ vào lệnh</span> · <span style={{ color: EXIT_COLORS.Signal }}>▼ SELL</span> ·{' '}
+              <span style={{ color: EXIT_COLORS.TakeProfit }}>▼ chốt lời</span> · <span style={{ color: EXIT_COLORS.StopLoss }}>▼ cắt lỗ</span>{' '}
+              (kèm giá và lãi/lỗ). Trong lúc giữ lệnh: <span style={{ color: ENTRY_COLOR }}>— giá vào</span>
+            </>
+          )}
           {result.settings.takeProfitPercent != null && <span style={{ color: TP_COLOR }}> · - - mức chốt lời</span>}
-          {result.settings.stopLossPercent != null && <span style={{ color: SL_COLOR }}> · - - mức cắt lỗ</span>}.
-          {hasEma ? (
+          {result.settings.stopLossPercent != null && <span style={{ color: SL_COLOR }}> · - - mức cắt lỗ</span>}
+          {futures && <span style={{ color: LIQUIDATION_COLOR }}> · ··· giá thanh lý</span>}.
+          {!isEmaCross(result.signal) ? (
+            ` Tín hiệu từ chỉ báo ${result.signal.type} (không vẽ đường chỉ báo trên chart này).`
+          ) : hasEma && result.parameters ? (
             <>
               {' '}<span style={{ color: EMA_FAST_COLOR }}>— EMA{result.parameters.fastPeriod}</span> ·{' '}
               <span style={{ color: EMA_SLOW_COLOR }}>— EMA{result.parameters.slowPeriod}</span>.
@@ -164,7 +193,7 @@ export function BacktestResultView({ result }: { result: BacktestResult }) {
         extra={
           <ExportExcelButton
             onExport={async () => ({
-              count: await downloadExcel(`backtest-${result.symbol}-${result.interval}`, 'Lệnh', result.trades, excelColumns),
+              count: await downloadExcel(`backtest-${result.symbol}-${result.interval}`, 'Lệnh', result.trades, excelColumns(labels)),
             })}
           />
         }
@@ -183,6 +212,17 @@ export function BacktestResultView({ result }: { result: BacktestResult }) {
             ),
           }}
           columns={[
+            ...(futures
+              ? [
+                  {
+                    title: 'Chiều',
+                    dataIndex: 'side',
+                    filters: (['Long', 'Short'] as const).map((side) => ({ text: side, value: side })),
+                    onFilter: (value: unknown, trade: BacktestTrade) => trade.side === value,
+                    render: (side: TradeSide) => <SideTag side={side} />,
+                  },
+                ]
+              : []),
             { title: 'Vào lúc', dataIndex: 'entryTimeUtc', render: formatVn },
             { title: 'Giá vào', dataIndex: 'entryPrice', align: 'right', render: fmtPrice2 },
             { title: 'Ra lúc', dataIndex: 'exitTimeUtc', render: formatVn },
@@ -190,9 +230,11 @@ export function BacktestResultView({ result }: { result: BacktestResult }) {
             {
               title: 'Lý do thoát',
               dataIndex: 'exitReason',
-              filters: (Object.keys(EXIT_LABELS) as BacktestExitReason[]).map((reason) => ({ text: EXIT_LABELS[reason], value: reason })),
+              filters: (Object.keys(labels) as BacktestExitReason[])
+                .filter((reason) => futures != null || reason !== 'Liquidation')
+                .map((reason) => ({ text: labels[reason], value: reason })),
               onFilter: (value, trade) => trade.exitReason === value,
-              render: (reason: BacktestExitReason) => <Tag color={EXIT_COLORS[reason]}>{EXIT_LABELS[reason]}</Tag>,
+              render: (reason: BacktestExitReason) => <Tag color={EXIT_COLORS[reason]}>{labels[reason]}</Tag>,
             },
             { title: 'Số coin', dataIndex: 'quantity', align: 'right', render: (value: number) => quantity.format(value) },
             { title: 'Phí', dataIndex: 'fees', align: 'right', render: (value: number) => fmtPrice2(value) },
@@ -213,3 +255,5 @@ export function BacktestResultView({ result }: { result: BacktestResult }) {
     </>
   );
 }
+
+const SideTag = ({ side }: { side: TradeSide }) => <Tag color={sideColor(side)}>{side}</Tag>;

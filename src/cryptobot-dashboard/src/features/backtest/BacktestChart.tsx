@@ -21,14 +21,16 @@ interface Props {
   bars: BacktestBar[];
   trades: OverlayTrade[];
   settings: BacktestSettings;
-  parameters: StrategyParameters;
+  /** Tham số EMA; null khi tín hiệu là chỉ báo tự viết (không vẽ EMA). */
+  parameters: StrategyParameters | null;
   /** Khung tổng vốn bên dưới (chart tổng); chart chi tiết một lệnh thì không có. */
   showEquity?: boolean;
   priceHeight?: number;
 }
 
 /**
- * Nến kèm EMA nhanh/chậm, đường giá vào và mức chốt lời/cắt lỗ của từng lệnh, mũi tên vào/ra có giá và lãi/lỗ.
+ * Nến kèm EMA nhanh/chậm (nếu tín hiệu là EMA), đường giá vào và mức chốt lời/cắt lỗ/thanh lý của từng lệnh, mũi
+ * tên vào/ra có giá và lãi/lỗ.
  * Chart tổng dùng cột đã gộp (tối đa 3000 cột); chart chi tiết một lệnh dùng nến thật.
  */
 export function BacktestChart({ bars, trades, settings, parameters, showEquity = false, priceHeight = 420 }: Props) {

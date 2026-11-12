@@ -51,12 +51,24 @@ public static class BacktestEndpoints
             }
         });
 
+        // Gợi ý cho form: chỉ báo tự viết làm tín hiệu Futures, phí/trượt giá/ký quỹ của Paper Futures.
+        api.MapGet("/options", async (int id, BacktestOptionsService options, CancellationToken ct) =>
+            await options.GetAsync(id, ct) is { } found
+                ? Results.Ok(new BacktestOptionsDto(
+                    found.Indicators.Select(choice => new BacktestIndicatorChoiceDto(choice.Type, choice.Description,
+                        choice.Parameters, choice.PresetName)).ToList(),
+                    new BacktestFuturesDefaultsDto(found.Futures.FeePercent, found.Futures.SlippagePercent,
+                        found.Futures.MaintenanceMarginPercent, found.Futures.MaxLeverage, found.Futures.Margin,
+                        found.Futures.Leverage, found.Futures.StopLossPercent, found.Futures.TakeProfitPercent)))
+                : Results.NotFound(new { error = "Không có chiến lược này." }));
+
         // Mọi lần chạy được lưu vào lịch sử để mở lại và so sánh.
         api.MapPost("/", async (int id, BacktestRequestDto body, BacktestService backtests,
             BacktestHistoryService history, CancellationToken ct) =>
         {
-            if (body.ToRequest(id) is not { } request)
-                return Results.BadRequest(new { error = QueryEnum.Error<PositionSizing>(body.Sizing ?? "") });
+            var (request, error) = body.ToRequest(id);
+            if (request is null)
+                return Results.BadRequest(new { error });
 
             try
             {
@@ -132,11 +144,18 @@ public static class BacktestEndpoints
 
     private static BacktestSettingsDto ToDto(BacktestSettings settings) => new(settings.InitialCapital,
         settings.Sizing.ToString(), settings.SizeValue, settings.TakeProfitPercent, settings.StopLossPercent,
-        settings.FeePercent);
+        settings.FeePercent, settings.Mode.ToString(),
+        settings.Futures is { } futures
+            ? new BacktestFuturesDto(futures.Leverage, futures.Direction.ToString(), futures.CloseOnReverse,
+                futures.SlippagePercent, futures.MaintenanceMarginPercent)
+            : null);
 
     private static BacktestSummaryDto ToDto(BacktestSummary summary) => new(summary.Id, summary.CreatedAtUtc,
         summary.StrategyInstanceId, summary.Symbol, summary.Interval,
-        new EmaCrossParameters(summary.FastPeriod, summary.SlowPeriod, summary.LookbackCandles),
+        summary is { FastPeriod: { } fast, SlowPeriod: { } slow }
+            ? new EmaCrossParameters(fast, slow, summary.LookbackCandles)
+            : null,
+        new BacktestSignalDto(summary.SignalType, BacktestSignalSpec.ParseParameters(summary.SignalParameters)),
         summary.FirstCandleUtc, summary.LastCandleUtc, ToDto(summary.Settings), summary.TotalTrades,
         summary.WinRatePercent, summary.NetProfit, summary.NetProfitPercent, summary.MaxDrawdownPercent, summary.Note);
 
@@ -147,7 +166,9 @@ public static class BacktestEndpoints
         var statistics = snapshot.Statistics;
         return new BacktestDto(
             saved.Id, saved.CreatedAtUtc, saved.Note,
-            saved.StrategyInstanceId, saved.Symbol, saved.Interval, snapshot.Parameters, ToDto(snapshot.Settings),
+            saved.StrategyInstanceId, saved.Symbol, saved.Interval, snapshot.Parameters,
+            new BacktestSignalDto(snapshot.SignalOrEmaCross.Type, snapshot.SignalOrEmaCross.Parameters),
+            ToDto(snapshot.Settings),
             snapshot.FirstCandleUtc, snapshot.LastCandleUtc, snapshot.CandleCount, snapshot.WarmupCandles,
             snapshot.EvaluatedCandles, snapshot.SkippedGapWindows, snapshot.BuySignals, snapshot.SellSignals,
             new BacktestStatisticsDto(statistics.TotalTrades, statistics.Wins, statistics.Losses,
@@ -156,10 +177,10 @@ public static class BacktestEndpoints
                 statistics.MaxDrawdownPercent, statistics.EndingEquity, statistics.BuyAndHoldPercent),
             snapshot.Trades.Select(trade => new BacktestTradeDto(trade.EntryTimeUtc, trade.EntryPrice,
                 trade.ExitTimeUtc, trade.ExitPrice, trade.Quantity, trade.Fees, trade.NetPnl, trade.ReturnPercent,
-                trade.ExitReason.ToString())).ToList(),
+                trade.ExitReason.ToString(), trade.Side.ToString())).ToList(),
             snapshot.OpenTrade is { } open
                 ? new BacktestOpenTradeDto(open.EntryTimeUtc, open.EntryPrice, open.Quantity, open.EntryFee,
-                    open.MarkPrice, open.UnrealizedPnl)
+                    open.MarkPrice, open.UnrealizedPnl, open.Side.ToString())
                 : null,
             new BacktestChartDto(snapshot.Chart.CandlesPerBar, snapshot.Chart.Bars.Select(ToDto).ToList()));
     }

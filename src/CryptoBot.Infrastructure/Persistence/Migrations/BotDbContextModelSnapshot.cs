@@ -30,6 +30,9 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<bool?>("CloseOnReverse")
+                        .HasColumnType("boolean");
+
                     b.Property<byte[]>("Content")
                         .IsRequired()
                         .HasColumnType("bytea");
@@ -37,7 +40,11 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("FastPeriod")
+                    b.Property<string>("Direction")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int?>("FastPeriod")
                         .HasColumnType("integer");
 
                     b.Property<decimal>("FeePercent")
@@ -57,8 +64,14 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("LastCandleUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("Leverage")
+                        .HasColumnType("integer");
+
                     b.Property<int>("LookbackCandles")
                         .HasColumnType("integer");
+
+                    b.Property<decimal?>("MaintenanceMarginPercent")
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("MaxDrawdownPercent")
                         .HasColumnType("numeric");
@@ -73,6 +86,15 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("SignalParameters")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("SignalType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<decimal>("SizeValue")
                         .HasColumnType("numeric");
 
@@ -81,7 +103,10 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<int>("SlowPeriod")
+                    b.Property<decimal?>("SlippagePercent")
+                        .HasColumnType("numeric");
+
+                    b.Property<int?>("SlowPeriod")
                         .HasColumnType("integer");
 
                     b.Property<decimal?>("StopLossPercent")

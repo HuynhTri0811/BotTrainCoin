@@ -7,7 +7,8 @@ namespace CryptoBot.Application.Backtesting;
 
 /// <summary>
 /// Chart chi tiết một lệnh của lần backtest đã lưu: nến thật (không gộp như chart tổng) từ trước lúc vào đến sau lúc
-/// ra, kèm EMA nhanh/chậm tính đúng như lúc bot ra tín hiệu. Chỉ đọc thông số của lần chạy (không giải nén kết quả)
+/// ra, kèm EMA nhanh/chậm tính đúng như lúc bot ra tín hiệu (lần chạy theo chỉ báo tự viết thì chỉ có nến). Chỉ đọc
+/// thông số của lần chạy (không giải nén kết quả)
 /// và nến trong DB; giờ vào/ra do dashboard gửi từ danh sách lệnh nó đã có.
 /// </summary>
 public sealed class BacktestTradeChartService(
@@ -45,13 +46,17 @@ public sealed class BacktestTradeChartService(
 
         // Cặp và khung nến lấy theo lần chạy (instance có thể đã đổi cấu hình sau đó); sàn lấy theo instance.
         var key = new CandleKey(instance.Exchange, run.Symbol, CandleInterval.Parse(run.Interval));
-        var strategy = new EmaCrossStrategy(new EmaCrossParameters(run.FastPeriod, run.SlowPeriod,
-            run.LookbackCandles));
+        // Lần chạy dùng chỉ báo tự viết không có EMA để vẽ: chỉ cần nến.
+        var strategy = run is { FastPeriod: { } fast, SlowPeriod: { } slow }
+            ? new EmaCrossStrategy(new EmaCrossParameters(fast, slow, run.LookbackCandles))
+            : null;
         var step = key.Interval.Duration;
         var from = entryUtc - step * ContextCandles;
         var span = (int)((exitUtc - from).Ticks / step.Ticks) + 1 + ContextCandles;
 
-        var warmup = await candles.GetLatestAsync(key, from, strategy.RequiredCandles - 1, closedOnly: true, ct);
+        IReadOnlyList<Candle> warmup = strategy is null
+            ? []
+            : await candles.GetLatestAsync(key, from, strategy.RequiredCandles - 1, closedOnly: true, ct);
         var window = await candles.GetAfterAsync(key, from.AddTicks(-1), span, closedOnly: true, ct);
         var series = new List<Candle>(warmup.Count + window.Count);
         series.AddRange(warmup);

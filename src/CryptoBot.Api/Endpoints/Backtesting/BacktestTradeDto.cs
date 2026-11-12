@@ -1,6 +1,8 @@
 namespace CryptoBot.Api.Endpoints;
 
-/// <summary>Một lệnh đã đóng. ExitReason: Signal, TakeProfit hoặc StopLoss.</summary>
+/// <summary>
+/// Một lệnh đã đóng. ExitReason: Signal, TakeProfit, StopLoss hoặc Liquidation; Side: Long hoặc Short.
+/// </summary>
 public sealed record BacktestTradeDto(
     DateTime EntryTimeUtc,
     decimal EntryPrice,
@@ -10,4 +12,5 @@ public sealed record BacktestTradeDto(
     decimal Fees,
     decimal NetPnl,
     decimal ReturnPercent,
-    string ExitReason);
+    string ExitReason,
+    string Side);

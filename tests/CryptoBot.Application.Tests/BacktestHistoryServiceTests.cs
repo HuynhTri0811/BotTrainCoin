@@ -1,7 +1,9 @@
 using System.IO.Compression;
+using System.Text.Json.Nodes;
 using CryptoBot.Application.Backtesting;
 using CryptoBot.Application.Signals;
 using CryptoBot.Domain.Backtesting;
+using CryptoBot.Domain.Futures;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Strategies;
 
@@ -74,6 +76,67 @@ public class BacktestHistoryServiceTests
 
         Assert.Contains("\"exitReason\":\"TakeProfit\"", json);
         Assert.Contains("\"sizing\":\"PercentOfEquity\"", json);
+    }
+
+    [Fact]
+    public async Task Runs_saved_before_futures_reopen_as_long_ema_cross_spot_runs()
+    {
+        var saved = await CreateService().SaveAsync(await RunAsync(), CancellationToken.None);
+        // Bỏ các trường mới để giống nội dung lưu trước khi có Futures và nguồn tín hiệu.
+        var node = JsonNode.Parse(await ReadJsonAsync(saved.Saved.Content))!.AsObject();
+        node.Remove("signal");
+        foreach (var trade in node["trades"]!.AsArray())
+            trade!.AsObject().Remove("side");
+        node["settings"]!.AsObject().Remove("futures");
+        var old = new SavedBacktest(T0, 1, "BTCUSDT", "1h", "EmaCross", null, 2, 3, 4, null, null, Settings,
+            saved.Snapshot.Statistics, Gzip(node.ToJsonString()));
+        _store.Add(old);
+
+        var snapshot = (await CreateService().GetAsync(old.Id, CancellationToken.None))!.Snapshot;
+
+        Assert.Null(snapshot.Signal);
+        Assert.Equal(BacktestSignalSpec.ForEmaCross(new EmaCrossParameters(2, 3, 4)).Type,
+            snapshot.SignalOrEmaCross.Type);
+        Assert.Equal(4, snapshot.SignalOrEmaCross.RequiredCandles);
+        Assert.All(snapshot.Trades, trade => Assert.Equal(PositionSide.Long, trade.Side));
+        Assert.Null(snapshot.Settings.Futures);
+    }
+
+    [Fact]
+    public async Task Indicator_futures_run_keeps_its_signal_and_settings()
+    {
+        var futures = Settings with
+        {
+            Futures = new FuturesBacktestSettings(3, BacktestDirection.Both, true, 0.05m, 0.4m),
+        };
+        var run = (await new BacktestService(_instances, _candles).RunAsync(new BacktestRequest(1, null, null, null,
+            futures, "MyRsi", new Dictionary<string, string?> { ["Period"] = "2", ["LookbackCandles"] = "4" }),
+            CancellationToken.None))!;
+
+        var saved = await CreateService().SaveAsync(run, CancellationToken.None);
+        var summary = (await CreateService().GetSummaryAsync(saved.Saved.Id, CancellationToken.None))!;
+        var snapshot = (await CreateService().GetAsync(saved.Saved.Id, CancellationToken.None))!.Snapshot;
+
+        Assert.Equal(("MyRsi", (int?)null, (int?)null, 4), (summary.SignalType, summary.FastPeriod,
+            summary.SlowPeriod, summary.LookbackCandles));
+        Assert.Equal("2", BacktestSignalSpec.ParseParameters(summary.SignalParameters)["Period"]);
+        Assert.Equal(futures, summary.Settings);
+        Assert.Equal(run.Signal.Parameters, snapshot.Signal!.Parameters);
+        Assert.Null(snapshot.Parameters);
+    }
+
+    private static async Task<string> ReadJsonAsync(byte[] content)
+    {
+        await using var gzip = new GZipStream(new MemoryStream(content), CompressionMode.Decompress);
+        return await new StreamReader(gzip).ReadToEndAsync();
+    }
+
+    private static byte[] Gzip(string json)
+    {
+        using var buffer = new MemoryStream();
+        using (var gzip = new GZipStream(buffer, CompressionLevel.Fastest))
+            gzip.Write(System.Text.Encoding.UTF8.GetBytes(json));
+        return buffer.ToArray();
     }
 
     [Fact]

@@ -23,9 +23,11 @@ public sealed class BacktestHistoryService(IBacktestStore store, IClock clock)
     public async Task<SavedBacktestRun> SaveAsync(BacktestRun run, CancellationToken ct)
     {
         var snapshot = BacktestSnapshot.From(run);
+        // EMA cross đã có cột riêng cho tham số; chỉ báo tự viết lưu tham số dạng JSON.
         var saved = new SavedBacktest(clock.UtcNow, run.Instance.Id, run.Instance.Symbol, run.Instance.Interval,
-            run.Parameters.FastPeriod, run.Parameters.SlowPeriod, run.Parameters.LookbackCandles,
-            run.FirstCandleUtc, run.LastCandleUtc, run.Result.Settings, run.Result.Statistics, Compress(snapshot));
+            run.Signal.Type, run.Parameters is null ? run.Signal.ParametersJson : null, run.Parameters?.FastPeriod,
+            run.Parameters?.SlowPeriod, run.Signal.RequiredCandles, run.FirstCandleUtc, run.LastCandleUtc,
+            run.Result.Settings, run.Result.Statistics, Compress(snapshot));
         store.Add(saved);
         await store.SaveAsync(ct);
         return new SavedBacktestRun(saved, snapshot);

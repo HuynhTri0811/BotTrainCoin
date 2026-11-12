@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CryptoBot.Application.Abstractions;
+using CryptoBot.Application.Indicators;
 using CryptoBot.Application.Signals;
 using CryptoBot.Domain.Backtesting;
 using CryptoBot.Domain.MarketData;
@@ -40,9 +41,13 @@ public sealed class BacktestService(IStrategyInstanceStore instances, ICandleSto
     }
 
     /// <summary>Chạy backtest; null nếu không có instance.</summary>
+    /// <remarks>
+    /// Spot chạy <see cref="Backtester"/> với đúng chiến lược EMA của bot (chỉ Long). Futures chạy
+    /// <see cref="FuturesBacktester"/> với EMA cross hai chiều hoặc một chỉ báo tự viết, trên nến của instance.
+    /// </remarks>
     /// <exception cref="ArgumentException">
-    /// Chiến lược không phải EMA cross, tham số chiến lược/vốn sai, khoảng thời gian sai, không có nến hoặc quá nhiều
-    /// nến.
+    /// Instance không phải EMA cross, tham số tín hiệu/vốn sai, chỉ báo dùng cho Spot, khoảng thời gian sai, không có
+    /// nến hoặc quá nhiều nến.
     /// </exception>
     /// <exception cref="OperationCanceledException">Request bị hủy; không có gì được trả về để lưu.</exception>
     public async Task<BacktestRun?> RunAsync(BacktestRequest request, CancellationToken ct)
@@ -54,13 +59,10 @@ public sealed class BacktestService(IStrategyInstanceStore instances, ICandleSto
         if (request.Settings.Validate() is { } settingsError)
             throw new ArgumentException(settingsError);
 
-        var defaults = ParseParameters(instance);
-        var parameters = request.Overrides?.ApplyTo(defaults) ?? defaults;
-        if (parameters.Validate() is { } parametersError)
-            throw new ArgumentException(parametersError);
-        if (parameters.LookbackCandles > MaxLookbackCandles)
-            throw new ArgumentException($"LookbackCandles tối đa {MaxLookbackCandles:N0} khi backtest.");
-        var strategy = new EmaCrossStrategy(parameters);
+        var signal = BuildSignal(instance, request);
+        if (signal.Source.RequiredCandles > MaxLookbackCandles)
+            throw new ArgumentException(
+                $"Cửa sổ nến của tín hiệu (LookbackCandles) tối đa {MaxLookbackCandles:N0} khi backtest.");
         var key = CandleKey.For(instance);
 
         var range = await LoadRangeAsync(key, request.FromUtc, request.ToUtc, ct);
@@ -69,17 +71,52 @@ public sealed class BacktestService(IStrategyInstanceStore instances, ICandleSto
             throw new ArgumentException(
                 "Không có nến nào trong khoảng đã chọn; hãy chọn khoảng khác hoặc tải thêm lịch sử.");
         // Nến trước khoảng chỉ để có đủ cửa sổ cho nến đầu, giống SignalEvaluationService.
-        var warmup = await candles.GetLatestAsync(key, range[0].OpenTimeUtc, strategy.RequiredCandles - 1,
+        var warmup = await candles.GetLatestAsync(key, range[0].OpenTimeUtc, signal.Source.RequiredCandles - 1,
             closedOnly: true, ct);
 
         var series = new List<Candle>(warmup.Count + range.Count);
         series.AddRange(warmup);
         series.AddRange(range);
-        var result = Backtester.Run(series, key.Interval, strategy, request.Settings, ct);
+        var result = request.Settings.Futures is null
+            ? Backtester.Run(series, key.Interval, signal.Ema!.Strategy, request.Settings, ct)
+            : FuturesBacktester.Run(series, key.Interval, signal.Source, request.Settings, ct);
 
-        return new BacktestRun(instance, parameters, range[0].OpenTimeUtc, range[^1].OpenTimeUtc, range.Count,
-            warmup.Count, result,
-            BacktestChart.Build(series, warmup.Count, key.Interval, result, strategy, MaxChartBars));
+        return new BacktestRun(instance, signal.EmaParameters, signal.Spec, range[0].OpenTimeUtc,
+            range[^1].OpenTimeUtc, range.Count, warmup.Count, result,
+            BacktestChart.Build(series, warmup.Count, key.Interval, result, signal.Ema?.Strategy, MaxChartBars));
+    }
+
+    /// <summary>Nguồn tín hiệu đã dựng: EMA cross (kèm tham số để vẽ EMA) hoặc chỉ báo tự viết.</summary>
+    private sealed record Signal(IBacktestSignalSource Source, BacktestSignalSpec Spec, EmaCrossSignalSource? Ema,
+        EmaCrossParameters? EmaParameters);
+
+    /// <exception cref="ArgumentException">Tham số sai, hoặc dùng chỉ báo cho backtest Spot.</exception>
+    private static Signal BuildSignal(StrategyInstance instance, BacktestRequest request)
+    {
+        if (request.SignalType is null
+            || string.Equals(request.SignalType, StrategyTypes.EmaCross, StringComparison.OrdinalIgnoreCase))
+        {
+            // Chỉ báo tự viết chạy trên nến của instance, không cần tham số EMA của instance.
+            var defaults = ParseParameters(instance);
+            var parameters = request.Overrides?.ApplyTo(defaults) ?? defaults;
+            if (parameters.Validate() is { } parametersError)
+                throw new ArgumentException(parametersError);
+            var ema = new EmaCrossSignalSource(parameters);
+            return new Signal(ema, BacktestSignalSpec.ForEmaCross(parameters), ema, parameters);
+        }
+
+        if (request.Settings.Futures is null)
+            throw new ArgumentException(
+                "Backtest Spot chỉ chạy chiến lược EMA của bot (chỉ Long); chọn Futures để chạy chỉ báo tự viết.");
+        if (IndicatorRegistry.CanonicalType(request.SignalType) is not { } type)
+            throw new ArgumentException(
+                $"Không có chỉ báo loại '{request.SignalType}'. Các loại có sẵn: " +
+                $"{string.Join(", ", IndicatorRegistry.AvailableTypes.Keys)}.");
+        var indicator = IndicatorRegistry.Create(type,
+            request.SignalParameters ?? new Dictionary<string, string?>());
+        return new Signal(new IndicatorSignalSource(indicator),
+            new BacktestSignalSpec(type, IndicatorRegistry.ReadParameters(indicator), indicator.RequiredCandles), null,
+            null);
     }
 
     /// <summary>Nến đã đóng có OpenTime trong [from, to], tăng dần, đọc theo trang.</summary>

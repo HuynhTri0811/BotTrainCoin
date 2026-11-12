@@ -10,30 +10,43 @@ import {
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts';
-import type { BacktestBar, BacktestOpenTrade, BacktestSettings, BacktestTrade, StrategyParameters } from '../../api/client';
+import type {
+  BacktestBar,
+  BacktestOpenTrade,
+  BacktestSettings,
+  BacktestTrade,
+  StrategyParameters,
+  TradeSide,
+} from '../../api/client';
 import { fmtPrice2, fmtSignedPercent } from '../futures/format';
+import { tradeLevels } from './describe';
 
 // Một nguồn màu duy nhất cho mũi tên, đường vị thế và chú thích.
-export const EXIT_COLORS = { TakeProfit: '#16a34a', StopLoss: '#dc2626', Signal: '#d97706' } as const;
+export const EXIT_COLORS = { TakeProfit: '#16a34a', StopLoss: '#dc2626', Signal: '#d97706', Liquidation: '#9333ea' } as const;
+/** Màu vào lệnh Long (cũng là lệnh Spot). */
 export const ENTRY_COLOR = '#0d9488';
+export const SHORT_COLOR = '#db2777';
 export const TP_COLOR = EXIT_COLORS.TakeProfit;
 export const SL_COLOR = EXIT_COLORS.StopLoss;
+export const LIQUIDATION_COLOR = EXIT_COLORS.Liquidation;
+export const sideColor = (side: TradeSide) => (side === 'Long' ? ENTRY_COLOR : SHORT_COLOR);
 // Cùng màu EMA của trang Biểu đồ, nhưng nhạt hơn để mũi tên vào/ra nổi lên trên.
 export const EMA_FAST_COLOR = 'rgba(217, 119, 6, 0.75)';
 export const EMA_SLOW_COLOR = 'rgba(37, 99, 235, 0.75)';
-const EXIT_TEXT = { TakeProfit: 'TP', StopLoss: 'SL', Signal: 'SELL' } as const;
+const EXIT_TEXT = { TakeProfit: 'TP', StopLoss: 'SL', Signal: 'SELL', Liquidation: 'THANH LÝ' } as const;
 const HIDDEN = 'transparent';
 
 /** Lệnh để vẽ: lệnh đã đóng, hoặc lệnh còn mở ở cuối kỳ (exit null). */
 export interface OverlayTrade {
   entryTimeUtc: string;
   entryPrice: number;
+  side: TradeSide;
   exit: BacktestTrade | null;
 }
 
 export const toOverlayTrades = (trades: BacktestTrade[], open: BacktestOpenTrade | null): OverlayTrade[] => [
-  ...trades.map((trade) => ({ entryTimeUtc: trade.entryTimeUtc, entryPrice: trade.entryPrice, exit: trade })),
-  ...(open ? [{ entryTimeUtc: open.entryTimeUtc, entryPrice: open.entryPrice, exit: null }] : []),
+  ...trades.map((trade) => ({ entryTimeUtc: trade.entryTimeUtc, entryPrice: trade.entryPrice, side: trade.side, exit: trade })),
+  ...(open ? [{ entryTimeUtc: open.entryTimeUtc, entryPrice: open.entryPrice, side: open.side, exit: null }] : []),
 ];
 
 const toUnix = (iso: string) => Math.floor(Date.parse(iso) / 1000);
@@ -93,11 +106,14 @@ function visibleRange(chart: IChartApi, data: LineData[], shown: boolean[]): Aut
   return minValue <= maxValue ? { priceRange: { minValue, maxValue } } : null;
 }
 
-/** Thêm một series đường từ `lineData`; điểm ẩn không được tính vào thang giá. */
+/**
+ * Thêm một series đường từ `lineData`; điểm ẩn không được tính vào thang giá. `scale: false` thì cả đường không
+ * được tính (giá thanh lý ở đòn bẩy thấp rất xa giá, sẽ ép dẹt nến).
+ */
 function addLine(
   chart: IChartApi,
   line: { data: LineData[]; shown: boolean[] },
-  options: { color: string; lineStyle?: LineStyle; title?: string },
+  { scale = true, ...options }: { color: string; lineStyle?: LineStyle; title?: string; scale?: boolean },
 ) {
   chart
     .addSeries(LineSeries, {
@@ -106,7 +122,7 @@ function addLine(
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerVisible: false,
-      autoscaleInfoProvider: () => visibleRange(chart, line.data, line.shown),
+      autoscaleInfoProvider: () => (scale ? visibleRange(chart, line.data, line.shown) : null),
     })
     .setData(line.data);
 }
@@ -115,7 +131,9 @@ function addLine(
  * Hai đường EMA nhanh/chậm. Cột không có EMA (warm-up, cửa sổ thiếu nến, lần chạy cũ) làm đường bị ngắt: không nối
  * qua chỗ bot không đánh giá.
  */
-export function addEmaLines(chart: IChartApi, bars: BacktestBar[], parameters: StrategyParameters) {
+export function addEmaLines(chart: IChartApi, bars: BacktestBar[], parameters: StrategyParameters | null) {
+  // Lần chạy theo chỉ báo tự viết không có EMA.
+  if (!parameters) return;
   const times = bars.map((bar) => bar.time);
   const add = (pick: (bar: BacktestBar) => number | null, color: string, title: string) => {
     const values = bars.map(pick);
@@ -150,8 +168,9 @@ function segmentLine(times: number[], segments: Segment[]) {
 }
 
 /**
- * Vẽ từng lệnh: đường liền giá vào từ lúc mua đến lúc bán, đường đứt xanh = mức chốt lời, đỏ = mức cắt lỗ (tính từ
- * giá vào như lúc giả lập), và mũi tên ghi giá vào/ra cùng lãi/lỗ. Lệnh còn mở kéo tới cột cuối.
+ * Vẽ từng lệnh: đường liền giá vào từ lúc vào đến lúc ra (xanh ngọc = Long, hồng = Short), đường đứt xanh = mức chốt
+ * lời, đỏ = mức cắt lỗ, chấm tím = giá thanh lý (Futures), tính từ giá vào như lúc giả lập; mũi tên ghi giá vào/ra
+ * cùng lãi/lỗ. Long vào bằng mũi tên lên dưới nến, Short vào bằng mũi tên xuống trên nến. Lệnh còn mở kéo tới cột cuối.
  */
 export function addTradeOverlay(
   chart: IChartApi,
@@ -162,9 +181,11 @@ export function addTradeOverlay(
   showText: boolean,
 ) {
   const times = bars.map((bar) => bar.time);
-  const entry: Segment[] = [];
+  const futures = settings.futures != null;
+  const entries: Record<TradeSide, Segment[]> = { Long: [], Short: [] };
   const takeProfit: Segment[] = [];
   const stopLoss: Segment[] = [];
+  const liquidation: Segment[] = [];
   const markers: SeriesMarker<Time>[] = [];
 
   for (const trade of trades) {
@@ -172,36 +193,43 @@ export function addTradeOverlay(
     const to = trade.exit ? barIndexAt(times, toUnix(trade.exit.exitTimeUtc)) : times.length - 1;
     if (from < 0 || to < 0) continue;
 
-    entry.push({ from, to, price: trade.entryPrice });
-    if (settings.takeProfitPercent != null)
-      takeProfit.push({ from, to, price: trade.entryPrice * (1 + settings.takeProfitPercent / 100) });
-    if (settings.stopLossPercent != null)
-      stopLoss.push({ from, to, price: trade.entryPrice * (1 - settings.stopLossPercent / 100) });
+    const isLong = trade.side === 'Long';
+    const levels = tradeLevels(trade.entryPrice, trade.side, settings);
+    entries[trade.side].push({ from, to, price: trade.entryPrice });
+    if (levels.takeProfit != null) takeProfit.push({ from, to, price: levels.takeProfit });
+    if (levels.stopLoss != null) stopLoss.push({ from, to, price: levels.stopLoss });
+    if (levels.liquidation != null) liquidation.push({ from, to, price: levels.liquidation });
 
+    // Spot giữ chữ BUY/SELL như tín hiệu của bot; Futures ghi chiều lệnh.
+    const entryText = futures ? (isLong ? 'LONG' : 'SHORT') : 'BUY';
     markers.push({
       time: times[from] as UTCTimestamp,
-      position: 'belowBar',
-      color: ENTRY_COLOR,
-      shape: 'arrowUp',
-      text: showText ? `BUY ${fmtPrice2(trade.entryPrice)}` : '',
+      position: isLong ? 'belowBar' : 'aboveBar',
+      color: sideColor(trade.side),
+      shape: isLong ? 'arrowUp' : 'arrowDown',
+      text: showText ? `${entryText} ${fmtPrice2(trade.entryPrice)}` : '',
     });
     if (trade.exit) {
       const reason = trade.exit.exitReason;
+      const exitText = reason === 'Signal' && futures ? 'ĐÓNG' : EXIT_TEXT[reason];
       markers.push({
         time: times[to] as UTCTimestamp,
-        position: 'aboveBar',
+        position: isLong ? 'aboveBar' : 'belowBar',
         color: EXIT_COLORS[reason],
-        shape: 'arrowDown',
+        shape: isLong ? 'arrowDown' : 'arrowUp',
         text: showText
-          ? `${EXIT_TEXT[reason]} ${fmtPrice2(trade.exit.exitPrice)} · ${fmtSignedPercent(trade.exit.returnPercent)}`
+          ? `${exitText} ${fmtPrice2(trade.exit.exitPrice)} · ${fmtSignedPercent(trade.exit.returnPercent)}`
           : '',
       });
     }
   }
 
-  if (entry.length > 0) addLine(chart, segmentLine(times, entry), { color: ENTRY_COLOR });
+  for (const side of ['Long', 'Short'] as const)
+    if (entries[side].length > 0) addLine(chart, segmentLine(times, entries[side]), { color: sideColor(side) });
   if (takeProfit.length > 0) addLine(chart, segmentLine(times, takeProfit), { color: TP_COLOR, lineStyle: LineStyle.Dashed });
   if (stopLoss.length > 0) addLine(chart, segmentLine(times, stopLoss), { color: SL_COLOR, lineStyle: LineStyle.Dashed });
+  if (liquidation.length > 0)
+    addLine(chart, segmentLine(times, liquidation), { color: LIQUIDATION_COLOR, lineStyle: LineStyle.Dotted, scale: false });
 
   markers.sort((first, second) => (first.time as number) - (second.time as number));
   createSeriesMarkers(candles, markers);

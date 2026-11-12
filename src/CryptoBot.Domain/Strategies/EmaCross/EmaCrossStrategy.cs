@@ -77,6 +77,23 @@ public sealed class EmaCrossStrategy : IStrategy
         return (values.Fast, values.Slow);
     }
 
+    /// <summary>
+    /// Hướng giao cắt EMA tại nến cuối của <paramref name="window"/>, không xét vị thế đang giữ. Backtest Futures dùng
+    /// hàm này để có cả tín hiệu Long (cắt lên) lẫn Short (cắt xuống); <see cref="Evaluate"/> thì long-only.
+    /// </summary>
+    /// <returns><see cref="EmaCrossDirection.None"/> khi chưa đủ nến hoặc không có giao cắt.</returns>
+    public EmaCrossDirection CrossAt(IReadOnlyList<Candle> window)
+    {
+        if (CheckInput(window) is not null)
+            return EmaCrossDirection.None;
+        IndicatorValues values = ComputeLast(LastCloses(window));
+        if (Crossover.Up(values.FastPrev, values.SlowPrev, values.Fast, values.Slow))
+            return EmaCrossDirection.Up;
+        if (Crossover.Down(values.FastPrev, values.SlowPrev, values.Fast, values.Slow))
+            return EmaCrossDirection.Down;
+        return EmaCrossDirection.None;
+    }
+
     // ── Các bước nhỏ ───────────────────────────────────────────────────────────
 
     /// <summary>Trả về Hold nếu chưa đủ dữ liệu; ném lỗi nếu nhận nến chưa đóng.</summary>

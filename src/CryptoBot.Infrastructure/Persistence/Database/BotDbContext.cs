@@ -111,6 +111,9 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
             entity.Property(saved => saved.Symbol).HasMaxLength(32);
             entity.Property(saved => saved.Interval).HasMaxLength(8);
             entity.Property(saved => saved.Sizing).HasConversion<string>().HasMaxLength(16);
+            entity.Property(saved => saved.SignalType).HasMaxLength(SavedBacktest.MaxSignalTypeLength);
+            entity.Property(saved => saved.SignalParameters).HasMaxLength(SavedBacktest.MaxSignalParametersLength);
+            entity.Property(saved => saved.Direction).HasConversion<string>().HasMaxLength(16);
             entity.Property(saved => saved.Note).HasMaxLength(SavedBacktest.MaxNoteLength);
             entity.Ignore(saved => saved.Settings);
             // Lịch sử liệt kê mới → cũ, có thể lọc theo chiến lược.

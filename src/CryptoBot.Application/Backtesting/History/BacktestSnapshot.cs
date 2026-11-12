@@ -7,8 +7,12 @@ namespace CryptoBot.Application.Backtesting;
 /// Phần kết quả backtest được lưu để mở lại: mọi thứ trang Backtest hiển thị, trừ đường vốn từng nến (đã có trong
 /// <see cref="Chart"/> ở dạng gộp).
 /// </summary>
+/// <remarks>
+/// <see cref="Parameters"/> null với lần chạy dùng chỉ báo tự viết; <see cref="Signal"/> null với lần chạy cũ (luôn là
+/// EMA cross).
+/// </remarks>
 public sealed record BacktestSnapshot(
-    EmaCrossParameters Parameters,
+    EmaCrossParameters? Parameters,
     BacktestSettings Settings,
     DateTime? FirstCandleUtc,
     DateTime? LastCandleUtc,
@@ -21,8 +25,12 @@ public sealed record BacktestSnapshot(
     BacktestStatistics Statistics,
     IReadOnlyList<BacktestTrade> Trades,
     BacktestOpenTrade? OpenTrade,
-    BacktestChart Chart)
+    BacktestChart Chart,
+    BacktestSignalSpec? Signal = null)
 {
+    /// <summary>Nguồn tín hiệu; lần chạy cũ chưa lưu thì dựng lại từ tham số EMA.</summary>
+    public BacktestSignalSpec SignalOrEmaCross => Signal ?? BacktestSignalSpec.ForEmaCross(Parameters!);
+
     public static BacktestSnapshot From(BacktestRun run) => new(
         run.Parameters,
         run.Result.Settings,
@@ -37,5 +45,6 @@ public sealed record BacktestSnapshot(
         run.Result.Statistics,
         run.Result.Trades,
         run.Result.OpenTrade,
-        run.Chart);
+        run.Chart,
+        run.Signal);
 }
