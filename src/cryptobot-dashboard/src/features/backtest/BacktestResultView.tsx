@@ -179,7 +179,7 @@ export function BacktestResultView({ result }: { result: BacktestResult }) {
           expandable={{
             expandRowByClick: true,
             expandedRowRender: (trade) => (
-              <BacktestTradeDetail result={result} trade={trade} tradeIndex={result.trades.indexOf(trade)} />
+              <BacktestTradeDetail result={result} trade={trade} />
             ),
           }}
           columns={[

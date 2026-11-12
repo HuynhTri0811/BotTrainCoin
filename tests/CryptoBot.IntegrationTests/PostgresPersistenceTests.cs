@@ -310,6 +310,8 @@ public sealed class PostgresPersistenceTests : IAsyncLifetime
                 (await store.ListAsync(null, 1, 1, default)).Select(summary => summary.CreatedAtUtc));
             Assert.Equal(3, await store.CountAsync(null, default));
             Assert.Equal(2, await store.CountAsync(1, default));
+            Assert.Equal(all[1], await store.GetSummaryAsync(all[1].Id, default));
+            Assert.Null(await store.GetSummaryAsync(999, default));
 
             var first = (await store.GetAsync(all[2].Id, default))!;
             Assert.Equal([1, 2, 3, 4], first.Content);

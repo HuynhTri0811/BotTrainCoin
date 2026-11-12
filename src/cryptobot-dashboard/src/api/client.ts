@@ -886,9 +886,11 @@ export const backtestApi = {
     }
   },
   get: (id: number) => getJson<BacktestResult>(`/api/backtests/${id}`),
-  /** `tradeIndex` theo thứ tự `trades`; bằng `trades.length` = lệnh còn mở ở cuối kỳ. */
-  tradeChart: (id: number, tradeIndex: number) =>
-    getJson<BacktestTradeChart>(`/api/backtests/${id}/trades/${tradeIndex}/chart`),
+  /** Nến thật quanh một lệnh; lệnh còn mở thì `exitUtc` là nến cuối của lần chạy. */
+  tradeChart: (id: number, entryUtc: string, exitUtc: string) =>
+    getJson<BacktestTradeChart>(
+      `/api/backtests/${id}/trade-chart?entryUtc=${encodeURIComponent(entryUtc)}&exitUtc=${encodeURIComponent(exitUtc)}`,
+    ),
   setNote: (id: number, note: string) => sendJson<{ note: string | null }>('PUT', `/api/backtests/${id}/note`, { note }),
   remove: (id: number) => sendJson<null>('DELETE', `/api/backtests/${id}`),
 };

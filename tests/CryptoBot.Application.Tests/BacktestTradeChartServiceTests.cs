@@ -36,23 +36,25 @@ public class BacktestTradeChartServiceTests
 
     private BacktestTradeChartService CreateService() => new(History(), _instances, _candles);
 
-    private async Task<long> SaveRunAsync()
+    private async Task<(long Id, BacktestTrade Trade)> SaveRunAsync()
     {
         var run = await new BacktestService(_instances, _candles).RunAsync(
             new BacktestRequest(1, null, null, null, Settings), CancellationToken.None);
-        return (await History().SaveAsync(run!, CancellationToken.None)).Saved.Id;
+        var id = (await History().SaveAsync(run!, CancellationToken.None)).Saved.Id;
+        return (id, Assert.Single(run!.Result.Trades));
     }
 
     [Fact]
     public async Task Shows_real_candles_from_before_entry_to_after_exit_with_ema()
     {
-        var id = await SaveRunAsync();
+        var (id, trade) = await SaveRunAsync();
 
-        var chart = await CreateService().GetAsync(id, 0, CancellationToken.None);
+        var chart = await CreateService().GetAsync(id, trade.EntryTimeUtc, trade.ExitTimeUtc, CancellationToken.None);
 
         Assert.NotNull(chart);
         Assert.Equal(1, chart.CandlesPerBar);
         // Vào ở nến 44: bắt đầu 30 nến trước; hết dữ liệu ở nến 49 (sau lúc ra ở nến 48).
+        Assert.Equal(Hour(44), trade.EntryTimeUtc);
         Assert.Equal(Hour(44 - BacktestTradeChartService.ContextCandles), chart.Bars[0].OpenTimeUtc);
         Assert.Equal(Hour(Closes.Length - 1), chart.Bars[^1].OpenTimeUtc);
         // Nến trước khoảng hiển thị dùng làm warm-up, nên cột đầu đã có EMA.
@@ -75,9 +77,10 @@ public class BacktestTradeChartServiceTests
         var run = await new BacktestService(_instances, _candles).RunAsync(
             new BacktestRequest(1, null, null, null, Settings), CancellationToken.None);
         var id = (await History().SaveAsync(run!, CancellationToken.None)).Saved.Id;
-        var openTradeIndex = run!.Result.Trades.Count;
+        var open = run!.Result.OpenTrade!;
 
-        var chart = await CreateService().GetAsync(id, openTradeIndex, CancellationToken.None);
+        var chart = await CreateService().GetAsync(id, open.EntryTimeUtc, run.LastCandleUtc!.Value,
+            CancellationToken.None);
 
         // Cột cuối chứa nến cuối của lần chạy, nơi lệnh còn mở được định giá.
         var lastBar = chart!.Bars[^1];
@@ -88,10 +91,10 @@ public class BacktestTradeChartServiceTests
     [Fact]
     public async Task Ema_is_left_out_where_the_window_spans_missing_candles()
     {
-        var id = await SaveRunAsync();
+        var (id, trade) = await SaveRunAsync();
         _candles.Candles.Remove(Hour(30));
 
-        var chart = await CreateService().GetAsync(id, 0, CancellationToken.None);
+        var chart = await CreateService().GetAsync(id, trade.EntryTimeUtc, trade.ExitTimeUtc, CancellationToken.None);
 
         // Cửa sổ 4 nến kết thúc ở nến 31, 32, 33 chứa khoảng thiếu nến 30: bot không đánh giá, chart không vẽ EMA.
         var emptyEma = chart!.Bars.Where(bar => bar.EmaFast is null).Select(bar => bar.OpenTimeUtc);
@@ -99,23 +102,30 @@ public class BacktestTradeChartServiceTests
     }
 
     [Fact]
-    public async Task Missing_run_or_trade_is_null()
+    public async Task Unknown_run_is_null()
     {
-        var id = await SaveRunAsync();
+        Assert.Null(await CreateService().GetAsync(999, Hour(44), Hour(48), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Times_outside_the_run_or_reversed_are_rejected()
+    {
+        var (id, _) = await SaveRunAsync();
         var service = CreateService();
 
-        Assert.Null(await service.GetAsync(999, 0, CancellationToken.None));
-        Assert.Null(await service.GetAsync(id, -1, CancellationToken.None));
-        // Chỉ có 1 lệnh đã đóng và không có lệnh còn mở.
-        Assert.Null(await service.GetAsync(id, 1, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.GetAsync(id, Hour(48), Hour(44), CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.GetAsync(id, Hour(44), Hour(Closes.Length + 5), CancellationToken.None));
     }
 
     [Fact]
     public async Task Run_whose_strategy_is_gone_is_rejected()
     {
-        var id = await SaveRunAsync();
+        var (id, trade) = await SaveRunAsync();
         _instances.Instances.Clear();
 
-        await Assert.ThrowsAsync<ArgumentException>(() => CreateService().GetAsync(id, 0, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            CreateService().GetAsync(id, trade.EntryTimeUtc, trade.ExitTimeUtc, CancellationToken.None));
     }
 }
