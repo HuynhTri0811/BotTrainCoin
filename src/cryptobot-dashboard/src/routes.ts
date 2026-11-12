@@ -9,6 +9,7 @@ export const PAGES = [
   { key: 'history', label: 'Lịch sử theo tháng' },
   { key: 'reports', label: 'Báo cáo ngày' },
   { key: 'news', label: 'Tin tức' },
+  { key: 'settings', label: 'Cài đặt' },
 ] as const;
 
 export type Page = (typeof PAGES)[number]['key'];

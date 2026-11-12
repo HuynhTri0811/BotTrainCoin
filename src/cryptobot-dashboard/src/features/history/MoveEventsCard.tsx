@@ -101,7 +101,7 @@ export function MoveEventsCard({ data }: { data: MonthlyHistory }) {
                           riêng {coin}
                         </Tag>
                       )}
-                      {monthEvent.detail && <div style={{ color: '#475569' }}>{monthEvent.detail}</div>}
+                      {monthEvent.detail && <div style={{ color: 'var(--text-soft)' }}>{monthEvent.detail}</div>}
                     </div>
                   ))}
                 </div>

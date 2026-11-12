@@ -6,7 +6,7 @@ import { fmtPrice2 } from '../futures/format';
 import { NewsList } from '../news/NewsList';
 
 export const fmtPct2 = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
-export const pctColor = (value: number) => (value > 0 ? '#16a34a' : value < 0 ? '#dc2626' : undefined);
+export const pctColor = (value: number) => (value > 0 ? 'var(--up)' : value < 0 ? 'var(--down)' : undefined);
 const volume = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
 /** Một dòng mô tả nến: giờ, giá mở → đóng và % thay đổi. */

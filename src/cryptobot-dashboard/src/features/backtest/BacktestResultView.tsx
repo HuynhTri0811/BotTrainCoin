@@ -75,7 +75,7 @@ export function BacktestResultView({ result }: { result: BacktestResult }) {
               title="Sụt giảm tối đa (Max Drawdown)"
               value={fmtUsdt(stats.maxDrawdown)}
               suffix={`· ${fmtPercent(stats.maxDrawdownPercent)}`}
-              styles={{ content: { color: '#dc2626' } }}
+              styles={{ content: { color: 'var(--down)' } }}
             />
           </Col>
           <Col xs={12} md={6}>

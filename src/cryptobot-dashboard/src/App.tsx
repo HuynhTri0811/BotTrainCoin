@@ -10,6 +10,7 @@ import { MarketPage } from './pages/MarketPage';
 import { NewsPage } from './pages/NewsPage';
 import { PredictionPage } from './pages/PredictionPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { SignalsPage } from './pages/SignalsPage';
 import { TradingPage } from './pages/TradingPage';
 import { PAGES, routeFromHash, type Route } from './routes';
@@ -28,16 +29,17 @@ export function App() {
 
   const strategies = status.data?.strategies.filter((strategy) => strategy.enabled) ?? [];
   const current = strategies.find((strategy) => strategy.id === selected) ?? strategies[0];
-  // Lịch sử theo tháng, báo cáo ngày và tin tức có danh sách riêng, không theo cặp/khung nến của chiến lược.
-  // Lịch sử backtest chỉ dùng chiến lược cho bộ lọc, nên vẫn mở được khi chưa có chiến lược nào.
-  const usesStrategy = page !== 'history' && page !== 'reports' && page !== 'news' && page !== 'backtest-history';
+  // Lịch sử theo tháng, báo cáo ngày và tin tức có danh sách riêng, Cài đặt không cần dữ liệu: không theo cặp/khung
+  // nến của chiến lược. Lịch sử backtest chỉ dùng chiến lược cho bộ lọc, nên vẫn mở được khi chưa có chiến lược nào.
+  const usesStrategy = page !== 'history' && page !== 'reports' && page !== 'news' && page !== 'backtest-history'
+    && page !== 'settings';
   // Trang chi tiết một lần backtest đã cố định cặp/khung nến: không cần chọn chiến lược.
   const showStrategyPicker =
     strategies.length > 1 && (usesStrategy || (page === 'backtest-history' && route.backtestId == null));
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Layout.Sider breakpoint="lg" collapsedWidth={0} width={200} theme="light" style={{ borderRight: '1px solid #e5e7eb' }}>
+      <Layout.Sider breakpoint="lg" collapsedWidth={0} width={200} theme="light" style={{ borderRight: '1px solid var(--border)' }}>
         <Typography.Title level={4} style={{ margin: 0, padding: '16px 24px' }}>
           CryptoBot
         </Typography.Title>
@@ -51,7 +53,7 @@ export function App() {
           items={PAGES.map((page) => ({ key: page.key, label: page.label }))}
         />
       </Layout.Sider>
-      <Layout style={{ background: '#f8fafc' }}>
+      <Layout style={{ background: 'var(--page-bg)' }}>
         <Layout.Content style={{ maxWidth: 1280, width: '100%', margin: '0 auto', padding: 16 }}>
           <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
             <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
@@ -77,6 +79,7 @@ export function App() {
             {page === 'reports' && <ReportsPage />}
             {page === 'news' && <NewsPage />}
             {page === 'backtest-history' && <BacktestHistoryPage strategyId={current?.id} openedId={route.backtestId} />}
+            {page === 'settings' && <SettingsPage />}
             {usesStrategy && current && (
               <>
                 {page === 'market' && <MarketPage key={current.id} strategy={current} />}

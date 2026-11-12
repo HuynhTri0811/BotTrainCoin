@@ -180,7 +180,7 @@ const historyColumns = (day: boolean, markets: MarketColumnInfo[]): ColumnsType<
     key: 'change',
     align: 'right',
     render: (_, entry) => (
-      <span style={{ color: entry.change > 0 ? '#16a34a' : entry.change < 0 ? '#dc2626' : undefined, fontVariantNumeric: 'tabular-nums' }}>
+      <span style={{ color: entry.change > 0 ? 'var(--up)' : entry.change < 0 ? 'var(--down)' : undefined, fontVariantNumeric: 'tabular-nums' }}>
         {entry.change > 0 ? '+' : ''}
         {fmtPrice(entry.change)} ({entry.changePercent > 0 ? '+' : ''}
         {entry.changePercent.toFixed(2)}%)
@@ -289,7 +289,7 @@ export function PredictionCard({ symbol, interval }: { symbol: string; interval:
                 title={`Tỷ lệ đúng (chạy thử ${prediction.backtestPredictions} ${unit})`}
                 value={prediction.hitRatePercent.toFixed(1)}
                 suffix="%"
-                styles={{ content: { color: prediction.hitRatePercent > 50 ? '#16a34a' : '#dc2626' } }}
+                styles={{ content: { color: prediction.hitRatePercent > 50 ? 'var(--up)' : 'var(--down)' } }}
               />
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 {prediction.backtestCorrect}/{prediction.backtestPredictions} lần đúng · đoán bừa ≈ 50%
