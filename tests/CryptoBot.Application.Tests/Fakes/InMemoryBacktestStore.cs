@@ -24,7 +24,8 @@ internal sealed class InMemoryBacktestStore : IBacktestStore
         Task.FromResult(ForInstance(strategyInstanceId).Count());
 
     private static BacktestSummary ToSummary(SavedBacktest saved) => new(saved.Id, saved.CreatedAtUtc,
-        saved.StrategyInstanceId, saved.Symbol, saved.Interval, saved.FastPeriod, saved.SlowPeriod,
+        saved.StrategyInstanceId, saved.Symbol, saved.Interval, saved.SignalType,
+        saved.SignalParameters, saved.FastPeriod, saved.SlowPeriod,
         saved.LookbackCandles, saved.FirstCandleUtc, saved.LastCandleUtc, saved.Settings, saved.TotalTrades,
         saved.WinRatePercent, saved.NetProfit, saved.NetProfitPercent, saved.MaxDrawdownPercent, saved.Note);
 

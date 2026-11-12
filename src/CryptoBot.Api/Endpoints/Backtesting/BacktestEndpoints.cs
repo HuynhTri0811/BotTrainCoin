@@ -143,11 +143,18 @@ public static class BacktestEndpoints
 
     private static BacktestSettingsDto ToDto(BacktestSettings settings) => new(settings.InitialCapital,
         settings.Sizing.ToString(), settings.SizeValue, settings.TakeProfitPercent, settings.StopLossPercent,
-        settings.FeePercent);
+        settings.FeePercent, settings.Mode.ToString(),
+        settings.Futures is { } futures
+            ? new BacktestFuturesDto(futures.Leverage, futures.Direction.ToString(), futures.CloseOnReverse,
+                futures.SlippagePercent, futures.MaintenanceMarginPercent)
+            : null);
 
     private static BacktestSummaryDto ToDto(BacktestSummary summary) => new(summary.Id, summary.CreatedAtUtc,
         summary.StrategyInstanceId, summary.Symbol, summary.Interval,
-        new EmaCrossParameters(summary.FastPeriod, summary.SlowPeriod, summary.LookbackCandles),
+        summary is { FastPeriod: { } fast, SlowPeriod: { } slow }
+            ? new EmaCrossParameters(fast, slow, summary.LookbackCandles)
+            : null,
+        new BacktestSignalDto(summary.SignalType, BacktestSignalSpec.ParseParameters(summary.SignalParameters)),
         summary.FirstCandleUtc, summary.LastCandleUtc, ToDto(summary.Settings), summary.TotalTrades,
         summary.WinRatePercent, summary.NetProfit, summary.NetProfitPercent, summary.MaxDrawdownPercent, summary.Note);
 

@@ -38,11 +38,14 @@ public sealed class BacktestStore(BotDbContext db) : IBacktestStore
     public Task SaveAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 
     // Chỉ chọn các cột tóm tắt: không đọc cột nội dung nén (vài trăm KB mỗi dòng).
+    // Thiết lập Futures được dựng lại ở client sau khi đọc các cột.
     private static readonly Expression<Func<SavedBacktest, BacktestSummary>> ToSummary = saved => new BacktestSummary(
-        saved.Id, saved.CreatedAtUtc, saved.StrategyInstanceId, saved.Symbol, saved.Interval, saved.FastPeriod,
-        saved.SlowPeriod, saved.LookbackCandles, saved.FirstCandleUtc, saved.LastCandleUtc,
+        saved.Id, saved.CreatedAtUtc, saved.StrategyInstanceId, saved.Symbol, saved.Interval, saved.SignalType,
+        saved.SignalParameters, saved.FastPeriod, saved.SlowPeriod,
+        saved.LookbackCandles, saved.FirstCandleUtc, saved.LastCandleUtc,
         new BacktestSettings(saved.InitialCapital, saved.Sizing, saved.SizeValue, saved.TakeProfitPercent,
-            saved.StopLossPercent, saved.FeePercent),
+            saved.StopLossPercent, saved.FeePercent, SavedBacktest.FuturesSettingsOf(saved.Leverage, saved.Direction,
+                saved.CloseOnReverse, saved.SlippagePercent, saved.MaintenanceMarginPercent)),
         saved.TotalTrades, saved.WinRatePercent, saved.NetProfit, saved.NetProfitPercent, saved.MaxDrawdownPercent,
         saved.Note);
 

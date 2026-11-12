@@ -25,13 +25,25 @@ public sealed class SavedBacktest
     /// <summary>Mã khung nến, ví dụ "1h".</summary>
     public string Interval { get; private set; } = null!;
 
-    /// <summary>Số nến EMA nhanh đã dùng.</summary>
-    public int FastPeriod { get; private set; }
+    /// <summary>Độ dài tối đa của <see cref="SignalType"/>.</summary>
+    public const int MaxSignalTypeLength = 64;
 
-    /// <summary>Số nến EMA chậm đã dùng.</summary>
-    public int SlowPeriod { get; private set; }
+    /// <summary>Độ dài tối đa của <see cref="SignalParameters"/>.</summary>
+    public const int MaxSignalParametersLength = 2000;
 
-    /// <summary>Cửa sổ nến đã dùng.</summary>
+    /// <summary>Nguồn tín hiệu: "EmaCross" hoặc loại chỉ báo tự viết, ví dụ "MyRsi".</summary>
+    public string SignalType { get; private set; } = null!;
+
+    /// <summary>Tham số của chỉ báo dạng JSON (tên → giá trị); null với EMA cross (đã có cột riêng).</summary>
+    public string? SignalParameters { get; private set; }
+
+    /// <summary>Số nến EMA nhanh đã dùng; null khi tín hiệu là chỉ báo tự viết.</summary>
+    public int? FastPeriod { get; private set; }
+
+    /// <summary>Số nến EMA chậm đã dùng; null khi tín hiệu là chỉ báo tự viết.</summary>
+    public int? SlowPeriod { get; private set; }
+
+    /// <summary>Cửa sổ nến của tín hiệu đã dùng.</summary>
     public int LookbackCandles { get; private set; }
 
     /// <summary>Nến đầu tiên được giao dịch; null khi khoảng không có nến.</summary>
@@ -58,6 +70,21 @@ public sealed class SavedBacktest
     /// <summary>Phí % mỗi lần khớp.</summary>
     public decimal FeePercent { get; private set; }
 
+    /// <summary>Futures: đòn bẩy; null = Spot.</summary>
+    public int? Leverage { get; private set; }
+
+    /// <summary>Futures: hướng lệnh được mở; null = Spot.</summary>
+    public BacktestDirection? Direction { get; private set; }
+
+    /// <summary>Futures: đóng lệnh khi tín hiệu đảo chiều; null = Spot.</summary>
+    public bool? CloseOnReverse { get; private set; }
+
+    /// <summary>Futures: trượt giá % mỗi lần khớp; null = Spot.</summary>
+    public decimal? SlippagePercent { get; private set; }
+
+    /// <summary>Futures: ký quỹ duy trì %; null = Spot.</summary>
+    public decimal? MaintenanceMarginPercent { get; private set; }
+
     /// <summary>Số lệnh đã đóng.</summary>
     public int TotalTrades { get; private set; }
 
@@ -83,13 +110,20 @@ public sealed class SavedBacktest
     private SavedBacktest() { }
 
     /// <summary>Tạo bản lưu từ thông số và kết quả của một lần chạy.</summary>
-    /// <exception cref="ArgumentException">Thiếu symbol/khung nến hoặc nội dung.</exception>
+    /// <exception cref="ArgumentException">Thiếu symbol/khung nến/nguồn tín hiệu hoặc nội dung.</exception>
     public SavedBacktest(DateTime createdAtUtc, int strategyInstanceId, string symbol, string interval,
-        int fastPeriod, int slowPeriod, int lookbackCandles, DateTime? firstCandleUtc, DateTime? lastCandleUtc,
-        BacktestSettings settings, BacktestStatistics statistics, byte[] content)
+        string signalType, string? signalParameters, int? fastPeriod, int? slowPeriod, int lookbackCandles,
+        DateTime? firstCandleUtc, DateTime? lastCandleUtc, BacktestSettings settings, BacktestStatistics statistics,
+        byte[] content)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(symbol);
         ArgumentException.ThrowIfNullOrWhiteSpace(interval);
+        ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
+        if (signalType.Length > MaxSignalTypeLength)
+            throw new ArgumentException($"Tên nguồn tín hiệu tối đa {MaxSignalTypeLength} ký tự.", nameof(signalType));
+        if (signalParameters is { Length: > MaxSignalParametersLength })
+            throw new ArgumentException($"Tham số tín hiệu tối đa {MaxSignalParametersLength} ký tự.",
+                nameof(signalParameters));
         if (content is null || content.Length == 0)
             throw new ArgumentException("Thiếu nội dung kết quả.", nameof(content));
 
@@ -97,6 +131,8 @@ public sealed class SavedBacktest
         StrategyInstanceId = strategyInstanceId;
         Symbol = symbol;
         Interval = interval;
+        SignalType = signalType;
+        SignalParameters = signalParameters;
         FastPeriod = fastPeriod;
         SlowPeriod = slowPeriod;
         LookbackCandles = lookbackCandles;
@@ -108,6 +144,11 @@ public sealed class SavedBacktest
         TakeProfitPercent = settings.TakeProfitPercent;
         StopLossPercent = settings.StopLossPercent;
         FeePercent = settings.FeePercent;
+        Leverage = settings.Futures?.Leverage;
+        Direction = settings.Futures?.Direction;
+        CloseOnReverse = settings.Futures?.CloseOnReverse;
+        SlippagePercent = settings.Futures?.SlippagePercent;
+        MaintenanceMarginPercent = settings.Futures?.MaintenanceMarginPercent;
         TotalTrades = statistics.TotalTrades;
         WinRatePercent = statistics.WinRatePercent;
         NetProfit = statistics.NetProfit;
@@ -117,8 +158,15 @@ public sealed class SavedBacktest
     }
 
     /// <summary>Thông số vốn/rủi ro đã dùng, dựng lại từ các cột.</summary>
-    public BacktestSettings Settings =>
-        new(InitialCapital, Sizing, SizeValue, TakeProfitPercent, StopLossPercent, FeePercent);
+    public BacktestSettings Settings => new(InitialCapital, Sizing, SizeValue, TakeProfitPercent, StopLossPercent,
+        FeePercent, FuturesSettingsOf(Leverage, Direction, CloseOnReverse, SlippagePercent, MaintenanceMarginPercent));
+
+    /// <summary>Thiết lập Futures dựng lại từ các cột; null (Spot) khi không có đòn bẩy.</summary>
+    public static FuturesBacktestSettings? FuturesSettingsOf(int? leverage, BacktestDirection? direction,
+        bool? closeOnReverse, decimal? slippagePercent, decimal? maintenanceMarginPercent) => leverage is { } value
+        ? new FuturesBacktestSettings(value, direction ?? BacktestDirection.LongOnly, closeOnReverse ?? true,
+            slippagePercent ?? 0m, maintenanceMarginPercent ?? 0m)
+        : null;
 
     /// <summary>Đặt hoặc xóa ghi chú (chuỗi trống = xóa). Khoảng trắng đầu/cuối bị bỏ.</summary>
     /// <exception cref="ArgumentException">Ghi chú dài hơn <see cref="MaxNoteLength"/> ký tự.</exception>

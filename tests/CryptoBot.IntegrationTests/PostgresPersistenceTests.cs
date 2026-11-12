@@ -288,13 +288,30 @@ public sealed class PostgresPersistenceTests : IAsyncLifetime
         var statistics = new BacktestStatistics(3, 1, 2, 33.3333333333333333333333333m, -1.23456789m, -0.123456789m,
             2m, 3.23456789m, 0.6183m, 0.6m, 4m, 0.4m, 998.76543211m, 12m);
         SavedBacktest Saved(int strategyId, int minute) =>
-            new(T0.AddMinutes(minute), strategyId, "BTCUSDT", "1h", 9, 21, 300, T0, T0.AddDays(10), settings,
-                statistics, [1, 2, 3, 4]);
+            new(T0.AddMinutes(minute), strategyId, "BTCUSDT", "1h", "EmaCross", null, 9, 21, 300, T0, T0.AddDays(10),
+                settings, statistics, [1, 2, 3, 4]);
+        // Futures theo chỉ báo tự viết: không có tham số EMA, có tham số chỉ báo và thiết lập Futures.
+        var futures = settings with
+        {
+            Futures = new FuturesBacktestSettings(5, BacktestDirection.ShortOnly, false, 0.05m, 0.4m),
+        };
+        var indicatorRun = new SavedBacktest(T0.AddMinutes(4), 2, "BTCUSDT", "1h", "MyRsi", "{\"Period\":\"14\"}",
+            null, null, 200, T0, T0.AddDays(10), futures, statistics, [5]);
 
         await using (var db = NewContext())
         {
-            db.SavedBacktests.AddRange(Saved(1, 1), Saved(1, 2), Saved(2, 3));
+            db.SavedBacktests.AddRange(Saved(1, 1), Saved(1, 2), Saved(2, 3), indicatorRun);
             await db.SaveChangesAsync();
+        }
+
+        await using (var db = NewContext())
+        {
+            var summary = (await new BacktestStore(db).GetSummaryAsync(indicatorRun.Id, default))!;
+            Assert.Equal(("MyRsi", "{\"Period\":\"14\"}", (int?)null, 200),
+                (summary.SignalType, summary.SignalParameters, summary.FastPeriod, summary.LookbackCandles));
+            Assert.Equal(futures, summary.Settings);
+            Assert.Equal(futures, (await db.SavedBacktests.SingleAsync(saved => saved.Id == indicatorRun.Id)).Settings);
+            Assert.True(await new BacktestStore(db).DeleteAsync(indicatorRun.Id, default));
         }
 
         await using (var db = NewContext())
