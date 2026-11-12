@@ -92,4 +92,17 @@ public class EmaCrossStrategyTests
     {
         Assert.Throws<ArgumentException>(() => new EmaCrossStrategy(new EmaCrossParameters(fast, slow, lookback)));
     }
+
+    [Theory]
+    [InlineData(new[] { 10.0, 10, 10, 13 }, EmaCrossDirection.Up)]
+    [InlineData(new[] { 10.0, 10, 10, 7 }, EmaCrossDirection.Down)]
+    [InlineData(new[] { 10.0, 10, 10, 10 }, EmaCrossDirection.None)]
+    [InlineData(new[] { 10.0, 13 }, EmaCrossDirection.None)]
+    public void Cross_direction_ignores_the_position(double[] closes, EmaCrossDirection expected)
+    {
+        // Evaluate chỉ phát SELL khi đang giữ; CrossAt luôn báo hướng cắt để backtest Futures mở Short.
+        decimal[] values = closes.Select(close => (decimal)close).ToArray();
+
+        Assert.Equal(expected, Strategy.CrossAt(TestCandles.FromCloses(values)));
+    }
 }
