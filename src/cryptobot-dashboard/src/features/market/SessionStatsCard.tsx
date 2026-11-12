@@ -18,8 +18,8 @@ function PressureCell({ percent }: { percent: VolumePressure | null }) {
   if (!percent) return <>—</>;
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-      <span style={{ display: 'inline-flex', width: 80, height: 8, borderRadius: 4, overflow: 'hidden', background: '#dc2626' }}>
-        <span style={{ width: `${percent.buyPercent}%`, background: '#16a34a' }} />
+      <span style={{ display: 'inline-flex', width: 80, height: 8, borderRadius: 4, overflow: 'hidden', background: 'var(--down)' }}>
+        <span style={{ width: `${percent.buyPercent}%`, background: 'var(--up)' }} />
       </span>
       <span style={{ fontVariantNumeric: 'tabular-nums' }}>
         {percent.buyPercent.toFixed(0)}/{(100 - percent.buyPercent).toFixed(0)}
@@ -143,7 +143,7 @@ export function SessionStatsCard({ candles, symbol, interval }: { candles: Chart
             title: `Khối lượng (${baseAsset})`,
             dataIndex: 'volume',
             align: 'right',
-            render: (value: number, row) => <span style={{ color: row.up ? '#16a34a' : '#dc2626' }}>{coin.format(value)}</span>,
+            render: (value: number, row) => <span style={{ color: row.up ? 'var(--up)' : 'var(--down)' }}>{coin.format(value)}</span>,
           },
           { title: 'Khối lượng (USDT)', dataIndex: 'quoteVolume', align: 'right', render: fmtQuote },
           {
@@ -159,7 +159,7 @@ export function SessionStatsCard({ candles, symbol, interval }: { candles: Chart
               value == null || !row.isClosed ? (
                 '—'
               ) : (
-                <span style={{ color: value >= 0 ? '#16a34a' : '#64748b' }}>
+                <span style={{ color: value >= 0 ? 'var(--up)' : 'var(--text-muted)' }}>
                   {value > 0 ? '+' : ''}
                   {value.toFixed(0)}%
                 </span>

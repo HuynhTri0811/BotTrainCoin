@@ -1,18 +1,21 @@
 import { useState, type ReactNode } from 'react';
-import { Button, Card, Checkbox, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Button, Card, Checkbox, Popconfirm, Space, Table, Tag, Typography } from 'antd';
+import { useQuery } from '@tanstack/react-query';
 import { backtestApi, type BacktestSettings, type BacktestSummary } from '../../api/client';
 import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/excel';
 import { ExportExcelButton } from '../../components/ExportExcelButton';
 import { excelVnDate, formatVn } from '../../time';
 import { fmtPercent, fmtSigned, fmtSignedPercent, pnlColor } from '../futures/format';
+import { fmtMode, fmtSignal } from './describe';
+import { BacktestNote } from './BacktestNote';
+import { useBacktestMutations } from './useBacktestMutations';
 
 const amount = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 const MAX_COMPARE = 4;
 
-/** `1000 USDT · 10% vốn` hoặc `1000 USDT · 100 USDT/lệnh`. */
+/** `1000 USDT · 10% vốn` hoặc `1000 USDT · 100 USDT/lệnh`; Futures ghi rõ là margin. */
 export const fmtSizing = (settings: BacktestSettings) =>
-  `${amount.format(settings.initialCapital)} USDT · ${
+  `${amount.format(settings.initialCapital)} USDT · ${settings.futures ? 'margin ' : ''}${
     settings.sizing === 'PercentOfEquity' ? `${amount.format(settings.sizeValue)}% vốn` : `${amount.format(settings.sizeValue)} USDT/lệnh`
   }`;
 
@@ -22,8 +25,7 @@ export const fmtStops = (settings: BacktestSettings) =>
     settings.stopLossPercent == null ? 'không' : `${amount.format(settings.stopLossPercent)}%`
   }`;
 
-const ema = (summary: BacktestSummary) =>
-  `EMA${summary.parameters.fastPeriod}/${summary.parameters.slowPeriod} · ${summary.parameters.lookbackCandles}`;
+const signal = (summary: BacktestSummary) => fmtSignal(summary.signal, summary.parameters);
 
 const period = (summary: BacktestSummary) =>
   `${formatVn(summary.firstCandleUtc).slice(-10)} → ${formatVn(summary.lastCandleUtc).slice(-10)}`;
@@ -33,9 +35,8 @@ const excelColumns: ExcelColumn<BacktestSummary>[] = [
   { header: 'Lúc chạy', value: (summary) => excelVnDate(summary.createdAtUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
   { header: 'Cặp', value: (summary) => summary.symbol, width: 10 },
   { header: 'Khung', value: (summary) => summary.interval, width: 7 },
-  { header: 'EMA nhanh', value: (summary) => summary.parameters.fastPeriod, width: 10 },
-  { header: 'EMA chậm', value: (summary) => summary.parameters.slowPeriod, width: 10 },
-  { header: 'Cửa sổ', value: (summary) => summary.parameters.lookbackCandles, width: 8 },
+  { header: 'Kiểu', value: (summary) => fmtMode(summary.settings), width: 24 },
+  { header: 'Tín hiệu', value: signal, width: 40 },
   { header: 'Từ nến', value: (summary) => excelVnDate(summary.firstCandleUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
   { header: 'Đến nến', value: (summary) => excelVnDate(summary.lastCandleUtc), format: EXCEL_FORMAT.dateTime, width: 17 },
   { header: 'Vốn ban đầu', value: (summary) => summary.settings.initialCapital, format: EXCEL_FORMAT.amount, width: 12 },
@@ -55,7 +56,8 @@ const excelColumns: ExcelColumn<BacktestSummary>[] = [
 const compareRows: { label: string; value: (summary: BacktestSummary) => ReactNode }[] = [
   { label: 'Lúc chạy', value: (summary) => formatVn(summary.createdAtUtc) },
   { label: 'Cặp · khung', value: (summary) => `${summary.symbol} ${summary.interval}` },
-  { label: 'EMA · cửa sổ', value: ema },
+  { label: 'Kiểu', value: (summary) => fmtMode(summary.settings) },
+  { label: 'Tín hiệu', value: signal },
   { label: 'Khoảng nến', value: period },
   { label: 'Vốn · khối lượng', value: (summary) => fmtSizing(summary.settings) },
   { label: 'TP · SL', value: (summary) => fmtStops(summary.settings) },
@@ -70,31 +72,25 @@ const compareRows: { label: string; value: (summary: BacktestSummary) => ReactNo
       </span>
     ),
   },
-  { label: 'Max Drawdown', value: (summary) => <span style={{ color: '#dc2626' }}>{fmtPercent(summary.maxDrawdownPercent)}</span> },
+  { label: 'Max Drawdown', value: (summary) => <span style={{ color: 'var(--down)' }}>{fmtPercent(summary.maxDrawdownPercent)}</span> },
   { label: 'Ghi chú', value: (summary) => summary.note ?? '—' },
 ];
 
 interface Props {
-  /** Chiến lược đang chọn trên dashboard, để lọc "chỉ chiến lược này". */
-  strategyId: number;
-  /** Lần chạy đang hiển thị bên dưới (tô đậm dòng). */
-  openedId: number | null;
+  /** Chiến lược đang chọn trên dashboard, để lọc "chỉ chiến lược này"; undefined thì ẩn bộ lọc. */
+  strategyId: number | undefined;
+  /** Bấm Xem: mở trang chi tiết của lần chạy. */
   onOpen: (id: number) => void;
-  /** Ghi chú của một lần chạy vừa được lưu, để kết quả đang mở cập nhật theo. */
-  onNoteSaved: (id: number, note: string | null) => void;
-  /** Một lần chạy vừa bị xóa, để đóng kết quả nếu đang mở nó. */
-  onDeleted: (id: number) => void;
 }
 
 /** Lịch sử mọi lần backtest đã chạy: xem lại, so sánh, ghi chú, xóa, xuất Excel. */
-export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved, onDeleted }: Props) {
-  const queryClient = useQueryClient();
+export function BacktestHistoryCard({ strategyId, onOpen }: Props) {
   const [onlyThisStrategy, setOnlyThisStrategy] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
   const [comparing, setComparing] = useState(false);
 
   // Lọc ở API: lọc phía client trên 200 dòng mới nhất sẽ thiếu các lần chạy cũ của chiến lược này.
-  const filterId = onlyThisStrategy ? strategyId : undefined;
+  const filterId = onlyThisStrategy && strategyId !== undefined ? strategyId : undefined;
   const history = useQuery({
     queryKey: ['backtests', filterId ?? 'all'],
     queryFn: () => backtestApi.list(filterId),
@@ -104,24 +100,8 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
     queryKey: ['backtests', filterId ?? 'all', 'count'],
     queryFn: () => backtestApi.count(filterId),
   });
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['backtests'] });
-
-  const setNote = useMutation({
-    mutationFn: ({ id, note }: { id: number; note: string }) => backtestApi.setNote(id, note),
-    onSuccess: (saved, { id }) => {
-      onNoteSaved(id, saved.note);
-      refresh();
-    },
-    onError: (error) => message.error(error.message),
-  });
-  const remove = useMutation({
-    mutationFn: backtestApi.remove,
-    onSuccess: (_, id) => {
-      setSelected((current) => current.filter((selectedId) => selectedId !== id));
-      onDeleted(id);
-      refresh();
-    },
-    onError: (error) => message.error(error.message),
+  const { setNote, remove } = useBacktestMutations({
+    onDeleted: (id) => setSelected((current) => current.filter((selectedId) => selectedId !== id)),
   });
 
   const rows = history.data ?? [];
@@ -136,17 +116,19 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
       title={`Lịch sử backtest (${countLabel})`}
       extra={
         <Space wrap>
-          <Checkbox
-            checked={onlyThisStrategy}
-            onChange={(event) => {
-              // Dòng đã chọn có thể không còn trong danh sách mới.
-              setSelected([]);
-              setComparing(false);
-              setOnlyThisStrategy(event.target.checked);
-            }}
-          >
-            Chỉ chiến lược đang chọn
-          </Checkbox>
+          {strategyId !== undefined && (
+            <Checkbox
+              checked={onlyThisStrategy}
+              onChange={(event) => {
+                // Dòng đã chọn có thể không còn trong danh sách mới.
+                setSelected([]);
+                setComparing(false);
+                setOnlyThisStrategy(event.target.checked);
+              }}
+            >
+              Chỉ chiến lược đang chọn
+            </Checkbox>
+          )}
           <Button size="small" disabled={selected.length < 2} onClick={() => setComparing((current) => !current)}>
             {comparing ? 'Ẩn so sánh' : `So sánh (${selected.length})`}
           </Button>
@@ -161,8 +143,8 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
     >
       <Space orientation="vertical" style={{ width: '100%' }}>
         <Typography.Text type="secondary">
-          Mọi lần chạy đều được lưu. Tick tối đa {MAX_COMPARE} dòng để so sánh, bấm vào ghi chú để sửa, bấm Xem để mở lại
-          đầy đủ kết quả mà không chạy lại.
+          Mọi lần chạy đều được lưu. Tick tối đa {MAX_COMPARE} dòng để so sánh, bấm vào ghi chú để sửa, bấm Xem để mở trang
+          chi tiết (thống kê, chart, danh sách lệnh) mà không chạy lại.
         </Typography.Text>
 
         {comparing && compared.length >= 2 && (
@@ -191,7 +173,6 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
           dataSource={rows}
           pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
           scroll={{ x: true }}
-          rowClassName={(summary) => (summary.id === openedId ? 'ant-table-row-selected' : '')}
           rowSelection={{
             selectedRowKeys: selected,
             onChange: (keys) => setSelected((keys as number[]).slice(0, MAX_COMPARE)),
@@ -211,8 +192,11 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
               key: 'strategy',
               render: (_, summary) => (
                 <Space orientation="vertical" size={0}>
-                  <Tag>{`${summary.symbol} ${summary.interval}`}</Tag>
-                  <Typography.Text type="secondary">{ema(summary)}</Typography.Text>
+                  <Space size={4}>
+                    <Tag>{`${summary.symbol} ${summary.interval}`}</Tag>
+                    <Tag color={summary.settings.futures ? 'purple' : undefined}>{fmtMode(summary.settings)}</Tag>
+                  </Space>
+                  <Typography.Text type="secondary">{signal(summary)}</Typography.Text>
                 </Space>
               ),
             },
@@ -269,19 +253,7 @@ export function BacktestHistoryCard({ strategyId, openedId, onOpen, onNoteSaved,
               dataIndex: 'note',
               width: 200,
               render: (note: string | null, summary) => (
-                <Typography.Text
-                  type={note ? undefined : 'secondary'}
-                  editable={{
-                    text: note ?? '',
-                    maxLength: 500,
-                    tooltip: 'Sửa ghi chú',
-                    onChange: (value) => {
-                      if (value !== (note ?? '')) setNote.mutate({ id: summary.id, note: value });
-                    },
-                  }}
-                >
-                  {note ?? 'thêm ghi chú'}
-                </Typography.Text>
+                <BacktestNote note={note} onSave={(value) => setNote.mutate({ id: summary.id, note: value })} />
               ),
             },
             {

@@ -31,16 +31,16 @@ function MonthAverageBars({ stats }: { stats: MonthStats[] }) {
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: 12 }}>
                 <div style={{ height: half, display: 'flex', alignItems: 'flex-end', width: '100%', justifyContent: 'center' }}>
-                  {value > 0 && <div style={{ width: '60%', maxWidth: 32, height: barHeight, background: '#16a34a', borderRadius: '4px 4px 0 0' }} />}
+                  {value > 0 && <div style={{ width: '60%', maxWidth: 32, height: barHeight, background: 'var(--up)', borderRadius: '4px 4px 0 0' }} />}
                 </div>
-                <div style={{ height: 1, width: '100%', background: '#94a3b8' }} />
+                <div style={{ height: 1, width: '100%', background: 'var(--faint)' }} />
                 <div style={{ height: half, display: 'flex', alignItems: 'flex-start', width: '100%', justifyContent: 'center' }}>
-                  {value < 0 && <div style={{ width: '60%', maxWidth: 32, height: barHeight, background: '#dc2626', borderRadius: '0 0 4px 4px' }} />}
+                  {value < 0 && <div style={{ width: '60%', maxWidth: 32, height: barHeight, background: 'var(--down)', borderRadius: '0 0 4px 4px' }} />}
                 </div>
                 <span style={{ fontWeight: 600, color: pctColor(value), fontVariantNumeric: 'tabular-nums' }}>
                   {stats ? fmtPct(value) : '—'}
                 </span>
-                <span style={{ color: '#64748b' }}>T{month}</span>
+                <span style={{ color: 'var(--text-muted)' }}>T{month}</span>
               </div>
             </Tooltip>
           );

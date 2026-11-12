@@ -23,9 +23,11 @@ public sealed class BacktestHistoryService(IBacktestStore store, IClock clock)
     public async Task<SavedBacktestRun> SaveAsync(BacktestRun run, CancellationToken ct)
     {
         var snapshot = BacktestSnapshot.From(run);
+        // EMA cross đã có cột riêng cho tham số; chỉ báo tự viết lưu tham số dạng JSON.
         var saved = new SavedBacktest(clock.UtcNow, run.Instance.Id, run.Instance.Symbol, run.Instance.Interval,
-            run.Parameters.FastPeriod, run.Parameters.SlowPeriod, run.Parameters.LookbackCandles,
-            run.FirstCandleUtc, run.LastCandleUtc, run.Result.Settings, run.Result.Statistics, Compress(snapshot));
+            run.Signal.Type, run.Parameters is null ? run.Signal.ParametersJson : null, run.Parameters?.FastPeriod,
+            run.Parameters?.SlowPeriod, run.Signal.RequiredCandles, run.FirstCandleUtc, run.LastCandleUtc,
+            run.Result.Settings, run.Result.Statistics, Compress(snapshot));
         store.Add(saved);
         await store.SaveAsync(ct);
         return new SavedBacktestRun(saved, snapshot);
@@ -35,6 +37,9 @@ public sealed class BacktestHistoryService(IBacktestStore store, IClock clock)
     public Task<IReadOnlyList<BacktestSummary>> ListAsync(int? strategyInstanceId, int limit, int offset,
         CancellationToken ct) =>
         store.ListAsync(strategyInstanceId, Math.Clamp(limit, 1, MaxListLimit), Math.Max(offset, 0), ct);
+
+    /// <summary>Thông số của một lần chạy mà không giải nén kết quả; null nếu không có.</summary>
+    public Task<BacktestSummary?> GetSummaryAsync(long id, CancellationToken ct) => store.GetSummaryAsync(id, ct);
 
     /// <summary>Tổng số lần chạy, để biết danh sách đang hiện có đủ chưa.</summary>
     public Task<int> CountAsync(int? strategyInstanceId, CancellationToken ct) =>

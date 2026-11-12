@@ -6,7 +6,7 @@ Backend chia 4 project theo kiểu Clean Architecture. Mũi tên là "tham chi�
 
 ```mermaid
 flowchart LR
-    Api[CryptoBot.Api<br/>endpoint, worker, Program.cs] --> Infra[CryptoBot.Infrastructure<br/>EF Core/SQLite, client Binance/Bitfinex, DI]
+    Api[CryptoBot.Api<br/>endpoint, worker, Program.cs] --> Infra[CryptoBot.Infrastructure<br/>EF Core/PostgreSQL, client Binance/Bitfinex, DI]
     Infra --> App[CryptoBot.Application<br/>service, port interface, options]
     App --> Domain[CryptoBot.Domain<br/>entity, công thức, chiến lược, chỉ báo]
     Dash[cryptobot-dashboard<br/>React] -. HTTP /api .-> Api
@@ -16,7 +16,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | **Domain** | Không gì cả | EF Core, HTTP, DI, logging, đồng hồ hệ thống, cấu hình | Không có |
 | **Application** | Domain | EF Core, HTTP, ASP.NET | `Microsoft.Extensions.Logging.Abstractions` |
-| **Infrastructure** | Application, Domain | ASP.NET | EF Core SQLite, `Microsoft.Extensions.Http` |
+| **Infrastructure** | Application, Domain | ASP.NET | EF Core Npgsql (PostgreSQL), `Microsoft.Extensions.Http` |
 | **Api** | Tất cả | — | Serilog, OpenApi, EF Core Design |
 
 Quy tắc chính:
@@ -76,7 +76,7 @@ sequenceDiagram
     participant W as MarketDataWorker
     participant S as CandleSyncService
     participant B as Binance REST
-    participant DB as SQLite (Candles, Signals)
+    participant DB as PostgreSQL (Candles, Signals)
     participant E as SignalEvaluationService
     participant X as EmaCrossStrategy
     W->>S: SyncAsync(key)
@@ -121,8 +121,10 @@ tính bằng đúng quy tắc cửa sổ của chiến lược, nên chart luôn
 
 ## 5. Lưu trữ
 
-**Database:** SQLite, file `data/cryptobot.db` (đường dẫn tương đối với thư mục chạy API), WAL mode,
-`Default Timeout=30`. Context: [`BotDbContext`](../src/CryptoBot.Infrastructure/Persistence/Database/BotDbContext.cs).
+**Database:** PostgreSQL 17 trong container `cryptobot-postgres` ([`docker-compose.yml`](../docker-compose.yml),
+`localhost:5433`, database `cryptobot`). `decimal` lưu `numeric` (không giới hạn độ chính xác), `DateTime` lưu
+`timestamptz` (chỉ nhận UTC). Trước #182 là SQLite; dữ liệu cũ chép bằng
+[`tools/sqlite-to-postgres`](../tools/sqlite-to-postgres/Program.cs). Context: [`BotDbContext`](../src/CryptoBot.Infrastructure/Persistence/Database/BotDbContext.cs).
 
 | Bảng | Entity | Khóa duy nhất / index |
 | --- | --- | --- |

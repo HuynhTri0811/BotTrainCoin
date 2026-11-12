@@ -188,7 +188,7 @@ export function PositionsCard({ account }: { account: FuturesAccount | undefined
                     title: 'Thanh lý',
                     dataIndex: 'liquidationPrice',
                     align: 'right',
-                    render: (value: number) => <span style={{ color: '#dc2626' }}>{fmtPrice(value)}</span>,
+                    render: (value: number) => <span style={{ color: 'var(--down)' }}>{fmtPrice(value)}</span>,
                   },
                   {
                     title: 'SL / TP',

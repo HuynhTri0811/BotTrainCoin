@@ -21,10 +21,10 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
-        // Tiền/giá/lượng: chuỗi decimal invariant chính xác. Không SUM/ORDER BY các cột này trong SQL.
-        builder.Properties<decimal>().HaveConversion<DecimalInvariantStringConverter>().HaveColumnType("TEXT");
-        // Thời gian: Unix milliseconds UTC, so sánh/sắp xếp được trong SQLite.
-        builder.Properties<DateTime>().HaveConversion<UtcUnixMillisecondsConverter>();
+        // Tiền/giá/lượng: numeric không giới hạn độ chính xác, giữ đúng mọi chữ số của decimal.
+        builder.Properties<decimal>().HaveColumnType("numeric");
+        // Thời gian: timestamptz. Npgsql chỉ nhận DateTime UTC, đúng quy ước của app.
+        builder.Properties<DateTime>().HaveColumnType("timestamp with time zone");
     }
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -111,6 +111,9 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
             entity.Property(saved => saved.Symbol).HasMaxLength(32);
             entity.Property(saved => saved.Interval).HasMaxLength(8);
             entity.Property(saved => saved.Sizing).HasConversion<string>().HasMaxLength(16);
+            entity.Property(saved => saved.SignalType).HasMaxLength(SavedBacktest.MaxSignalTypeLength);
+            entity.Property(saved => saved.SignalParameters).HasMaxLength(SavedBacktest.MaxSignalParametersLength);
+            entity.Property(saved => saved.Direction).HasConversion<string>().HasMaxLength(16);
             entity.Property(saved => saved.Note).HasMaxLength(SavedBacktest.MaxNoteLength);
             entity.Ignore(saved => saved.Settings);
             // Lịch sử liệt kê mới → cũ, có thể lọc theo chiến lược.

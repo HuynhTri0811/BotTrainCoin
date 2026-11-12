@@ -109,7 +109,10 @@ export const API_MAX_LIMIT = {
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${url}`);
+  if (!res.ok) {
+    const text = `${res.status} ${res.statusText} — ${url}`;
+    throw new ApiError(text, [text], res.status);
+  }
   return (await res.json()) as T;
 }
 
@@ -200,6 +203,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly details: string[] = [],
+    /** Mã HTTP, ví dụ 404 khi không có bản ghi. */
+    public readonly status?: number,
   ) {
     super(message);
   }
@@ -216,7 +221,7 @@ async function sendJson<T>(method: 'POST' | 'PUT' | 'DELETE', url: string, body?
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const details: string[] = data?.errors ?? (data?.error ? [data.error] : []);
-    throw new ApiError(details[0] ?? `${res.status} ${res.statusText}`, details);
+    throw new ApiError(details[0] ?? `${res.status} ${res.statusText}`, details, res.status);
   }
   return data as T;
 }
@@ -712,7 +717,13 @@ export const newsApi = {
 // ---- Backtest chiến lược trên nến lịch sử (chỉ mô phỏng, không đặt lệnh) ----
 
 export type PositionSizing = 'PercentOfEquity' | 'FixedAmount';
-export type BacktestExitReason = 'Signal' | 'TakeProfit' | 'StopLoss';
+export type BacktestExitReason = 'Signal' | 'TakeProfit' | 'StopLoss' | 'Liquidation';
+/** Spot: chỉ Long, không đòn bẩy (như bot EMA). Futures: Long/Short có đòn bẩy (như lệnh tự động Paper). */
+export type BacktestMode = 'Spot' | 'Futures';
+export type BacktestDirection = 'LongOnly' | 'ShortOnly' | 'Both';
+export type TradeSide = 'Long' | 'Short';
+/** Tín hiệu EMA cross của chiến lược; loại khác là chỉ báo tự viết, ví dụ 'MyRsi'. */
+export const EMA_CROSS_SIGNAL = 'EmaCross';
 
 export interface BacktestCoverage {
   firstOpenTimeUtc: string | null;
@@ -741,6 +752,43 @@ export interface BacktestRequest {
   takeProfitPercent: string | null;
   stopLossPercent: string | null;
   feePercent: string;
+  /** Mặc định Spot. Các trường dưới chỉ dùng với Futures. */
+  mode?: BacktestMode;
+  leverage?: number;
+  direction?: BacktestDirection;
+  closeOnReverse?: boolean;
+  slippagePercent?: string;
+  maintenanceMarginPercent?: string;
+  /** null hoặc 'EmaCross' = EMA cross; loại chỉ báo tự viết chỉ chạy với Futures. */
+  signalType?: string | null;
+  signalParameters?: Record<string, string>;
+}
+
+/** Gợi ý cho form backtest của một chiến lược. */
+export interface BacktestOptions {
+  indicators: {
+    type: string;
+    description: string;
+    /** Tham số của chỉ báo đang cấu hình cùng cặp/khung nến (presetName), nếu không có thì mặc định. */
+    parameters: Record<string, string>;
+    presetName: string | null;
+  }[];
+  /** Theo %: phí/trượt giá/ký quỹ của Paper Futures, margin/đòn bẩy/SL/TP của quy tắc tự động. */
+  futures: {
+    feePercent: number;
+    slippagePercent: number;
+    maintenanceMarginPercent: number;
+    maxLeverage: number;
+    margin: number;
+    leverage: number;
+    stopLossPercent: number;
+    takeProfitPercent: number;
+  };
+}
+
+export interface BacktestSignal {
+  type: string;
+  parameters: Record<string, string>;
 }
 
 export interface BacktestStatistics {
@@ -769,8 +817,10 @@ export interface BacktestTrade {
   quantity: number;
   fees: number;
   netPnl: number;
+  /** Spot: so với tiền vào lệnh; Futures: so với margin. */
   returnPercent: number;
   exitReason: BacktestExitReason;
+  side: TradeSide;
 }
 
 export interface BacktestOpenTrade {
@@ -780,6 +830,7 @@ export interface BacktestOpenTrade {
   entryFee: number;
   markPrice: number;
   unrealizedPnl: number;
+  side: TradeSide;
 }
 
 export interface BacktestBar {
@@ -788,17 +839,17 @@ export interface BacktestBar {
   high: number;
   low: number;
   close: number;
-  /** null với cột thuộc phần warm-up. */
+  /** null với cột thuộc phần warm-up (và với chart chi tiết lệnh). */
   equity: number | null;
+  /** EMA nhanh/chậm tại nến cuối của cột; null khi chưa đủ nến hoặc lần chạy lưu trước khi có EMA. */
+  emaFast: number | null;
+  emaSlow: number | null;
 }
 
-export interface BacktestMarker {
-  /** Trùng `time` của cột chứa nến khớp lệnh. */
-  time: number;
-  kind: 'Entry' | 'Exit';
-  price: number;
-  exitReason: BacktestExitReason | null;
-  netPnl: number | null;
+/** Nến thật quanh một lệnh backtest (chart chi tiết lệnh). */
+export interface BacktestTradeChart {
+  candlesPerBar: number;
+  bars: BacktestBar[];
 }
 
 export interface BacktestSettings {
@@ -808,6 +859,15 @@ export interface BacktestSettings {
   takeProfitPercent: number | null;
   stopLossPercent: number | null;
   feePercent: number;
+  mode: BacktestMode;
+  /** null với Spot. */
+  futures: {
+    leverage: number;
+    direction: BacktestDirection;
+    closeOnReverse: boolean;
+    slippagePercent: number;
+    maintenanceMarginPercent: number;
+  } | null;
 }
 
 /** Một lần backtest đã lưu (mọi lần chạy đều được lưu). */
@@ -817,7 +877,9 @@ export interface BacktestSummary {
   strategyId: number;
   symbol: string;
   interval: string;
-  parameters: StrategyParameters;
+  /** Tham số EMA; null khi tín hiệu là chỉ báo tự viết. */
+  parameters: StrategyParameters | null;
+  signal: BacktestSignal;
   firstCandleUtc: string | null;
   lastCandleUtc: string | null;
   settings: BacktestSettings;
@@ -837,7 +899,9 @@ export interface BacktestResult {
   strategyId: number;
   symbol: string;
   interval: string;
-  parameters: StrategyParameters;
+  /** Tham số EMA; null khi tín hiệu là chỉ báo tự viết. */
+  parameters: StrategyParameters | null;
+  signal: BacktestSignal;
   settings: BacktestSettings;
   firstCandleUtc: string | null;
   lastCandleUtc: string | null;
@@ -845,13 +909,14 @@ export interface BacktestResult {
   warmupCandles: number;
   evaluatedCandles: number;
   skippedGapWindows: number;
+  /** Futures: số tín hiệu Long / Short. */
   buySignals: number;
   sellSignals: number;
   statistics: BacktestStatistics;
   trades: BacktestTrade[];
   openTrade: BacktestOpenTrade | null;
-  /** Mỗi cột gộp `candlesPerBar` nến liên tiếp khi khoảng thời gian dài. */
-  chart: { candlesPerBar: number; bars: BacktestBar[]; markers: BacktestMarker[] };
+  /** Mỗi cột gộp `candlesPerBar` nến liên tiếp khi khoảng thời gian dài. Điểm vào/ra lấy từ `trades`/`openTrade`. */
+  chart: { candlesPerBar: number; bars: BacktestBar[] };
 }
 
 /** Số dòng tối đa mỗi lần gọi `/api/backtests` (BacktestHistoryService.MaxListLimit). */
@@ -859,6 +924,7 @@ const BACKTEST_PAGE_LIMIT = 500;
 
 export const backtestApi = {
   coverage: (strategyId: number) => getJson<BacktestCoverage>(`/api/strategies/${strategyId}/backtest/coverage`),
+  options: (strategyId: number) => getJson<BacktestOptions>(`/api/strategies/${strategyId}/backtest/options`),
   history: (strategyId: number, fromUtc: string) =>
     postJson<BackfillResult>(`/api/strategies/${strategyId}/backtest/history`, { fromUtc }),
   /** Chạy và lưu vào lịch sử. */
@@ -881,6 +947,11 @@ export const backtestApi = {
     }
   },
   get: (id: number) => getJson<BacktestResult>(`/api/backtests/${id}`),
+  /** Nến thật quanh một lệnh; lệnh còn mở thì `exitUtc` là nến cuối của lần chạy. */
+  tradeChart: (id: number, entryUtc: string, exitUtc: string) =>
+    getJson<BacktestTradeChart>(
+      `/api/backtests/${id}/trade-chart?entryUtc=${encodeURIComponent(entryUtc)}&exitUtc=${encodeURIComponent(exitUtc)}`,
+    ),
   setNote: (id: number, note: string) => sendJson<{ note: string | null }>('PUT', `/api/backtests/${id}/note`, { note }),
   remove: (id: number) => sendJson<null>('DELETE', `/api/backtests/${id}`),
 };

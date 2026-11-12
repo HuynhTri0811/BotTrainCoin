@@ -41,8 +41,8 @@ có giới hạn lỗ ngày. Không có mark price mới (≤ 10 giây) thì **k
 
 - Không dùng `double`/`float` cho tiền/giá/lượng. Ngoại lệ có chủ đích: phép thống kê cần `Math.Exp`/`Math.Log`/căn
   (σ trong `DailyMoveRange`, khoảng cách trong `SimilarDaysForecast`), đổi sang `double` ở đúng chỗ đó rồi đổi lại.
-- SQLite lưu `decimal` dạng chuỗi invariant → **không SUM/ORDER BY/so sánh cột decimal trong SQL**; đọc lên rồi tính
-  trong C#.
+- PostgreSQL lưu `decimal` dạng `numeric` chính xác, nên SUM/ORDER BY/so sánh trong SQL đúng. Code cũ vẫn tính trong
+  C# (từ thời SQLite lưu chuỗi); giữ được, không cần đổi.
 - Client gửi số tiền có thể dạng chuỗi (`"50.5"`), API chấp nhận (`AllowReadingFromString`).
 - Dashboard: số chỉ để hiển thị, **mọi tính toán nằm ở backend**.
 
@@ -145,7 +145,7 @@ người dùng luôn thấy **vì sao** bot làm (hoặc không làm) một vi�
 
 - **Domain thuần túy, Application điều phối, Infrastructure kỹ thuật, Api ghép nối** ([architecture.md](architecture.md)).
 - **Thư mục theo tính năng**, giống nhau ở mọi tầng ([folder-structure.md](folder-structure.md)).
-- **Đơn giản trước:** REST polling thay vì WebSocket, SQLite thay vì server DB, một worker tuần tự thay vì nhiều luồng
+- **Đơn giản trước:** REST polling thay vì WebSocket, một database PostgreSQL trong container, một worker tuần tự thay vì nhiều luồng
   ghi. Chỉ thêm phức tạp khi có số đo cho thấy cần (ví dụ bảng số đo trong signal-functions.md).
 - **Gom trùng lặp khi đã lặp lại** (≥ 2 chỗ cùng công thức, cùng thông báo lỗi): `PercentChange`, `DailyCloses.Validate`,
   `Crossover`, `ListSlice`, `PredictAt`. Không tạo abstraction trước khi có chỗ thứ hai dùng.

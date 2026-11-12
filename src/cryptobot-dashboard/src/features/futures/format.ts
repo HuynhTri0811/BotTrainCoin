@@ -6,7 +6,7 @@ export const fmtPrice = (value: number | null | undefined) => (value == null ? '
 export const fmtSigned = (value: number | null | undefined) =>
   value == null ? '—' : `${value > 0 ? '+' : ''}${usdt.format(value)}`;
 export const pnlColor = (value: number | null | undefined) =>
-  value == null || value === 0 ? undefined : value > 0 ? '#16a34a' : '#dc2626';
+  value == null || value === 0 ? undefined : value > 0 ? 'var(--up)' : 'var(--down)';
 
 const percent2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /** `12.34%`. */

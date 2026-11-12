@@ -11,7 +11,7 @@ Cột "Mặc định" là giá trị trong code khi không khai báo; giá trị
 
 | Khóa | Hiện tại | Ghi chú |
 | --- | --- | --- |
-| `Bot` | `Data Source=data/cryptobot.db;Default Timeout=30` | Đường dẫn tương đối với thư mục chạy API. Thiếu thì dùng `Data Source=data/cryptobot.db` |
+| `Bot` | `Host=localhost;Port=5433;Database=cryptobot;Username=cryptobot;Password=cryptobot` | PostgreSQL trong container `cryptobot-postgres` ([`docker-compose.yml`](../docker-compose.yml)). Bắt buộc: thiếu thì API báo lỗi khi khởi động. Mật khẩu container đổi bằng biến môi trường `CRYPTOBOT_DB_PASSWORD` (nhớ đổi cả chuỗi này, ví dụ qua `ConnectionStrings__Bot`) |
 
 ## Serilog
 
@@ -84,6 +84,7 @@ không tăng version. Cấu hình sai bị bỏ qua và ghi log lỗi.
 
 Tham số của `MyRsi`: `Period` (14), `Oversold` (30), `Overbought` (70), `TrendEmaPeriod` (0 = tắt),
 `PullbackLong` (40), `PullbackShort` (60), `LookbackCandles` (200).
+Tham số của `FlowRsi`: `Period` (14), `Oversold` (30), `Overbought` (70), `LookbackCandles` (200).
 Lỗi (loại không tồn tại, tham số sai tên/kiểu, `Validate()` trả lỗi, interval sai) hiện trong
 `GET /api/indicators` → `errors` và log.
 

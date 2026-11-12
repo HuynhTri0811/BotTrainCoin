@@ -25,7 +25,7 @@ Chế độ cố định của bot: `DecisionMode = SignalOnly`, `Environment = 
 15. [Trạng thái, health check, log](#15-trạng-thái-health-check-log)
 16. [Báo cáo biến động hằng ngày](#16-báo-cáo-biến-động-hằng-ngày)
 17. [Tin tức (RSS, mỗi 5 giờ)](#17-tin-tức-rss-mỗi-5-giờ)
-18. [Backtest chiến lược EMA](#18-backtest-chiến-lược-ema)
+18. [Backtest Spot và Futures](#18-backtest-spot-và-futures)
 19. [Chưa làm / giới hạn đã biết](#19-chưa-làm--giới-hạn-đã-biết)
 
 ---
@@ -79,6 +79,7 @@ Chi tiết thuật toán: [signal-functions.md](signal-functions.md).
 
 **Code:** [`ICustomIndicator`](../src/CryptoBot.Domain/Indicators/Contracts/ICustomIndicator.cs),
 [`MyRsiIndicator`](../src/CryptoBot.Domain/Indicators/Rsi/MyRsiIndicator.cs) (ví dụ đầy đủ),
+[`FlowRsiIndicator`](../src/CryptoBot.Domain/Indicators/FlowRsi/FlowRsiIndicator.cs),
 [`TemplateIndicator`](../src/CryptoBot.Domain/Indicators/Template/TemplateIndicator.cs) (khung trống),
 [`IndicatorRegistry`](../src/CryptoBot.Application/Indicators/Registry/IndicatorRegistry.cs),
 [`IndicatorService`](../src/CryptoBot.Application/Indicators/Computation/IndicatorService.cs).
@@ -96,7 +97,13 @@ Chi tiết thuật toán: [signal-functions.md](signal-functions.md).
   - Bật `TrendEmaPeriod` (ví dụ 50, hồi trong xu hướng, sửa ở PR #48): giá trên EMA và RSI cắt lên `PullbackLong`
     (40) → Long; giá dưới EMA và RSI cắt xuống `PullbackShort` (60) → Short. Lý do bỏ 30/70 khi có EMA: RSI dưới
     30 thì giá gần như luôn dưới EMA, nên bản cũ cho 0 tín hiệu.
-- Mặc định có 2 chỉ báo: `btc-1h-myrsi` (đảo chiều) và `eth-15m-myrsi-trend` (hồi trong xu hướng, EMA50).
+- **FlowRsi** (#180): RSI tính trên khối lượng mua/bán chủ động thay cho giá. Mỗi nến lấy chênh lệch
+  mua − bán chủ động (`2 × TakerBuyVolume − Volume`) làm "thay đổi", rồi tính RSI kiểu Wilder như RSI giá. Flow RSI
+  cắt lên `Oversold` (30) → Long (bên mua lấy lại thế), cắt xuống `Overbought` (70) → Short. Cửa sổ có nến thiếu
+  `TakerBuyVolume` (nến lưu trước khi bot lấy số liệu này) thì không tính, kèm lý do. Lý do tín hiệu ghi thêm tỷ trọng
+  mua chủ động của nến vừa đóng.
+- Mặc định có 3 chỉ báo: `btc-1h-myrsi` (đảo chiều), `eth-15m-myrsi-trend` (hồi trong xu hướng, EMA50) và
+  `btc-1h-flowrsi` (RSI mua/bán chủ động).
 
 ## 4. Paper Futures (Long/Short có đòn bẩy, tiền giả lập)
 
@@ -301,7 +308,7 @@ UI: trang **Lịch sử theo tháng** ([`HistoryPage.tsx`](../src/cryptobot-dash
 **Code:** [`src/cryptobot-dashboard`](../src/cryptobot-dashboard). Chi tiết thư mục ở
 [folder-structure.md](folder-structure.md#srccryptobot-dashboard--frontend).
 
-- Menu trái 8 trang: Biểu đồ, Giao dịch Paper, Dự đoán, Tín hiệu, Backtest, Lịch sử theo tháng, Báo cáo ngày, Tin tức. Trang
+- Menu trái 9 trang: Biểu đồ, Giao dịch Paper, Dự đoán, Tín hiệu, Backtest, Lịch sử backtest, Lịch sử theo tháng, Báo cáo ngày, Tin tức. Trang
   hiện tại nằm trong `#hash` (tải lại hoặc gửi link vẫn mở đúng trang).
 - Nút chọn chiến lược (`BTCUSDT 1h`, `BTCUSDT 15m`, …) ở góc phải; các trang (trừ Lịch sử, Báo cáo ngày, Tin tức)
   dùng symbol/khung của chiến lược đang chọn.
@@ -385,9 +392,10 @@ UI: trang **Tin tức** ([`NewsPage.tsx`](../src/cryptobot-dashboard/src/pages/N
 - **Giới hạn:** feed chỉ giữ 20–60 bài mới nhất; nguồn đăng dày có thể đẩy bài ra khỏi feed trước lượt đồng bộ sau
   5 giờ, nên có thể lỡ một ít bài. Không dịch, không tóm tắt bằng AI, không đánh giá tin tốt/xấu.
 
-## 18. Backtest chiến lược EMA
+## 18. Backtest Spot và Futures
 
 **Code:** [`Backtester`](../src/CryptoBot.Domain/Backtesting/Engine/Backtester.cs),
+[`FuturesBacktester`](../src/CryptoBot.Domain/Backtesting/Engine/FuturesBacktester.cs),
 [`BacktestSettings`](../src/CryptoBot.Domain/Backtesting/Settings/BacktestSettings.cs),
 [`BacktestStatistics`](../src/CryptoBot.Domain/Backtesting/Results/BacktestStatistics.cs),
 [`BacktestService`](../src/CryptoBot.Application/Backtesting/BacktestService.cs),
@@ -395,6 +403,29 @@ UI: trang **Tin tức** ([`NewsPage.tsx`](../src/cryptobot-dashboard/src/pages/N
 [`BacktestEndpoints`](../src/CryptoBot.Api/Endpoints/Backtesting/BacktestEndpoints.cs).
 UI: trang **Backtest** ([`BacktestPage.tsx`](../src/cryptobot-dashboard/src/pages/BacktestPage.tsx),
 [`features/backtest/`](../src/cryptobot-dashboard/src/features/backtest)).
+
+Trang Backtest có ô **Kiểu backtest**:
+
+- **Spot** (mặc định, phần bên dưới): chỉ Long, không đòn bẩy, đúng chiến lược EMA bot đang chạy.
+- **Futures** (#198, #199, #200): vị thế USDⓈ-M isolated có đòn bẩy, tính giống lệnh tự động Paper Futures.
+  - **Tín hiệu:** EMA cross hai chiều (cắt lên → Long, cắt xuống → Short, `EmaCrossStrategy.CrossAt`) hoặc chỉ báo tự
+    viết (MyRsi, FlowRsi…) gọi đúng `ICustomIndicator.Compute` như quy tắc tự động, trên nến của chiến lược đang chọn.
+    Tham số chỉ báo sửa được; mặc định lấy theo chỉ báo đang cấu hình cùng cặp/khung nến, nếu không có thì mặc định
+    của class ([`BacktestOptionsService`](../src/CryptoBot.Application/Backtesting/Options/BacktestOptionsService.cs)).
+  - **Hướng lệnh:** chỉ Long, chỉ Short hoặc cả hai. Bật **đóng khi tín hiệu đảo chiều** (giống "Tự đóng khi đảo
+    chiều" của quy tắc tự động): tín hiệu ngược chiều đóng lệnh, và với cả hai chiều thì mở luôn chiều kia ở cùng giá
+    mở. Tắt thì lệnh chỉ đóng ở TP/SL/thanh lý; cần ít nhất một cách đóng lệnh.
+  - **Khớp lệnh:** margin = khối lượng mỗi lệnh (% tiền đang có hoặc USDT cố định), giá trị vị thế = margin × đòn bẩy
+    (1–125), phí tính trên giá trị vị thế ở cả lần mở và đóng, trượt giá bất lợi mỗi lần khớp, lỗ một lệnh tối đa bằng
+    margin. Giá thanh lý theo ký quỹ duy trì (`FuturesMath.LiquidationPrice`); cắt lỗ phải nằm trước giá thanh lý. Giá
+    mở nến đã qua giá thanh lý → thanh lý trước khi lệnh đóng theo tín hiệu kịp khớp; trong nến: SL → thanh lý → TP.
+    Phí, trượt giá, ký quỹ duy trì mặc định theo Paper Futures; nút "Dùng mặc định của lệnh tự động" điền margin, đòn
+    bẩy, SL, TP của quy tắc tự động. Không tính funding.
+  - **Hiển thị:** bảng lệnh có cột Chiều, lý do thoát thêm Thanh lý; chart vẽ ▲ LONG / ▼ SHORT, TP/SL đúng phía, đường
+    chấm tím là giá thanh lý (không tính vào thang giá). Lần chạy theo chỉ báo không có đường EMA. Lịch sử lưu kiểu,
+    nguồn tín hiệu, tham số chỉ báo và thiết lập Futures (cột riêng); lần chạy cũ đọc lại là Spot EMA cross.
+
+Phần còn lại mô tả Spot và những gì dùng chung:
 
 - **Tín hiệu giữ nguyên như bot:** mỗi nến gọi đúng `EmaCrossStrategy.Evaluate` với cửa sổ `LookbackCandles` nến,
   bỏ qua cửa sổ có nến thiếu (`CandleWindow.HasGap`, dùng chung với `SignalEvaluationService`), trạng thái "đang giữ"
@@ -407,23 +438,31 @@ UI: trang **Backtest** ([`BacktestPage.tsx`](../src/cryptobot-dashboard/src/page
 - **Thống kê:** số lệnh đã đóng, thắng/thua (thắng = lãi sau phí), tỷ lệ thắng, lợi nhuận ròng sau phí, Max Drawdown
   (tiền và %, theo tổng vốn ở giá đóng từng nến), profit factor, tổng phí, vốn cuối, mua-và-giữ cùng kỳ. Lệnh còn mở ở
   nến cuối được báo riêng, không tính vào số lệnh và lợi nhuận ròng.
-- **Chart:** nến kèm mũi tên vào lệnh/thoát lệnh (SELL, TP, SL khác màu) và đường tổng vốn. Quá 3000 nến thì backend gộp
-  nến liên tiếp (OHLC đúng của cả nhóm) chỉ để hiển thị; thống kê vẫn tính trên từng nến gốc. Bảng lệnh xuất Excel.
+- **Chart:** nến kèm EMA nhanh/chậm (tính đúng quy tắc cửa sổ của bot tại nến cuối mỗi cột; cửa sổ có nến thiếu thì
+  đường EMA bị ngắt, vì bot không đánh giá ở đó), mũi tên vào lệnh/thoát
+  lệnh (SELL, TP, SL khác màu) ghi giá và lãi/lỗ, và trong lúc giữ lệnh: đường giá vào, đường đứt mức chốt lời (xanh)
+  và cắt lỗ (đỏ) tính từ giá vào. Khung dưới là tổng vốn. Quá 3000 nến thì backend gộp nến liên tiếp (OHLC đúng của
+  cả nhóm) chỉ để hiển thị; thống kê vẫn tính trên từng nến gốc. Lần chạy lưu trước khi có EMA không có hai đường EMA.
+- **Chi tiết một lệnh** (#184): bấm một dòng trong Danh sách lệnh để mở chart nến **thật** của lệnh đó ngay dưới dòng
+  ([`BacktestTradeChartService`](../src/CryptoBot.Application/Backtesting/History/BacktestTradeChartService.cs)):
+  từ 30 nến trước lúc mua đến 30 nến sau lúc bán, kèm EMA, giá vào và mức TP/SL, để thấy rõ EMA cắt lên → BUY, cắt
+  xuống → SELL. Bảng lệnh xuất Excel.
 - **Tải lịch sử:** nút **Tải lịch sử từ Binance** tải nến cũ hơn nến sớm nhất đang có (không đụng phần đồng bộ thường),
   tối đa 1000 request mỗi lần, một lần tải tại một thời điểm cho mỗi cặp và khung nến. Mọi bên ghi nến (đồng bộ
   thường, nến 1d, tải lịch sử) upsert lần lượt theo cặp và khung nến (`CandleStore`), nên không chèn trùng nến. DB chưa có nến nào thì phải chờ
   đồng bộ thường chạy lần đầu. Nến 1h từ 2020 (≈ 58 nghìn nến) mất khoảng 16 giây; chạy
   backtest trên khoảng đó khoảng 4 giây.
-- **Giới hạn:** không trượt giá, độ sâu sổ lệnh, funding; không short; tối đa 400 nghìn nến mỗi lần chạy. Cửa sổ chứa
+- **Giới hạn:** Spot không tính trượt giá; cả hai không tính độ sâu sổ lệnh và funding; tối đa 400 nghìn nến mỗi lần chạy. Cửa sổ chứa
   khoảng nến thiếu của Binance (bảo trì) bị bỏ qua giống bot, nên có vài nghìn nến không được đánh giá trên nhiều năm.
-  Cửa sổ EMA (`LookbackCandles`) tối đa 1000 khi backtest. Khoảng không có nến
+  Cửa sổ nến của tín hiệu (`LookbackCandles`) tối đa 1000 khi backtest. Khoảng không có nến
   thì báo lỗi, không lưu. Đóng tab hoặc bấm chạy lại thì lần chạy cũ dừng giữa chừng. Kết quả quá khứ không bảo đảm cho
   tương lai.
 - **Lịch sử backtest:** mọi lần chạy được lưu tự động vào bảng `SavedBacktests`
   ([`SavedBacktest`](../src/CryptoBot.Domain/Backtesting/History/SavedBacktest.cs),
   [`BacktestHistoryService`](../src/CryptoBot.Application/Backtesting/History/BacktestHistoryService.cs)). Thông số và
   con số chính là cột riêng để liệt kê nhanh; toàn bộ kết quả (lệnh, chart gộp) lưu dạng JSON nén gzip (≈ 250 KB một
-  lần chạy 1h nhiều năm, ≈ 700 KB với 15m; enum lưu dạng chữ). Card **Lịch sử backtest** trên trang: mở lại đầy đủ không cần chạy lại, so
+  lần chạy 1h nhiều năm, ≈ 700 KB với 15m; enum lưu dạng chữ). Tab **Lịch sử backtest** riêng ([`BacktestHistoryPage.tsx`](../src/cryptobot-dashboard/src/pages/BacktestHistoryPage.tsx)):
+  bấm Xem mở trang chi tiết `#backtest-history/{id}` (thống kê, chart, danh sách lệnh, sửa ghi chú, xóa) không cần chạy lại, so
   sánh tối đa 4 lần cạnh nhau, sửa ghi chú tại chỗ, xóa, lọc theo chiến lược đang chọn. Bảng hiện 200 lần mới nhất (tiêu đề ghi
   "200 mới nhất / tổng" khi còn nhiều hơn); Xuất Excel tải đủ mọi lần chạy. Đường vốn từng nến
   không lưu, chỉ lưu bản gộp trên chart.

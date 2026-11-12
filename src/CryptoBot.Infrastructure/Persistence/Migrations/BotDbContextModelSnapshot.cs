@@ -4,6 +4,7 @@ using CryptoBot.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -15,94 +16,118 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
+            modelBuilder
+                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("CryptoBot.Domain.Backtesting.SavedBacktest", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool?>("CloseOnReverse")
+                        .HasColumnType("boolean");
 
                     b.Property<byte[]>("Content")
                         .IsRequired()
-                        .HasColumnType("BLOB");
+                        .HasColumnType("bytea");
 
-                    b.Property<long>("CreatedAtUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("FastPeriod")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("Direction")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
-                    b.Property<string>("FeePercent")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<int?>("FastPeriod")
+                        .HasColumnType("integer");
 
-                    b.Property<long?>("FirstCandleUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("FeePercent")
+                        .HasColumnType("numeric");
 
-                    b.Property<string>("InitialCapital")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<DateTime?>("FirstCandleUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("InitialCapital")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Interval")
                         .IsRequired()
                         .HasMaxLength(8)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(8)");
 
-                    b.Property<long?>("LastCandleUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime?>("LastCandleUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("Leverage")
+                        .HasColumnType("integer");
 
                     b.Property<int>("LookbackCandles")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
-                    b.Property<string>("MaxDrawdownPercent")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal?>("MaintenanceMarginPercent")
+                        .HasColumnType("numeric");
 
-                    b.Property<string>("NetProfit")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("MaxDrawdownPercent")
+                        .HasColumnType("numeric");
 
-                    b.Property<string>("NetProfitPercent")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("NetProfit")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("NetProfitPercent")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Note")
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
-                    b.Property<string>("SizeValue")
+                    b.Property<string>("SignalParameters")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("SignalType")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<decimal>("SizeValue")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Sizing")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(16)");
 
-                    b.Property<int>("SlowPeriod")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal?>("SlippagePercent")
+                        .HasColumnType("numeric");
 
-                    b.Property<string>("StopLossPercent")
-                        .HasColumnType("TEXT");
+                    b.Property<int?>("SlowPeriod")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("StopLossPercent")
+                        .HasColumnType("numeric");
 
                     b.Property<int>("StrategyInstanceId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Symbol")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(32)");
 
-                    b.Property<string>("TakeProfitPercent")
-                        .HasColumnType("TEXT");
+                    b.Property<decimal?>("TakeProfitPercent")
+                        .HasColumnType("numeric");
 
                     b.Property<int>("TotalTrades")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
-                    b.Property<string>("WinRatePercent")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("WinRatePercent")
+                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
@@ -117,93 +142,93 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<Guid?>("CloseCommandId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("CloseDetail")
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("CloseOnReverse")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
-                    b.Property<long?>("CloseWatchEndedAtUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime?>("CloseWatchEndedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("CommandId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Condition")
                         .HasMaxLength(16)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(16)");
 
-                    b.Property<long>("CreatedAtUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Environment")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(16)");
 
                     b.Property<string>("IndicatorName")
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<int>("Leverage")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
-                    b.Property<string>("Margin")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("Margin")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Note")
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<long?>("PositionId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
 
                     b.Property<string>("Side")
                         .IsRequired()
                         .HasMaxLength(8)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(8)");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(16)");
 
-                    b.Property<string>("StopLossPercent")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("StopLossPercent")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Symbol")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(32)");
 
-                    b.Property<string>("TakeProfitPercent")
-                        .HasColumnType("TEXT");
+                    b.Property<decimal?>("TakeProfitPercent")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("TriggerDetail")
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
-                    b.Property<string>("TriggerPrice")
-                        .HasColumnType("TEXT");
+                    b.Property<decimal?>("TriggerPrice")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("TriggerType")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(16)");
 
-                    b.Property<long?>("TriggeredAtUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime?>("TriggeredAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("TriggeredMarkPrice")
-                        .HasColumnType("TEXT");
+                    b.Property<decimal?>("TriggeredMarkPrice")
+                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
@@ -219,83 +244,78 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<Guid?>("CloseCommandId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
-                    b.Property<string>("CloseFee")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("CloseFee")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("CloseReason")
                         .HasMaxLength(16)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(16)");
 
-                    b.Property<long?>("ClosedAtUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("EntryPrice")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("EntryPrice")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Environment")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(16)");
 
-                    b.Property<string>("ExitPrice")
-                        .HasColumnType("TEXT");
+                    b.Property<decimal?>("ExitPrice")
+                        .HasColumnType("numeric");
 
                     b.Property<int>("Leverage")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
-                    b.Property<string>("LiquidationPrice")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("LiquidationPrice")
+                        .HasColumnType("numeric");
 
-                    b.Property<string>("Margin")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("Margin")
+                        .HasColumnType("numeric");
 
                     b.Property<Guid>("OpenCommandId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
-                    b.Property<string>("OpenFee")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("OpenFee")
+                        .HasColumnType("numeric");
 
-                    b.Property<long>("OpenedAtUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime>("OpenedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Quantity")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric");
 
-                    b.Property<string>("RealizedPnl")
-                        .HasColumnType("TEXT");
+                    b.Property<decimal?>("RealizedPnl")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Side")
                         .IsRequired()
                         .HasMaxLength(8)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(8)");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(16)");
 
-                    b.Property<string>("StopLoss")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("StopLoss")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Symbol")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(32)");
 
-                    b.Property<string>("TakeProfit")
-                        .HasColumnType("TEXT");
+                    b.Property<decimal?>("TakeProfit")
+                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
@@ -311,37 +331,38 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
 
-                    b.Property<string>("Amount")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Asset")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(16)");
 
                     b.Property<string>("Environment")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(16)");
 
                     b.Property<string>("Note")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<long?>("PositionId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
 
-                    b.Property<long>("TimeUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime>("TimeUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(16)");
 
                     b.HasKey("Id");
 
@@ -356,63 +377,60 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
 
-                    b.Property<string>("Close")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
-                    b.Property<long>("CloseTimeUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("Close")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTime>("CloseTimeUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Exchange")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(32)");
 
-                    b.Property<string>("High")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("High")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Interval")
                         .IsRequired()
                         .HasMaxLength(8)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(8)");
 
                     b.Property<bool>("IsClosed")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
-                    b.Property<string>("Low")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("Low")
+                        .HasColumnType("numeric");
 
-                    b.Property<string>("Open")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("Open")
+                        .HasColumnType("numeric");
 
-                    b.Property<long>("OpenTimeUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime>("OpenTimeUtc")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("QuoteVolume")
-                        .HasColumnType("TEXT");
+                    b.Property<decimal?>("QuoteVolume")
+                        .HasColumnType("numeric");
 
-                    b.Property<long>("ReceivedAtUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Symbol")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(32)");
 
-                    b.Property<string>("TakerBuyVolume")
-                        .HasColumnType("TEXT");
+                    b.Property<decimal?>("TakerBuyVolume")
+                        .HasColumnType("numeric");
 
                     b.Property<long?>("TradeCount")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
 
-                    b.Property<string>("Volume")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("Volume")
+                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
@@ -426,30 +444,32 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<string>("ContentJson")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
-                    b.Property<long>("CreatedAtUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Interval")
                         .IsRequired()
                         .HasMaxLength(8)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(8)");
 
-                    b.Property<long>("PeriodEndUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime>("PeriodEndUtc")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<long>("PeriodStartUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime>("PeriodStartUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Symbol")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(32)");
 
                     b.HasKey("Id");
 
@@ -463,43 +483,45 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<string>("Coins")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(32)");
 
                     b.Property<string>("ExternalId")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
-                    b.Property<long>("FetchedAtUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime>("FetchedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<long>("PublishedAtUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime>("PublishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("Summary")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Url")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(1000)");
 
                     b.HasKey("Id");
 
@@ -515,45 +537,47 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<bool>("Enabled")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Exchange")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(32)");
 
                     b.Property<string>("Interval")
                         .IsRequired()
                         .HasMaxLength(8)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(8)");
 
-                    b.Property<long?>("LastEvaluatedCandleOpenTimeUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime?>("LastEvaluatedCandleOpenTimeUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("ParametersJson")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("StrategyType")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Symbol")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(32)");
 
                     b.Property<int>("Version")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -567,54 +591,53 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<string>("Action")
                         .IsRequired()
                         .HasMaxLength(8)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(8)");
 
-                    b.Property<string>("CandleClose")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("CandleClose")
+                        .HasColumnType("numeric");
 
-                    b.Property<long>("CandleOpenTimeUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime>("CandleOpenTimeUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("ConfigVersion")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
-                    b.Property<long>("CreatedAtUtc")
-                        .HasColumnType("INTEGER");
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("FastEma")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("FastEma")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Interval")
                         .IsRequired()
                         .HasMaxLength(8)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(8)");
 
                     b.Property<bool>("IsBackfill")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
-                    b.Property<string>("SlowEma")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<decimal>("SlowEma")
+                        .HasColumnType("numeric");
 
                     b.Property<int>("StrategyInstanceId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Symbol")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(32)");
 
                     b.HasKey("Id");
 

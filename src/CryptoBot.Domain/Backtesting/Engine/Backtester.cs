@@ -38,6 +38,9 @@ public static class Backtester
     {
         if (settings.Validate() is { } error)
             throw new ArgumentException(error, nameof(settings));
+        if (settings.Futures is not null)
+            throw new ArgumentException("Backtest Spot không dùng đòn bẩy; Futures chạy bằng FuturesBacktester.",
+                nameof(settings));
 
         Simulation simulation = new(settings);
         List<BacktestSignal> signals = [];

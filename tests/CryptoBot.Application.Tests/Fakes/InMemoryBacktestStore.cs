@@ -14,14 +14,20 @@ internal sealed class InMemoryBacktestStore : IBacktestStore
             .OrderByDescending(saved => saved.CreatedAtUtc).ThenByDescending(saved => saved.Id)
             .Skip(offset)
             .Take(limit)
-            .Select(saved => new BacktestSummary(saved.Id, saved.CreatedAtUtc, saved.StrategyInstanceId, saved.Symbol,
-                saved.Interval, saved.FastPeriod, saved.SlowPeriod, saved.LookbackCandles, saved.FirstCandleUtc,
-                saved.LastCandleUtc, saved.Settings, saved.TotalTrades, saved.WinRatePercent, saved.NetProfit,
-                saved.NetProfitPercent, saved.MaxDrawdownPercent, saved.Note))
+            .Select(ToSummary)
             .ToList());
+
+    public Task<BacktestSummary?> GetSummaryAsync(long id, CancellationToken ct) =>
+        Task.FromResult(Saved.Where(saved => saved.Id == id).Select(ToSummary).FirstOrDefault());
 
     public Task<int> CountAsync(int? strategyInstanceId, CancellationToken ct) =>
         Task.FromResult(ForInstance(strategyInstanceId).Count());
+
+    private static BacktestSummary ToSummary(SavedBacktest saved) => new(saved.Id, saved.CreatedAtUtc,
+        saved.StrategyInstanceId, saved.Symbol, saved.Interval, saved.SignalType,
+        saved.SignalParameters, saved.FastPeriod, saved.SlowPeriod,
+        saved.LookbackCandles, saved.FirstCandleUtc, saved.LastCandleUtc, saved.Settings, saved.TotalTrades,
+        saved.WinRatePercent, saved.NetProfit, saved.NetProfitPercent, saved.MaxDrawdownPercent, saved.Note);
 
     private IEnumerable<SavedBacktest> ForInstance(int? strategyInstanceId) =>
         Saved.Where(saved => strategyInstanceId is null || saved.StrategyInstanceId == strategyInstanceId);

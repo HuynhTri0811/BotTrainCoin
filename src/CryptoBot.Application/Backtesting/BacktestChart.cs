@@ -1,78 +1,76 @@
 using CryptoBot.Domain.Backtesting;
+using CryptoBot.Domain.Common;
 using CryptoBot.Domain.MarketData;
+using CryptoBot.Domain.Strategies;
 
 namespace CryptoBot.Application.Backtesting;
 
 /// <summary>
 /// Dữ liệu vẽ chart cho kết quả backtest. Nhiều năm nến 1h/15m là hàng chục đến hàng trăm nghìn nến, quá nặng để
 /// gửi và vẽ, nên gộp các nến liên tiếp thành tối đa <c>maxBars</c> cột (OHLC đúng của cả nhóm). Số liệu thống kê
-/// luôn tính trên từng nến gốc; chỉ phần hiển thị được gộp.
+/// luôn tính trên từng nến gốc; chỉ phần hiển thị được gộp. Điểm vào/ra do dashboard đặt từ danh sách lệnh.
 /// </summary>
-public sealed record BacktestChart(
-    int CandlesPerBar,
-    IReadOnlyList<BacktestChartBar> Bars,
-    IReadOnlyList<BacktestChartMarker> Markers)
+public sealed record BacktestChart(int CandlesPerBar, IReadOnlyList<BacktestChartBar> Bars)
 {
-    public static BacktestChart Build(IReadOnlyList<Candle> candles, BacktestResult result, int maxBars)
+    /// <param name="series">Nến warm-up rồi tới nến của khoảng chạy, tăng dần (đúng chuỗi đưa vào Backtester).</param>
+    /// <param name="rangeStart">Vị trí nến đầu của khoảng chạy trong <paramref name="series"/>.</param>
+    /// <param name="interval">Khung nến, để nhận ra cửa sổ EMA có nến thiếu.</param>
+    /// <param name="result">Kết quả backtest, để lấy tổng vốn.</param>
+    /// <param name="strategy">Chiến lược EMA đã chạy, để vẽ EMA đúng như lúc ra tín hiệu; null = không vẽ EMA.</param>
+    /// <param name="maxBars">Số cột tối đa.</param>
+    public static BacktestChart Build(IReadOnlyList<Candle> series, int rangeStart, CandleInterval interval,
+        BacktestResult result, EmaCrossStrategy? strategy, int maxBars)
+    {
+        var equity = result.Equity.ToDictionary(point => point.CandleOpenTimeUtc, point => point.Equity);
+        var (perBar, bars) = GroupBars(series, rangeStart, interval, maxBars, strategy,
+            openTimeUtc => equity.TryGetValue(openTimeUtc, out var value) ? value : null);
+        return new BacktestChart(perBar, bars);
+    }
+
+    /// <summary>
+    /// Gộp nến từ <paramref name="start"/> tới hết <paramref name="series"/> thành tối đa <paramref name="maxBars"/>
+    /// cột, kèm EMA của <paramref name="strategy"/> (nếu có) tại nến cuối mỗi cột. Nến trước <paramref name="start"/>
+    /// chỉ dùng để có đủ cửa sổ EMA.
+    /// </summary>
+    /// <remarks>
+    /// EMA để trống khi cửa sổ kết thúc tại nến cuối của cột thiếu nến hoặc chứa khoảng thiếu nến: bot và Backtester
+    /// không đánh giá các cửa sổ đó (<see cref="CandleWindow.HasGap"/>), nên chart cũng không vẽ EMA ở đó.
+    /// </remarks>
+    /// <param name="equityAt">Tổng vốn tại nến cuối của cột (theo OpenTime), null nếu không có.</param>
+    public static (int CandlesPerBar, List<BacktestChartBar> Bars) GroupBars(IReadOnlyList<Candle> series, int start,
+        CandleInterval interval, int maxBars, EmaCrossStrategy? strategy, Func<DateTime, decimal?> equityAt)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxBars, 1);
-        if (candles.Count == 0)
-            return new BacktestChart(1, [], []);
+        var count = series.Count - start;
+        if (count <= 0)
+            return (1, []);
 
-        var perBar = (candles.Count + maxBars - 1) / maxBars;
-        var equity = result.Equity.ToDictionary(point => point.CandleOpenTimeUtc, point => point.Equity);
-        var bars = new List<BacktestChartBar>((candles.Count + perBar - 1) / perBar);
+        var perBar = (count + maxBars - 1) / maxBars;
+        var window = strategy?.RequiredCandles ?? 0;
+        var closes = new decimal[series.Count];
+        for (var index = 0; index < series.Count; index++)
+            closes[index] = series[index].Close;
 
-        for (var start = 0; start < candles.Count; start += perBar)
+        var bars = new List<BacktestChartBar>((count + perBar - 1) / perBar);
+        for (var first = start; first < series.Count; first += perBar)
         {
-            var end = Math.Min(start + perBar, candles.Count) - 1;
-            var first = candles[start];
-            var high = first.High;
-            var low = first.Low;
-            for (var index = start; index <= end; index++)
+            var last = Math.Min(first + perBar, series.Count) - 1;
+            var high = series[first].High;
+            var low = series[first].Low;
+            for (var index = first; index <= last; index++)
             {
-                high = Math.Max(high, candles[index].High);
-                low = Math.Min(low, candles[index].Low);
+                high = Math.Max(high, series[index].High);
+                low = Math.Min(low, series[index].Low);
             }
 
-            var last = candles[end];
-            bars.Add(new BacktestChartBar(first.OpenTimeUtc, first.Open, high, low, last.Close,
-                equity.TryGetValue(last.OpenTimeUtc, out var value) ? value : null));
+            // EMA trên cửa sổ kết thúc tại nến cuối của cột, giống lúc bot ra tín hiệu ở nến đó.
+            var hasWindow = strategy is not null && last + 1 >= window
+                            && !CandleWindow.HasGap(new ListSlice<Candle>(series, last + 1 - window, window), interval);
+            var ema = hasWindow ? strategy!.ComputeAt(closes.AsSpan(0, last + 1)) : null;
+            bars.Add(new BacktestChartBar(series[first].OpenTimeUtc, series[first].Open, high, low, series[last].Close,
+                equityAt(series[last].OpenTimeUtc), ema?.Fast, ema?.Slow));
         }
 
-        var markers = new List<BacktestChartMarker>(result.Trades.Count * 2 + 1);
-        foreach (var trade in result.Trades)
-        {
-            if (BarTimeOf(trade.EntryTimeUtc) is { } entryBar)
-                markers.Add(new BacktestChartMarker(entryBar, true, trade.EntryPrice, null, null));
-            if (BarTimeOf(trade.ExitTimeUtc) is { } exitBar)
-                markers.Add(new BacktestChartMarker(exitBar, false, trade.ExitPrice, trade.ExitReason, trade.NetPnl));
-        }
-
-        if (result.OpenTrade is { } open && BarTimeOf(open.EntryTimeUtc) is { } openBar)
-            markers.Add(new BacktestChartMarker(openBar, true, open.EntryPrice, null, null));
-
-        return new BacktestChart(perBar, bars, markers);
-
-        // Cột chứa nến có OpenTime này; null nếu nến không thuộc khoảng (ví dụ nến warm-up).
-        // Tìm nhị phân trên nến đã sắp tăng dần: chỉ vài trăm marker, không cần bảng cho mọi nến.
-        DateTime? BarTimeOf(DateTime openTimeUtc)
-        {
-            var low = 0;
-            var high = candles.Count - 1;
-            while (low <= high)
-            {
-                var middle = low + (high - low) / 2;
-                var compared = candles[middle].OpenTimeUtc.CompareTo(openTimeUtc);
-                if (compared == 0)
-                    return bars[middle / perBar].OpenTimeUtc;
-                if (compared < 0)
-                    low = middle + 1;
-                else
-                    high = middle - 1;
-            }
-
-            return null;
-        }
+        return (perBar, bars);
     }
 }
