@@ -9,7 +9,7 @@ export function NewsList({ articles, showSummary = true }: { articles: NewsArtic
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {articles.map((article) => (
-        <div key={article.id} style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
+        <div key={article.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
           <Space size={4} wrap style={{ fontSize: 12 }}>
             <Typography.Text type="secondary">{formatVn(article.publishedAtUtc)}</Typography.Text>
             <Tag>{article.source}</Tag>

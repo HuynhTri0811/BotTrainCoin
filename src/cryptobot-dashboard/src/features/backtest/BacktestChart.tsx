@@ -10,6 +10,7 @@ import {
   type UTCTimestamp,
 } from 'lightweight-charts';
 import type { BacktestBar, BacktestSettings, StrategyParameters } from '../../api/client';
+import { useChartColors } from '../../theme';
 import { formatVnTick, formatVnUnix } from '../../time';
 import { addEmaLines, addTradeOverlay, type OverlayTrade } from './tradeOverlay';
 
@@ -32,6 +33,7 @@ interface Props {
  */
 export function BacktestChart({ bars, trades, settings, parameters, showEquity = false, priceHeight = 420 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const colors = useChartColors();
 
   useEffect(() => {
     const element = containerRef.current;
@@ -39,12 +41,12 @@ export function BacktestChart({ bars, trades, settings, parameters, showEquity =
 
     const chart = createChart(element, {
       autoSize: true,
-      layout: { background: { type: ColorType.Solid, color: '#ffffff' }, textColor: '#334155' },
-      grid: { vertLines: { color: '#f1f5f9' }, horzLines: { color: '#f1f5f9' } },
+      layout: { background: { type: ColorType.Solid, color: colors.background }, textColor: colors.text },
+      grid: { vertLines: { color: colors.grid }, horzLines: { color: colors.grid } },
       crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: '#e2e8f0' },
+      rightPriceScale: { borderColor: colors.border },
       timeScale: {
-        borderColor: '#e2e8f0',
+        borderColor: colors.border,
         timeVisible: true,
         tickMarkFormatter: (time: Time, type: TickMarkType) =>
           formatVnTick(time as number, type === TickMarkType.DayOfMonth || type === TickMarkType.Month
@@ -54,10 +56,10 @@ export function BacktestChart({ bars, trades, settings, parameters, showEquity =
     });
 
     const candles = chart.addSeries(CandlestickSeries, {
-      upColor: '#16a34a',
-      downColor: '#dc2626',
-      wickUpColor: '#16a34a',
-      wickDownColor: '#dc2626',
+      upColor: colors.up,
+      downColor: colors.down,
+      wickUpColor: colors.up,
+      wickDownColor: colors.down,
       borderVisible: false,
     });
     candles.setData(
@@ -86,7 +88,7 @@ export function BacktestChart({ bars, trades, settings, parameters, showEquity =
       cancelAnimationFrame(frame);
       chart.remove();
     };
-  }, [bars, trades, settings, parameters, showEquity]);
+  }, [bars, trades, settings, parameters, showEquity, colors]);
 
   return <div ref={containerRef} style={{ width: '100%', height: priceHeight + (showEquity ? EQUITY_HEIGHT : 0) }} />;
 }

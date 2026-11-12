@@ -72,7 +72,7 @@ const compareRows: { label: string; value: (summary: BacktestSummary) => ReactNo
       </span>
     ),
   },
-  { label: 'Max Drawdown', value: (summary) => <span style={{ color: '#dc2626' }}>{fmtPercent(summary.maxDrawdownPercent)}</span> },
+  { label: 'Max Drawdown', value: (summary) => <span style={{ color: 'var(--down)' }}>{fmtPercent(summary.maxDrawdownPercent)}</span> },
   { label: 'Ghi chú', value: (summary) => summary.note ?? '—' },
 ];
 
