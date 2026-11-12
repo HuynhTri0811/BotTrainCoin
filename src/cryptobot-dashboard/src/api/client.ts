@@ -717,7 +717,7 @@ export const newsApi = {
 // ---- Backtest chiến lược trên nến lịch sử (chỉ mô phỏng, không đặt lệnh) ----
 
 export type PositionSizing = 'PercentOfEquity' | 'FixedAmount';
-export type BacktestExitReason = 'Signal' | 'TakeProfit' | 'StopLoss';
+export type BacktestExitReason = 'Signal' | 'TakeProfit' | 'StopLoss' | 'Liquidation';
 /** Spot: chỉ Long, không đòn bẩy (như bot EMA). Futures: Long/Short có đòn bẩy (như lệnh tự động Paper). */
 export type BacktestMode = 'Spot' | 'Futures';
 export type BacktestDirection = 'LongOnly' | 'ShortOnly' | 'Both';
@@ -877,7 +877,8 @@ export interface BacktestSummary {
   strategyId: number;
   symbol: string;
   interval: string;
-  parameters: StrategyParameters;
+  /** Tham số EMA; null khi tín hiệu là chỉ báo tự viết. */
+  parameters: StrategyParameters | null;
   signal: BacktestSignal;
   firstCandleUtc: string | null;
   lastCandleUtc: string | null;
@@ -898,7 +899,8 @@ export interface BacktestResult {
   strategyId: number;
   symbol: string;
   interval: string;
-  parameters: StrategyParameters;
+  /** Tham số EMA; null khi tín hiệu là chỉ báo tự viết. */
+  parameters: StrategyParameters | null;
   signal: BacktestSignal;
   settings: BacktestSettings;
   firstCandleUtc: string | null;
