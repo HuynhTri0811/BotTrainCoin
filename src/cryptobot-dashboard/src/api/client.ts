@@ -806,15 +806,6 @@ export interface BacktestTradeChart {
   bars: BacktestBar[];
 }
 
-export interface BacktestMarker {
-  /** Trùng `time` của cột chứa nến khớp lệnh. */
-  time: number;
-  kind: 'Entry' | 'Exit';
-  price: number;
-  exitReason: BacktestExitReason | null;
-  netPnl: number | null;
-}
-
 export interface BacktestSettings {
   initialCapital: number;
   sizing: PositionSizing;
@@ -864,8 +855,8 @@ export interface BacktestResult {
   statistics: BacktestStatistics;
   trades: BacktestTrade[];
   openTrade: BacktestOpenTrade | null;
-  /** Mỗi cột gộp `candlesPerBar` nến liên tiếp khi khoảng thời gian dài. */
-  chart: { candlesPerBar: number; bars: BacktestBar[]; markers: BacktestMarker[] };
+  /** Mỗi cột gộp `candlesPerBar` nến liên tiếp khi khoảng thời gian dài. Điểm vào/ra lấy từ `trades`/`openTrade`. */
+  chart: { candlesPerBar: number; bars: BacktestBar[] };
 }
 
 /** Số dòng tối đa mỗi lần gọi `/api/backtests` (BacktestHistoryService.MaxListLimit). */
@@ -895,9 +886,11 @@ export const backtestApi = {
     }
   },
   get: (id: number) => getJson<BacktestResult>(`/api/backtests/${id}`),
-  /** `tradeIndex` theo thứ tự `trades`; bằng `trades.length` = lệnh còn mở ở cuối kỳ. */
-  tradeChart: (id: number, tradeIndex: number) =>
-    getJson<BacktestTradeChart>(`/api/backtests/${id}/trades/${tradeIndex}/chart`),
+  /** Nến thật quanh một lệnh; lệnh còn mở thì `exitUtc` là nến cuối của lần chạy. */
+  tradeChart: (id: number, entryUtc: string, exitUtc: string) =>
+    getJson<BacktestTradeChart>(
+      `/api/backtests/${id}/trade-chart?entryUtc=${encodeURIComponent(entryUtc)}&exitUtc=${encodeURIComponent(exitUtc)}`,
+    ),
   setNote: (id: number, note: string) => sendJson<{ note: string | null }>('PUT', `/api/backtests/${id}/note`, { note }),
   remove: (id: number) => sendJson<null>('DELETE', `/api/backtests/${id}`),
 };

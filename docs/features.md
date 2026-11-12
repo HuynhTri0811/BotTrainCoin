@@ -414,7 +414,8 @@ UI: trang **Backtest** ([`BacktestPage.tsx`](../src/cryptobot-dashboard/src/page
 - **Thống kê:** số lệnh đã đóng, thắng/thua (thắng = lãi sau phí), tỷ lệ thắng, lợi nhuận ròng sau phí, Max Drawdown
   (tiền và %, theo tổng vốn ở giá đóng từng nến), profit factor, tổng phí, vốn cuối, mua-và-giữ cùng kỳ. Lệnh còn mở ở
   nến cuối được báo riêng, không tính vào số lệnh và lợi nhuận ròng.
-- **Chart:** nến kèm EMA nhanh/chậm (tính đúng quy tắc cửa sổ của bot tại nến cuối mỗi cột), mũi tên vào lệnh/thoát
+- **Chart:** nến kèm EMA nhanh/chậm (tính đúng quy tắc cửa sổ của bot tại nến cuối mỗi cột; cửa sổ có nến thiếu thì
+  đường EMA bị ngắt, vì bot không đánh giá ở đó), mũi tên vào lệnh/thoát
   lệnh (SELL, TP, SL khác màu) ghi giá và lãi/lỗ, và trong lúc giữ lệnh: đường giá vào, đường đứt mức chốt lời (xanh)
   và cắt lỗ (đỏ) tính từ giá vào. Khung dưới là tổng vốn. Quá 3000 nến thì backend gộp nến liên tiếp (OHLC đúng của
   cả nhóm) chỉ để hiển thị; thống kê vẫn tính trên từng nến gốc. Lần chạy lưu trước khi có EMA không có hai đường EMA.

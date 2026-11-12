@@ -11,6 +11,9 @@ public interface IBacktestStore
     Task<IReadOnlyList<BacktestSummary>> ListAsync(int? strategyInstanceId, int limit, int offset,
         CancellationToken ct);
 
+    /// <summary>Thông số và con số chính của một lần chạy, không đọc nội dung nén; null nếu không có.</summary>
+    Task<BacktestSummary?> GetSummaryAsync(long id, CancellationToken ct);
+
     /// <summary>Tổng số lần chạy (lọc theo instance nếu có).</summary>
     Task<int> CountAsync(int? strategyInstanceId, CancellationToken ct);
 

@@ -10,15 +10,14 @@ import { EMA_FAST_COLOR, EMA_SLOW_COLOR, ENTRY_COLOR, SL_COLOR, TP_COLOR } from 
 interface Props {
   result: BacktestResult;
   trade: BacktestTrade;
-  /** Vị trí của lệnh trong `result.trades`. */
-  tradeIndex: number;
 }
 
 /** Chart nến thật của một lệnh (từ 30 nến trước lúc vào đến 30 nến sau lúc ra), kèm EMA, giá vào và TP/SL. */
-export function BacktestTradeDetail({ result, trade, tradeIndex }: Props) {
+export function BacktestTradeDetail({ result, trade }: Props) {
   const chart = useQuery({
-    queryKey: ['backtest-trade-chart', result.id, tradeIndex],
-    queryFn: () => backtestApi.tradeChart(result.id, tradeIndex),
+    queryKey: ['backtest-trade-chart', result.id, trade.entryTimeUtc, trade.exitTimeUtc],
+    // Gửi giờ vào/ra đã có: server chỉ đọc thông số lần chạy, không giải nén lại toàn bộ kết quả.
+    queryFn: () => backtestApi.tradeChart(result.id, trade.entryTimeUtc, trade.exitTimeUtc),
     // Nến đã đóng không đổi.
     staleTime: Infinity,
   });

@@ -36,6 +36,9 @@ public sealed class BacktestHistoryService(IBacktestStore store, IClock clock)
         CancellationToken ct) =>
         store.ListAsync(strategyInstanceId, Math.Clamp(limit, 1, MaxListLimit), Math.Max(offset, 0), ct);
 
+    /// <summary>Thông số của một lần chạy mà không giải nén kết quả; null nếu không có.</summary>
+    public Task<BacktestSummary?> GetSummaryAsync(long id, CancellationToken ct) => store.GetSummaryAsync(id, ct);
+
     /// <summary>Tổng số lần chạy, để biết danh sách đang hiện có đủ chưa.</summary>
     public Task<int> CountAsync(int? strategyInstanceId, CancellationToken ct) =>
         store.CountAsync(strategyInstanceId, ct);

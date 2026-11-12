@@ -5,9 +5,17 @@ import { EXCEL_FORMAT, downloadExcel, type ExcelColumn } from '../../components/
 import { ExportExcelButton } from '../../components/ExportExcelButton';
 import { excelVnDate, formatVn } from '../../time';
 import { fmtPercent, fmtPrice2, fmtSigned, fmtSignedPercent, fmtUsdt, pnlColor } from '../futures/format';
-import { BacktestChart, EXIT_COLORS } from './BacktestChart';
+import { BacktestChart } from './BacktestChart';
 import { BacktestTradeDetail } from './BacktestTradeDetail';
-import { EMA_FAST_COLOR, EMA_SLOW_COLOR, ENTRY_COLOR, SL_COLOR, TP_COLOR, toOverlayTrades } from './tradeOverlay';
+import {
+  EMA_FAST_COLOR,
+  EMA_SLOW_COLOR,
+  ENTRY_COLOR,
+  EXIT_COLORS,
+  SL_COLOR,
+  TP_COLOR,
+  toOverlayTrades,
+} from './tradeOverlay';
 import { fmtSizing, fmtStops } from './BacktestHistoryCard';
 
 const quantity = new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 });
@@ -171,7 +179,7 @@ export function BacktestResultView({ result }: { result: BacktestResult }) {
           expandable={{
             expandRowByClick: true,
             expandedRowRender: (trade) => (
-              <BacktestTradeDetail result={result} trade={trade} tradeIndex={result.trades.indexOf(trade)} />
+              <BacktestTradeDetail result={result} trade={trade} />
             ),
           }}
           columns={[

@@ -48,7 +48,8 @@ public sealed class PostgresPersistenceTests : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await using var connection = new NpgsqlConnection(
-            new NpgsqlConnectionStringBuilder(ServerConnection) { Database = "postgres", Pooling = false }.ConnectionString);
+            new NpgsqlConnectionStringBuilder(ServerConnection) { Database = "postgres", Pooling = false }
+                .ConnectionString);
         await connection.OpenAsync();
         await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_database}\" WITH (FORCE)", connection);
         await drop.ExecuteNonQueryAsync();
@@ -310,6 +311,8 @@ public sealed class PostgresPersistenceTests : IAsyncLifetime
                 (await store.ListAsync(null, 1, 1, default)).Select(summary => summary.CreatedAtUtc));
             Assert.Equal(3, await store.CountAsync(null, default));
             Assert.Equal(2, await store.CountAsync(1, default));
+            Assert.Equal(all[1], await store.GetSummaryAsync(all[1].Id, default));
+            Assert.Null(await store.GetSummaryAsync(999, default));
 
             var first = (await store.GetAsync(all[2].Id, default))!;
             Assert.Equal([1, 2, 3, 4], first.Content);

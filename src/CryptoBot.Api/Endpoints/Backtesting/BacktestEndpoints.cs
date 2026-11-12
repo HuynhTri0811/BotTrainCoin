@@ -90,16 +90,17 @@ public static class BacktestEndpoints
                 ? Results.Ok(ToDto(saved))
                 : Results.NotFound(new { error = "Không có lần backtest này." }));
 
-        // Nến thật quanh một lệnh (không gộp như chart tổng) kèm EMA. tradeIndex theo thứ tự trades; bằng số lệnh
-        // đã đóng = lệnh còn mở ở cuối kỳ.
-        api.MapGet("/{backtestId:long}/trades/{tradeIndex:int}/chart", async (long backtestId, int tradeIndex,
-            BacktestTradeChartService tradeCharts, CancellationToken ct) =>
+        // Nến thật quanh một lệnh (không gộp như chart tổng) kèm EMA. Dashboard gửi giờ vào/ra của lệnh; lệnh còn
+        // mở thì exitUtc là nến cuối của lần chạy.
+        api.MapGet("/{backtestId:long}/trade-chart", async (long backtestId, DateTimeOffset entryUtc,
+            DateTimeOffset exitUtc, BacktestTradeChartService tradeCharts, CancellationToken ct) =>
         {
             try
             {
-                return await tradeCharts.GetAsync(backtestId, tradeIndex, ct) is { } chart
+                return await tradeCharts.GetAsync(backtestId, entryUtc.UtcDateTime, exitUtc.UtcDateTime, ct) is
+                    { } chart
                     ? Results.Ok(new BacktestTradeChartDto(chart.CandlesPerBar, chart.Bars.Select(ToDto).ToList()))
-                    : Results.NotFound(new { error = "Không có lần backtest hoặc lệnh này." });
+                    : Results.NotFound(new { error = "Không có lần backtest này." });
             }
             catch (ArgumentException ex)
             {
@@ -160,11 +161,7 @@ public static class BacktestEndpoints
                 ? new BacktestOpenTradeDto(open.EntryTimeUtc, open.EntryPrice, open.Quantity, open.EntryFee,
                     open.MarkPrice, open.UnrealizedPnl)
                 : null,
-            new BacktestChartDto(snapshot.Chart.CandlesPerBar,
-                snapshot.Chart.Bars.Select(ToDto).ToList(),
-                snapshot.Chart.Markers.Select(marker => new BacktestMarkerDto(ToUnixSeconds(marker.BarOpenTimeUtc),
-                    marker.IsEntry ? "Entry" : "Exit", marker.Price, marker.ExitReason?.ToString(),
-                    marker.NetPnl)).ToList()));
+            new BacktestChartDto(snapshot.Chart.CandlesPerBar, snapshot.Chart.Bars.Select(ToDto).ToList()));
     }
 
     private static BacktestBarDto ToDto(BacktestChartBar bar) => new(ToUnixSeconds(bar.OpenTimeUtc), bar.Open,

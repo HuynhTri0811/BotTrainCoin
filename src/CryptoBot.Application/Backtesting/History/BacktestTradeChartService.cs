@@ -7,7 +7,8 @@ namespace CryptoBot.Application.Backtesting;
 
 /// <summary>
 /// Chart chi tiết một lệnh của lần backtest đã lưu: nến thật (không gộp như chart tổng) từ trước lúc vào đến sau lúc
-/// ra, kèm EMA nhanh/chậm tính đúng như lúc bot ra tín hiệu. Đọc lại nến trong DB, không lưu thêm gì.
+/// ra, kèm EMA nhanh/chậm tính đúng như lúc bot ra tín hiệu. Chỉ đọc thông số của lần chạy (không giải nén kết quả)
+/// và nến trong DB; giờ vào/ra do dashboard gửi từ danh sách lệnh nó đã có.
 /// </summary>
 public sealed class BacktestTradeChartService(
     BacktestHistoryService history,
@@ -20,37 +21,35 @@ public sealed class BacktestTradeChartService(
     /// <summary>Số cột tối đa; lệnh giữ rất lâu thì gộp nến giống chart tổng.</summary>
     public const int MaxBars = 1500;
 
-    /// <summary>Số nến tối đa đọc từ DB cho một lệnh.</summary>
-    public const int MaxCandles = 50_000;
-
     /// <summary>
-    /// Chart của lệnh thứ <paramref name="tradeIndex"/> (theo thứ tự trong kết quả; bằng số lệnh đã đóng = lệnh còn
-    /// mở ở cuối kỳ). Null nếu không có lần chạy hoặc không có lệnh ở vị trí đó.
+    /// Chart từ <paramref name="entryUtc"/> đến <paramref name="exitUtc"/> (lệnh còn mở thì exit là nến cuối của lần
+    /// chạy). Null nếu không có lần chạy.
     /// </summary>
-    /// <exception cref="ArgumentException">Chiến lược của lần chạy không còn, nên không biết đọc nến của sàn nào.</exception>
-    public async Task<BacktestTradeChart?> GetAsync(long backtestId, int tradeIndex, CancellationToken ct)
+    /// <exception cref="ArgumentException">
+    /// Giờ vào/ra sai hoặc nằm ngoài khoảng của lần chạy, hoặc chiến lược của lần chạy không còn.
+    /// </exception>
+    public async Task<BacktestTradeChart?> GetAsync(long backtestId, DateTime entryUtc, DateTime exitUtc,
+        CancellationToken ct)
     {
-        if (await history.GetAsync(backtestId, ct) is not { } run)
+        if (await history.GetSummaryAsync(backtestId, ct) is not { } run)
             return null;
+        if (entryUtc > exitUtc)
+            throw new ArgumentException("Giờ vào phải trước giờ ra.");
+        // Lệnh luôn nằm trong khoảng của lần chạy (tối đa BacktestService.MaxCandles nến), nên đọc đủ tới sau lúc ra.
+        if (run.FirstCandleUtc is not { } first || run.LastCandleUtc is not { } last || entryUtc < first
+            || exitUtc > last)
+            throw new ArgumentException("Giờ vào/ra nằm ngoài khoảng nến của lần chạy này.");
 
-        var snapshot = run.Snapshot;
-        DateTime entry, exit;
-        if (tradeIndex >= 0 && tradeIndex < snapshot.Trades.Count)
-            (entry, exit) = (snapshot.Trades[tradeIndex].EntryTimeUtc, snapshot.Trades[tradeIndex].ExitTimeUtc);
-        else if (tradeIndex == snapshot.Trades.Count && snapshot.OpenTrade is { } open)
-            (entry, exit) = (open.EntryTimeUtc, snapshot.LastCandleUtc ?? open.EntryTimeUtc);
-        else
-            return null;
-
-        if (await instances.GetAsync(run.Saved.StrategyInstanceId, ct) is not { } instance)
+        if (await instances.GetAsync(run.StrategyInstanceId, ct) is not { } instance)
             throw new ArgumentException("Chiến lược của lần chạy này không còn, không đọc được nến.");
 
         // Cặp và khung nến lấy theo lần chạy (instance có thể đã đổi cấu hình sau đó); sàn lấy theo instance.
-        var key = new CandleKey(instance.Exchange, run.Saved.Symbol, CandleInterval.Parse(run.Saved.Interval));
-        var strategy = new EmaCrossStrategy(snapshot.Parameters);
+        var key = new CandleKey(instance.Exchange, run.Symbol, CandleInterval.Parse(run.Interval));
+        var strategy = new EmaCrossStrategy(new EmaCrossParameters(run.FastPeriod, run.SlowPeriod,
+            run.LookbackCandles));
         var step = key.Interval.Duration;
-        var from = entry - step * ContextCandles;
-        var span = Math.Min(MaxCandles, (int)((exit - from).Ticks / step.Ticks) + 1 + ContextCandles);
+        var from = entryUtc - step * ContextCandles;
+        var span = (int)((exitUtc - from).Ticks / step.Ticks) + 1 + ContextCandles;
 
         var warmup = await candles.GetLatestAsync(key, from, strategy.RequiredCandles - 1, closedOnly: true, ct);
         var window = await candles.GetAfterAsync(key, from.AddTicks(-1), span, closedOnly: true, ct);
@@ -58,7 +57,7 @@ public sealed class BacktestTradeChartService(
         series.AddRange(warmup);
         series.AddRange(window);
 
-        var (perBar, bars) = BacktestChart.GroupBars(series, warmup.Count, MaxBars, strategy, _ => null);
+        var (perBar, bars) = BacktestChart.GroupBars(series, warmup.Count, key.Interval, MaxBars, strategy, _ => null);
         return new BacktestTradeChart(perBar, bars);
     }
 }

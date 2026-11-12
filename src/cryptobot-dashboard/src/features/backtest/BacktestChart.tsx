@@ -13,8 +13,6 @@ import type { BacktestBar, BacktestSettings, StrategyParameters } from '../../ap
 import { formatVnTick, formatVnUnix } from '../../time';
 import { addEmaLines, addTradeOverlay, type OverlayTrade } from './tradeOverlay';
 
-export { EXIT_COLORS } from './tradeOverlay';
-
 const EQUITY_HEIGHT = 160;
 const MAX_LABELLED_TRADES = 100;
 
