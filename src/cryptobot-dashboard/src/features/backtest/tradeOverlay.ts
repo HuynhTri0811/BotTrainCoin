@@ -114,15 +114,17 @@ interface Segment {
   price: number;
 }
 
-/** Nhiều đoạn ngang rời nhau trên một series: đoạn i → i+1 hiện khi i nằm trong [from, to) của một lệnh. */
+/**
+ * Nhiều đoạn ngang rời nhau trên một series. Mỗi cột thuộc về tối đa một đoạn (đoạn sau thắng khi lệnh sau vào đúng
+ * cột lệnh trước thoát), và chỉ vẽ nối hai cột cùng một đoạn, nên không bao giờ có đường chéo giữa hai lệnh.
+ */
 function segmentLine(times: number[], segments: Segment[]) {
-  const values: (number | null)[] = times.map(() => null);
-  const inside = times.map(() => false);
-  for (const segment of segments) {
-    for (let index = segment.from; index <= segment.to; index++) values[index] = segment.price;
-    for (let index = segment.from; index < segment.to; index++) inside[index] = true;
-  }
-  return lineData(times, values, (index) => inside[index]);
+  const owner = times.map(() => -1);
+  segments.forEach((segment, segmentIndex) => {
+    for (let index = segment.from; index <= segment.to; index++) owner[index] = segmentIndex;
+  });
+  const values = owner.map((segmentIndex) => (segmentIndex >= 0 ? segments[segmentIndex].price : null));
+  return lineData(times, values, (index) => owner[index] >= 0 && owner[index] === owner[index + 1]);
 }
 
 /**
