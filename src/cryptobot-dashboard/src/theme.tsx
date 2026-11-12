@@ -10,8 +10,8 @@ const STORAGE_KEY = 'cryptobot-theme';
 
 function readMode(): ThemeMode {
   try {
-    const v = localStorage.getItem(STORAGE_KEY);
-    return v === 'light' || v === 'dark' ? v : 'system';
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored === 'light' || stored === 'dark' ? stored : 'system';
   } catch {
     return 'system';
   }

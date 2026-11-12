@@ -13,14 +13,14 @@ export function SettingsPage() {
 
   return (
     <Card size="small" title="Giao diện" style={{ maxWidth: 560 }}>
-      <Radio.Group value={mode} onChange={(e) => setMode(e.target.value as ThemeMode)}>
+      <Radio.Group value={mode} onChange={(event) => setMode(event.target.value as ThemeMode)}>
         <Space orientation="vertical" size="middle">
-          {MODES.map((m) => (
-            <Radio key={m.value} value={m.value}>
-              <Typography.Text strong>{m.label}</Typography.Text>
+          {MODES.map((option) => (
+            <Radio key={option.value} value={option.value}>
+              <Typography.Text strong>{option.label}</Typography.Text>
               <div>
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  {m.description}
+                  {option.description}
                 </Typography.Text>
               </div>
             </Radio>
