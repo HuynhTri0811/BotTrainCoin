@@ -61,6 +61,19 @@ public class BacktestTradeChartServiceTests
     }
 
     [Fact]
+    public async Task Ema_is_left_out_where_the_window_spans_missing_candles()
+    {
+        var id = await SaveRunAsync();
+        _candles.Candles.Remove(Hour(30));
+
+        var chart = await CreateService().GetAsync(id, 0, CancellationToken.None);
+
+        // Cửa sổ 4 nến kết thúc ở nến 31, 32, 33 chứa khoảng thiếu nến 30: bot không đánh giá, chart không vẽ EMA.
+        var emptyEma = chart!.Bars.Where(bar => bar.EmaFast is null).Select(bar => bar.OpenTimeUtc);
+        Assert.Equal([Hour(31), Hour(32), Hour(33)], emptyEma);
+    }
+
+    [Fact]
     public async Task Missing_run_or_trade_is_null()
     {
         var id = await SaveRunAsync();

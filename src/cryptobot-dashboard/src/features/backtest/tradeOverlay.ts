@@ -111,20 +111,22 @@ function addLine(
     .setData(line.data);
 }
 
-/** Hai đường EMA nhanh/chậm; bỏ qua cột chưa có EMA (warm-up hoặc lần chạy cũ). */
+/**
+ * Hai đường EMA nhanh/chậm. Cột không có EMA (warm-up, cửa sổ thiếu nến, lần chạy cũ) làm đường bị ngắt: không nối
+ * qua chỗ bot không đánh giá.
+ */
 export function addEmaLines(chart: IChartApi, bars: BacktestBar[], parameters: StrategyParameters) {
-  const line = (pick: (bar: BacktestBar) => number | null, color: string, title: string) => {
-    const data = bars.flatMap((bar) => {
-      const value = pick(bar);
-      return value == null ? [] : [{ time: bar.time as UTCTimestamp, value }];
+  const times = bars.map((bar) => bar.time);
+  const add = (pick: (bar: BacktestBar) => number | null, color: string, title: string) => {
+    const values = bars.map(pick);
+    if (values.every((value) => value == null)) return;
+    addLine(chart, lineData(times, values, (index) => values[index] != null && values[index + 1] != null), {
+      color,
+      title,
     });
-    if (data.length === 0) return;
-    chart
-      .addSeries(LineSeries, { color, lineWidth: 1, title, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
-      .setData(data);
   };
-  line((bar) => bar.emaFast, EMA_FAST_COLOR, `EMA${parameters.fastPeriod}`);
-  line((bar) => bar.emaSlow, EMA_SLOW_COLOR, `EMA${parameters.slowPeriod}`);
+  add((bar) => bar.emaFast, EMA_FAST_COLOR, `EMA${parameters.fastPeriod}`);
+  add((bar) => bar.emaSlow, EMA_SLOW_COLOR, `EMA${parameters.slowPeriod}`);
 }
 
 /** Một đoạn ngang: giữ giá `price` từ cột `from` đến cột `to`. */

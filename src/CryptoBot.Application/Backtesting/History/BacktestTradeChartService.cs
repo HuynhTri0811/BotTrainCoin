@@ -58,7 +58,7 @@ public sealed class BacktestTradeChartService(
         series.AddRange(warmup);
         series.AddRange(window);
 
-        var (perBar, bars) = BacktestChart.GroupBars(series, warmup.Count, MaxBars, strategy, _ => null);
+        var (perBar, bars) = BacktestChart.GroupBars(series, warmup.Count, key.Interval, MaxBars, strategy, _ => null);
         return new BacktestTradeChart(perBar, bars);
     }
 }
