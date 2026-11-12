@@ -21,6 +21,7 @@ export const SL_COLOR = EXIT_COLORS.StopLoss;
 export const EMA_FAST_COLOR = 'rgba(217, 119, 6, 0.75)';
 export const EMA_SLOW_COLOR = 'rgba(37, 99, 235, 0.75)';
 const EXIT_TEXT = { TakeProfit: 'TP', StopLoss: 'SL', Signal: 'SELL' } as const;
+const HIDDEN = 'transparent';
 
 /** Lệnh để vẽ: lệnh đã đóng, hoặc lệnh còn mở ở cuối kỳ (exit null). */
 export interface OverlayTrade {
@@ -51,6 +52,45 @@ function barIndexAt(times: number[], unix: number): number {
   return found;
 }
 
+/**
+ * Dữ liệu cho một series có đoạn hiện, đoạn ẩn. Lightweight Charts 5 nối mọi điểm (khoảng trống không làm đứt
+ * đường) và tô đoạn i → i+1 bằng màu của điểm i, nên đoạn i → i+1 chỉ hiện khi `connects(i)`; điểm không có giá trị
+ * lấy giá của điểm có giá trị gần nhất phía trước (hoặc phía sau) để đoạn ẩn nằm ngang.
+ */
+function lineData(
+  times: number[],
+  values: (number | null)[],
+  connects: (index: number) => boolean,
+): LineData[] {
+  const filled = [...values];
+  for (let index = 1; index < filled.length; index++) filled[index] ??= filled[index - 1];
+  for (let index = filled.length - 2; index >= 0; index--) filled[index] ??= filled[index + 1];
+
+  const drawsToNext = times.map((_, index) => index + 1 < times.length && connects(index));
+  return times.map((time, index) => ({
+    time: time as UTCTimestamp,
+    value: filled[index] ?? 0,
+    ...(drawsToNext[index] ? {} : { color: HIDDEN }),
+  }));
+}
+
+/** Thêm một series đường từ `lineData`. */
+function addLine(
+  chart: IChartApi,
+  data: LineData[],
+  options: { color: string; lineStyle?: LineStyle; title?: string },
+) {
+  chart
+    .addSeries(LineSeries, {
+      ...options,
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    })
+    .setData(data);
+}
+
 /** Hai đường EMA nhanh/chậm; bỏ qua cột chưa có EMA (warm-up hoặc lần chạy cũ). */
 export function addEmaLines(chart: IChartApi, bars: BacktestBar[], parameters: StrategyParameters) {
   const line = (pick: (bar: BacktestBar) => number | null, color: string, title: string) => {
@@ -74,34 +114,15 @@ interface Segment {
   price: number;
 }
 
-/**
- * Dữ liệu cho một series vẽ nhiều đoạn ngang rời nhau. Lightweight Charts nối mọi điểm (khoảng trống không làm đứt
- * đường) và tô mỗi đoạn theo màu của điểm đầu đoạn, nên: điểm trong [from, to) mang màu đường, điểm cuối và điểm
- * ngoài lệnh trong suốt; điểm ngoài lệnh lấy giá của đoạn kế tiếp để đoạn ẩn nằm ngang, không lộ đường chéo.
- */
-function segmentData(times: number[], segments: Segment[]): LineData[] {
+/** Nhiều đoạn ngang rời nhau trên một series: đoạn i → i+1 hiện khi i nằm trong [from, to) của một lệnh. */
+function segmentLine(times: number[], segments: Segment[]) {
   const values: (number | null)[] = times.map(() => null);
-  const visible = times.map(() => false);
+  const inside = times.map(() => false);
   for (const segment of segments) {
     for (let index = segment.from; index <= segment.to; index++) values[index] = segment.price;
-    for (let index = segment.from; index < segment.to; index++) visible[index] = true;
+    for (let index = segment.from; index < segment.to; index++) inside[index] = true;
   }
-  // Lấp chỗ trống bằng giá của đoạn kế tiếp; phần sau đoạn cuối lấy giá của đoạn cuối.
-  let next: number | null = null;
-  for (let index = values.length - 1; index >= 0; index--) {
-    if (values[index] == null) values[index] = next;
-    else next = values[index];
-  }
-  let previous: number | null = null;
-  for (let index = 0; index < values.length; index++) {
-    if (values[index] == null) values[index] = previous;
-    else previous = values[index];
-  }
-  return times.map((time, index) => ({
-    time: time as UTCTimestamp,
-    value: values[index] ?? 0,
-    ...(visible[index] ? {} : { color: 'transparent' }),
-  }));
+  return lineData(times, values, (index) => inside[index]);
 }
 
 /**
@@ -147,27 +168,16 @@ export function addTradeOverlay(
         position: 'aboveBar',
         color: EXIT_COLORS[reason],
         shape: 'arrowDown',
-        text: showText ? `${EXIT_TEXT[reason]} ${fmtPrice2(trade.exit.exitPrice)} · ${fmtSignedPercent(trade.exit.returnPercent)}` : '',
+        text: showText
+          ? `${EXIT_TEXT[reason]} ${fmtPrice2(trade.exit.exitPrice)} · ${fmtSignedPercent(trade.exit.returnPercent)}`
+          : '',
       });
     }
   }
 
-  const line = (segments: Segment[], color: string, style: LineStyle) => {
-    if (segments.length === 0) return;
-    chart
-      .addSeries(LineSeries, {
-        color,
-        lineWidth: 1,
-        lineStyle: style,
-        priceLineVisible: false,
-        lastValueVisible: false,
-        crosshairMarkerVisible: false,
-      })
-      .setData(segmentData(times, segments));
-  };
-  line(entry, ENTRY_COLOR, LineStyle.Solid);
-  line(takeProfit, TP_COLOR, LineStyle.Dashed);
-  line(stopLoss, SL_COLOR, LineStyle.Dashed);
+  if (entry.length > 0) addLine(chart, segmentLine(times, entry), { color: ENTRY_COLOR });
+  if (takeProfit.length > 0) addLine(chart, segmentLine(times, takeProfit), { color: TP_COLOR, lineStyle: LineStyle.Dashed });
+  if (stopLoss.length > 0) addLine(chart, segmentLine(times, stopLoss), { color: SL_COLOR, lineStyle: LineStyle.Dashed });
 
   markers.sort((first, second) => (first.time as number) - (second.time as number));
   createSeriesMarkers(candles, markers);
