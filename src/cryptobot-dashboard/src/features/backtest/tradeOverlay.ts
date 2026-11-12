@@ -12,10 +12,11 @@ import {
 import type { BacktestBar, BacktestOpenTrade, BacktestSettings, BacktestTrade, StrategyParameters } from '../../api/client';
 import { fmtPrice2, fmtSignedPercent } from '../futures/format';
 
+// Một nguồn màu duy nhất cho mũi tên, đường vị thế và chú thích.
 export const EXIT_COLORS = { TakeProfit: '#16a34a', StopLoss: '#dc2626', Signal: '#d97706' } as const;
 export const ENTRY_COLOR = '#0d9488';
-export const TP_COLOR = '#16a34a';
-export const SL_COLOR = '#dc2626';
+export const TP_COLOR = EXIT_COLORS.TakeProfit;
+export const SL_COLOR = EXIT_COLORS.StopLoss;
 // Cùng màu EMA của trang Biểu đồ, nhưng nhạt hơn để mũi tên vào/ra nổi lên trên.
 export const EMA_FAST_COLOR = 'rgba(217, 119, 6, 0.75)';
 export const EMA_SLOW_COLOR = 'rgba(37, 99, 235, 0.75)';
