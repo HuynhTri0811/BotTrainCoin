@@ -25,7 +25,7 @@ Chế độ cố định của bot: `DecisionMode = SignalOnly`, `Environment = 
 15. [Trạng thái, health check, log](#15-trạng-thái-health-check-log)
 16. [Báo cáo biến động hằng ngày](#16-báo-cáo-biến-động-hằng-ngày)
 17. [Tin tức (RSS, mỗi 5 giờ)](#17-tin-tức-rss-mỗi-5-giờ)
-18. [Backtest chiến lược EMA](#18-backtest-chiến-lược-ema)
+18. [Backtest Spot và Futures](#18-backtest-spot-và-futures)
 19. [Chưa làm / giới hạn đã biết](#19-chưa-làm--giới-hạn-đã-biết)
 
 ---
@@ -392,9 +392,10 @@ UI: trang **Tin tức** ([`NewsPage.tsx`](../src/cryptobot-dashboard/src/pages/N
 - **Giới hạn:** feed chỉ giữ 20–60 bài mới nhất; nguồn đăng dày có thể đẩy bài ra khỏi feed trước lượt đồng bộ sau
   5 giờ, nên có thể lỡ một ít bài. Không dịch, không tóm tắt bằng AI, không đánh giá tin tốt/xấu.
 
-## 18. Backtest chiến lược EMA
+## 18. Backtest Spot và Futures
 
 **Code:** [`Backtester`](../src/CryptoBot.Domain/Backtesting/Engine/Backtester.cs),
+[`FuturesBacktester`](../src/CryptoBot.Domain/Backtesting/Engine/FuturesBacktester.cs),
 [`BacktestSettings`](../src/CryptoBot.Domain/Backtesting/Settings/BacktestSettings.cs),
 [`BacktestStatistics`](../src/CryptoBot.Domain/Backtesting/Results/BacktestStatistics.cs),
 [`BacktestService`](../src/CryptoBot.Application/Backtesting/BacktestService.cs),
@@ -402,6 +403,29 @@ UI: trang **Tin tức** ([`NewsPage.tsx`](../src/cryptobot-dashboard/src/pages/N
 [`BacktestEndpoints`](../src/CryptoBot.Api/Endpoints/Backtesting/BacktestEndpoints.cs).
 UI: trang **Backtest** ([`BacktestPage.tsx`](../src/cryptobot-dashboard/src/pages/BacktestPage.tsx),
 [`features/backtest/`](../src/cryptobot-dashboard/src/features/backtest)).
+
+Trang Backtest có ô **Kiểu backtest**:
+
+- **Spot** (mặc định, phần bên dưới): chỉ Long, không đòn bẩy, đúng chiến lược EMA bot đang chạy.
+- **Futures** (#198, #199, #200): vị thế USDⓈ-M isolated có đòn bẩy, tính giống lệnh tự động Paper Futures.
+  - **Tín hiệu:** EMA cross hai chiều (cắt lên → Long, cắt xuống → Short, `EmaCrossStrategy.CrossAt`) hoặc chỉ báo tự
+    viết (MyRsi, FlowRsi…) gọi đúng `ICustomIndicator.Compute` như quy tắc tự động, trên nến của chiến lược đang chọn.
+    Tham số chỉ báo sửa được; mặc định lấy theo chỉ báo đang cấu hình cùng cặp/khung nến, nếu không có thì mặc định
+    của class ([`BacktestOptionsService`](../src/CryptoBot.Application/Backtesting/Options/BacktestOptionsService.cs)).
+  - **Hướng lệnh:** chỉ Long, chỉ Short hoặc cả hai. Bật **đóng khi tín hiệu đảo chiều** (giống "Tự đóng khi đảo
+    chiều" của quy tắc tự động): tín hiệu ngược chiều đóng lệnh, và với cả hai chiều thì mở luôn chiều kia ở cùng giá
+    mở. Tắt thì lệnh chỉ đóng ở TP/SL/thanh lý; cần ít nhất một cách đóng lệnh.
+  - **Khớp lệnh:** margin = khối lượng mỗi lệnh (% tiền đang có hoặc USDT cố định), giá trị vị thế = margin × đòn bẩy
+    (1–125), phí tính trên giá trị vị thế ở cả lần mở và đóng, trượt giá bất lợi mỗi lần khớp, lỗ một lệnh tối đa bằng
+    margin. Giá thanh lý theo ký quỹ duy trì (`FuturesMath.LiquidationPrice`); cắt lỗ phải nằm trước giá thanh lý. Giá
+    mở nến đã qua giá thanh lý → thanh lý trước khi lệnh đóng theo tín hiệu kịp khớp; trong nến: SL → thanh lý → TP.
+    Phí, trượt giá, ký quỹ duy trì mặc định theo Paper Futures; nút "Dùng mặc định của lệnh tự động" điền margin, đòn
+    bẩy, SL, TP của quy tắc tự động. Không tính funding.
+  - **Hiển thị:** bảng lệnh có cột Chiều, lý do thoát thêm Thanh lý; chart vẽ ▲ LONG / ▼ SHORT, TP/SL đúng phía, đường
+    chấm tím là giá thanh lý (không tính vào thang giá). Lần chạy theo chỉ báo không có đường EMA. Lịch sử lưu kiểu,
+    nguồn tín hiệu, tham số chỉ báo và thiết lập Futures (cột riêng); lần chạy cũ đọc lại là Spot EMA cross.
+
+Phần còn lại mô tả Spot và những gì dùng chung:
 
 - **Tín hiệu giữ nguyên như bot:** mỗi nến gọi đúng `EmaCrossStrategy.Evaluate` với cửa sổ `LookbackCandles` nến,
   bỏ qua cửa sổ có nến thiếu (`CandleWindow.HasGap`, dùng chung với `SignalEvaluationService`), trạng thái "đang giữ"
@@ -428,9 +452,9 @@ UI: trang **Backtest** ([`BacktestPage.tsx`](../src/cryptobot-dashboard/src/page
   thường, nến 1d, tải lịch sử) upsert lần lượt theo cặp và khung nến (`CandleStore`), nên không chèn trùng nến. DB chưa có nến nào thì phải chờ
   đồng bộ thường chạy lần đầu. Nến 1h từ 2020 (≈ 58 nghìn nến) mất khoảng 16 giây; chạy
   backtest trên khoảng đó khoảng 4 giây.
-- **Giới hạn:** không trượt giá, độ sâu sổ lệnh, funding; không short; tối đa 400 nghìn nến mỗi lần chạy. Cửa sổ chứa
+- **Giới hạn:** Spot không tính trượt giá; cả hai không tính độ sâu sổ lệnh và funding; tối đa 400 nghìn nến mỗi lần chạy. Cửa sổ chứa
   khoảng nến thiếu của Binance (bảo trì) bị bỏ qua giống bot, nên có vài nghìn nến không được đánh giá trên nhiều năm.
-  Cửa sổ EMA (`LookbackCandles`) tối đa 1000 khi backtest. Khoảng không có nến
+  Cửa sổ nến của tín hiệu (`LookbackCandles`) tối đa 1000 khi backtest. Khoảng không có nến
   thì báo lỗi, không lưu. Đóng tab hoặc bấm chạy lại thì lần chạy cũ dừng giữa chừng. Kết quả quá khứ không bảo đảm cho
   tương lai.
 - **Lịch sử backtest:** mọi lần chạy được lưu tự động vào bảng `SavedBacktests`
