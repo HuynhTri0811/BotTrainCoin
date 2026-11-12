@@ -9,7 +9,8 @@ namespace CryptoBot.Application.Tests;
 public class BacktestServiceTests
 {
     private static readonly DateTime T0 = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-    private static readonly BacktestSettings Settings = new(1000m, PositionSizing.PercentOfEquity, 100m, null, null, 0m);
+    private static readonly BacktestSettings Settings =
+        new(1000m, PositionSizing.PercentOfEquity, 100m, null, null, 0m);
 
     // BUY ở nến 3, SELL ở nến 7 với EMA 2/3 trên cửa sổ 4 nến.
     private static readonly decimal[] UpThenDown = [10, 10, 10, 13, 14, 15, 16, 8, 7, 7];

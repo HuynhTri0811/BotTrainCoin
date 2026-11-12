@@ -48,7 +48,8 @@ public sealed class PostgresPersistenceTests : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await using var connection = new NpgsqlConnection(
-            new NpgsqlConnectionStringBuilder(ServerConnection) { Database = "postgres", Pooling = false }.ConnectionString);
+            new NpgsqlConnectionStringBuilder(ServerConnection) { Database = "postgres", Pooling = false }
+                .ConnectionString);
         await connection.OpenAsync();
         await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_database}\" WITH (FORCE)", connection);
         await drop.ExecuteNonQueryAsync();
