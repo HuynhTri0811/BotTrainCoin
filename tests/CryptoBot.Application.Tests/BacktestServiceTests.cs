@@ -2,6 +2,7 @@ using CryptoBot.Application.Backtesting;
 using CryptoBot.Application.Signals;
 using CryptoBot.Domain.Backtesting;
 using CryptoBot.Domain.Futures;
+using CryptoBot.Domain.Indicators;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Strategies;
 
@@ -274,6 +275,23 @@ public class BacktestServiceTests
         Assert.Contains(run.Result.Trades, trade => trade.Side == PositionSide.Long);
         Assert.Contains(run.Result.Trades, trade => trade.Side == PositionSide.Short);
         Assert.All(run.Chart.Bars, bar => Assert.Null(bar.EmaFast));
+    }
+
+    [Fact]
+    public async Task Default_macd_fits_the_backtest_window_limit()
+    {
+        Assert.InRange(new MacdIndicator().RequiredCandles, 1, BacktestService.MaxLookbackCandles);
+
+        AddCandles(Waves(200));
+        var run = await CreateService().RunAsync(new BacktestRequest(1, null, null, null, FuturesBoth, "macd",
+            new Dictionary<string, string?>
+            {
+                ["FastPeriod"] = "3", ["SlowPeriod"] = "8", ["SignalPeriod"] = "3", ["LookbackCandles"] = "30",
+            }), CancellationToken.None);
+
+        Assert.Equal("Macd", run!.Signal.Type);
+        Assert.Equal(30, run.Signal.RequiredCandles);
+        Assert.NotEmpty(run.Result.Trades);
     }
 
     [Fact]
