@@ -51,7 +51,7 @@ Ví dụ tốt có sẵn:
 | Muốn xem cách test… | File |
 | --- | --- |
 | Công thức thuần túy | [`DailyMoveRangeTests`](../tests/CryptoBot.Domain.Tests/DailyMoveRangeTests.cs), [`FuturesMathTests`](../tests/CryptoBot.Domain.Tests/FuturesMathTests.cs) |
-| Chỉ báo (warm-up, cắt mức, bộ lọc) | [`MyRsiIndicatorTests`](../tests/CryptoBot.Domain.Tests/MyRsiIndicatorTests.cs) |
+| Chỉ báo (warm-up, cắt mức, bộ lọc) | [`MyRsiIndicatorTests`](../tests/CryptoBot.Domain.Tests/MyRsiIndicatorTests.cs), [`MacdIndicatorTests`](../tests/CryptoBot.Domain.Tests/MacdIndicatorTests.cs) |
 | Entity và bất biến | [`CandleTests`](../tests/CryptoBot.Domain.Tests/CandleTests.cs), [`AutoOrderRuleTests`](../tests/CryptoBot.Domain.Tests/AutoOrderRuleTests.cs) |
 | Nhiều trường hợp từ chối bằng `[Theory]` | [`CandleIntervalTests`](../tests/CryptoBot.Domain.Tests/CandleIntervalTests.cs), [`StrategyConfiguratorTests`](../tests/CryptoBot.Application.Tests/StrategyConfiguratorTests.cs) |
 | Service với fake + đồng hồ giả | [`PaperFuturesServiceTests`](../tests/CryptoBot.Application.Tests/PaperFuturesServiceTests.cs), [`AutoOrderServiceTests`](../tests/CryptoBot.Application.Tests/AutoOrderServiceTests.cs) |

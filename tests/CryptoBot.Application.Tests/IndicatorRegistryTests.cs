@@ -30,6 +30,17 @@ public class IndicatorRegistryTests
         Assert.Equal(50, ind.RequiredCandles);
     }
 
+    [Fact]
+    public void Creates_macd_from_its_configuration_keys()
+    {
+        var ind = Assert.IsType<MacdIndicator>(IndicatorRegistry.Create("Macd",
+            P(("FastPeriod", "12"), ("SlowPeriod", "26"), ("SignalPeriod", "9"), ("LookbackCandles", "200"))));
+
+        Assert.Equal((12, 26, 9, 200), (ind.FastPeriod, ind.SlowPeriod, ind.SignalPeriod, ind.RequiredCandles));
+        Assert.Throws<ArgumentException>(() => IndicatorRegistry.Create("Macd", P(("SlowPeriod", "50"),
+            ("FastPeriod", "60"))));
+    }
+
     [Theory]
     [InlineData("Nope", "Period", "14", "Không có chỉ báo loại")]
     [InlineData("MyRsi", "Peroid", "14", "không tồn tại")]
