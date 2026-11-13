@@ -80,6 +80,7 @@ Chi tiết thuật toán: [signal-functions.md](signal-functions.md).
 **Code:** [`ICustomIndicator`](../src/CryptoBot.Domain/Indicators/Contracts/ICustomIndicator.cs),
 [`MyRsiIndicator`](../src/CryptoBot.Domain/Indicators/Rsi/MyRsiIndicator.cs) (ví dụ đầy đủ),
 [`FlowRsiIndicator`](../src/CryptoBot.Domain/Indicators/FlowRsi/FlowRsiIndicator.cs),
+[`MacdIndicator`](../src/CryptoBot.Domain/Indicators/Macd/MacdIndicator.cs),
 [`TemplateIndicator`](../src/CryptoBot.Domain/Indicators/Template/TemplateIndicator.cs) (khung trống),
 [`IndicatorRegistry`](../src/CryptoBot.Application/Indicators/Registry/IndicatorRegistry.cs),
 [`IndicatorService`](../src/CryptoBot.Application/Indicators/Computation/IndicatorService.cs).
@@ -102,8 +103,12 @@ Chi tiết thuật toán: [signal-functions.md](signal-functions.md).
   cắt lên `Oversold` (30) → Long (bên mua lấy lại thế), cắt xuống `Overbought` (70) → Short. Cửa sổ có nến thiếu
   `TakerBuyVolume` (nến lưu trước khi bot lấy số liệu này) thì không tính, kèm lý do. Lý do tín hiệu ghi thêm tỷ trọng
   mua chủ động của nến vừa đóng.
-- Mặc định có 3 chỉ báo: `btc-1h-myrsi` (đảo chiều), `eth-15m-myrsi-trend` (hồi trong xu hướng, EMA50) và
-  `btc-1h-flowrsi` (RSI mua/bán chủ động).
+- **Macd**: MACD bám xu hướng. Đường MACD = EMA nhanh − EMA chậm của giá đóng cửa, đường tín hiệu = EMA của đường
+  MACD. MACD cắt lên đường tín hiệu → Long, cắt xuống → Short. Mặc định là bản chậm 96/208/72 (MACD chuẩn 12/26/9
+  kéo dài 8 lần) với cửa sổ 600 nến, vì 12/26/9 trên nến 1h cho quá nhiều tín hiệu nhiễu. Khác MyRsi đảo chiều,
+  chỉ báo này đi theo xu hướng: tỉ lệ thắng thấp, lãi đến từ số ít lệnh đi xa, nên hợp với chốt lời xa hơn cắt lỗ.
+- Mặc định có 4 chỉ báo: `btc-1h-myrsi` (đảo chiều), `eth-15m-myrsi-trend` (hồi trong xu hướng, EMA50),
+  `btc-1h-flowrsi` (RSI mua/bán chủ động) và `btc-1h-macd` (MACD chậm 96/208/72).
 
 ## 4. Paper Futures (Long/Short có đòn bẩy, tiền giả lập)
 

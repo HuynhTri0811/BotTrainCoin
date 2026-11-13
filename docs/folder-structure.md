@@ -104,6 +104,8 @@ CryptoBot.Domain/
 │   ├── Rsi/
 │   │   ├── Rsi.cs                # RSI Wilder: Calculate, LastTwo
 │   │   └── MyRsiIndicator.cs     # Chỉ báo mẫu đầy đủ (đọc file này trước khi viết chỉ báo mới)
+│   ├── Macd/
+│   │   └── MacdIndicator.cs      # MACD chậm bám xu hướng (EMA nhanh − EMA chậm cắt đường tín hiệu)
 │   ├── Template/
 │   │   └── TemplateIndicator.cs  # Khung trống để copy (không có [Indicator] nên không được đăng ký)
 │   └── Enums/                    # IndicatorSignal
