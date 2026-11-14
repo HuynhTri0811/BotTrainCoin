@@ -31,7 +31,10 @@ public sealed class MacdIndicator : ICustomIndicator
     /// <summary>Số nến của EMA chậm. Phải lớn hơn <see cref="FastPeriod"/>.</summary>
     public int SlowPeriod { get; set; } = 208;
 
-    /// <summary>Số nến của đường tín hiệu (EMA của đường MACD).</summary>
+    /// <summary>
+    /// Số nến của đường tín hiệu (EMA của đường MACD). Phải &gt;= 2: EMA 1 chính là đường MACD nên hai đường không bao
+    /// giờ cắt nhau.
+    /// </summary>
     public int SignalPeriod { get; set; } = 72;
 
     /// <summary>
@@ -50,7 +53,8 @@ public sealed class MacdIndicator : ICustomIndicator
     {
         if (FastPeriod < 1) return "FastPeriod phải >= 1.";
         if (SlowPeriod <= FastPeriod) return "SlowPeriod phải lớn hơn FastPeriod.";
-        if (SignalPeriod < 1) return "SignalPeriod phải >= 1.";
+        // EMA 1 của đường MACD chính là đường MACD: hai đường trùng nhau, không bao giờ cắt nên không có tín hiệu.
+        if (SignalPeriod < 2) return "SignalPeriod phải >= 2.";
         // Đường MACD có từ nến thứ SlowPeriod; đường tín hiệu cần thêm SignalPeriod + 1 giá trị MACD để có 2 điểm cuối.
         if (LookbackCandles < SlowPeriod + SignalPeriod)
             return "LookbackCandles phải >= SlowPeriod + SignalPeriod.";

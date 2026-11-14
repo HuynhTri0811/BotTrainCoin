@@ -130,6 +130,7 @@ public class MacdIndicatorTests
     [InlineData(0, 2, 2, 10)]   // FastPeriod < 1
     [InlineData(3, 3, 2, 10)]   // SlowPeriod không lớn hơn FastPeriod
     [InlineData(1, 2, 0, 10)]   // SignalPeriod < 1
+    [InlineData(1, 2, 1, 10)]   // SignalPeriod = 1: đường tín hiệu trùng đường MACD
     [InlineData(1, 6, 5, 10)]   // LookbackCandles < SlowPeriod + SignalPeriod
     public void Validate_rejects_bad_parameters(int fast, int slow, int signal, int lookback)
     {
