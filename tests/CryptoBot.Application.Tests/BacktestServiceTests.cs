@@ -278,10 +278,8 @@ public class BacktestServiceTests
     }
 
     [Fact]
-    public async Task Default_macd_fits_the_backtest_window_limit()
+    public async Task Small_macd_trades_in_the_futures_backtest()
     {
-        Assert.InRange(new MacdIndicator().RequiredCandles, 1, BacktestService.MaxLookbackCandles);
-
         AddCandles(Waves(200));
         var run = await CreateService().RunAsync(new BacktestRequest(1, null, null, null, FuturesBoth, "macd",
             new Dictionary<string, string?>
@@ -292,6 +290,29 @@ public class BacktestServiceTests
         Assert.Equal("Macd", run!.Signal.Type);
         Assert.Equal(30, run.Signal.RequiredCandles);
         Assert.NotEmpty(run.Result.Trades);
+    }
+
+    [Fact]
+    public async Task Default_macd_reads_its_full_warm_up_and_trades()
+    {
+        Assert.InRange(new MacdIndicator().RequiredCandles, 1, BacktestService.MaxLookbackCandles);
+        // Sóng chậm (chu kỳ khoảng 500 nến) để MACD 96/208/72 kịp cắt đường tín hiệu nhiều lần.
+        AddCandles(Enumerable.Range(0, 2600)
+            .Select(index => Math.Round(100m + 20m * (decimal)Math.Sin(index / 80.0), 4))
+            .ToArray());
+
+        var run = await CreateService().RunAsync(
+            new BacktestRequest(1, Hour(600), null, null, FuturesBoth, "Macd"), CancellationToken.None);
+
+        Assert.Equal(new Dictionary<string, string>
+        {
+            ["FastPeriod"] = "96", ["SlowPeriod"] = "208", ["SignalPeriod"] = "72", ["LookbackCandles"] = "600",
+        }, run!.Signal.Parameters);
+        Assert.Equal(600, run.Signal.RequiredCandles);
+        Assert.Equal(599, run.WarmupCandles);
+        Assert.Equal(2000, run.CandleCount);
+        Assert.Contains(run.Result.Trades, trade => trade.Side == PositionSide.Long);
+        Assert.Contains(run.Result.Trades, trade => trade.Side == PositionSide.Short);
     }
 
     [Fact]
