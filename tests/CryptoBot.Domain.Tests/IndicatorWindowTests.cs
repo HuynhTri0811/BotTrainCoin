@@ -15,6 +15,18 @@ public class IndicatorWindowTests
     }
 
     [Fact]
+    public void Copy_last_closes_fills_the_whole_destination_with_the_tail()
+    {
+        var candles = TestCandles.FromCloses(1, 2, 3, 4, 5);
+        var destination = new decimal[3];
+
+        IndicatorWindow.CopyLastCloses(candles, destination);
+
+        Assert.Equal([3m, 4m, 5m], destination);
+        Assert.Throws<ArgumentException>(() => IndicatorWindow.CopyLastCloses(candles, new decimal[6]));
+    }
+
+    [Fact]
     public void Last_closes_rejects_asking_for_more_than_available()
     {
         var ex = Assert.Throws<ArgumentException>(() => IndicatorWindow.LastCloses(TestCandles.FromCloses(1, 2), 3));

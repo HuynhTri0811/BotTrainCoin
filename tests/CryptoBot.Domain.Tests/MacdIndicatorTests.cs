@@ -42,6 +42,21 @@ public class MacdIndicatorTests
     }
 
     [Fact]
+    public void Low_priced_coins_keep_significant_digits()
+    {
+        // Cùng hình dạng nến như test Long nhưng giá nhân 1e-7: MACD khoảng 7e-7, làm tròn 4 chữ số sẽ thành 0.
+        IndicatorResult result = Small().Compute(
+            TestCandles.FromCloses(0.00001m, 0.000009m, 0.000007m, 0.00001m));
+
+        Assert.Equal(IndicatorSignal.Long, result.Signal);
+        Assert.Equal(0.0000007222m, result.Values["macd"]);
+        Assert.Equal(0.0000002593m, result.Values["signal"]);
+        // Dấu thập phân theo culture của máy, nên chỉ kiểm tra phần chữ số.
+        Assert.Contains("0000007222, tín hiệu 0", result.Reason);
+        Assert.EndsWith("0000002593.", result.Reason);
+    }
+
+    [Fact]
     public void Uses_only_the_last_lookback_candles()
     {
         // Thêm nến cũ phía trước không đổi kết quả: cửa sổ cố định.
@@ -130,7 +145,9 @@ public class MacdIndicatorTests
     [InlineData(0, 2, 2, 10)]   // FastPeriod < 1
     [InlineData(3, 3, 2, 10)]   // SlowPeriod không lớn hơn FastPeriod
     [InlineData(1, 2, 0, 10)]   // SignalPeriod < 1
+    [InlineData(1, 2, 1, 10)]   // SignalPeriod = 1: đường tín hiệu trùng đường MACD
     [InlineData(1, 6, 5, 10)]   // LookbackCandles < SlowPeriod + SignalPeriod
+    [InlineData(1, 300, int.MaxValue, 600)]   // SlowPeriod + SignalPeriod tràn int
     public void Validate_rejects_bad_parameters(int fast, int slow, int signal, int lookback)
     {
         MacdIndicator indicator = new()
