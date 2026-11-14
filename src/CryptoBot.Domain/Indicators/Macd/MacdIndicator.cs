@@ -1,3 +1,4 @@
+using System.Buffers;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Strategies;
 
@@ -77,12 +78,27 @@ public sealed class MacdIndicator : ICustomIndicator
         if (closedCandles.Count < LookbackCandles)
             return IndicatorResult.None($"Warm-up: có {closedCandles.Count}/{LookbackCandles} nến.");
 
-        decimal[] closes = IndicatorWindow.LastCloses(closedCandles, LookbackCandles);
-        decimal[] macd = MacdLine(closes);
-        // Cần giá trị ở nến trước để biết hai đường "vừa" cắt nhau, chứ không phải đã nằm khác phía từ lâu.
-        (decimal signalPrev, decimal signalNow) = Ema.LastTwo(macd, SignalPeriod);
-        decimal macdPrev = macd[^2];
-        decimal macdNow = macd[^1];
+        // Chart và backtest gọi Compute một lần mỗi nến: mượn bộ đệm từ ArrayPool thay vì tạo hai mảng mới mỗi lần.
+        // Pool dùng chung an toàn khi nhiều request tính cùng lúc; mảng mượn có thể dài hơn nên chỉ dùng phần span.
+        decimal[] closesBuffer = ArrayPool<decimal>.Shared.Rent(LookbackCandles);
+        decimal[] macdBuffer = ArrayPool<decimal>.Shared.Rent(LookbackCandles - SlowPeriod + 1);
+        decimal signalPrev, signalNow, macdPrev, macdNow;
+        try
+        {
+            Span<decimal> closes = closesBuffer.AsSpan(0, LookbackCandles);
+            IndicatorWindow.CopyLastCloses(closedCandles, closes);
+            Span<decimal> macd = macdBuffer.AsSpan(0, LookbackCandles - SlowPeriod + 1);
+            FillMacdLine(closes, macd);
+            // Cần giá trị ở nến trước để biết hai đường "vừa" cắt nhau, chứ không phải đã nằm khác phía từ lâu.
+            (signalPrev, signalNow) = Ema.LastTwo(macd, SignalPeriod);
+            macdPrev = macd[^2];
+            macdNow = macd[^1];
+        }
+        finally
+        {
+            ArrayPool<decimal>.Shared.Return(closesBuffer);
+            ArrayPool<decimal>.Shared.Return(macdBuffer);
+        }
 
         Dictionary<string, decimal?> values = new Dictionary<string, decimal?>
         {
@@ -100,8 +116,8 @@ public sealed class MacdIndicator : ICustomIndicator
 
     // Đường MACD = EMA nhanh − EMA chậm, từ nến đầu tiên có EMA chậm (vị trí SlowPeriod − 1) đến nến cuối.
     // Một vòng lặp cập nhật cả hai EMA bằng chính Ema.Seed/Weights/Step, nên ra đúng giá trị như Ema.Calculate mà
-    // không tạo mảng trung gian.
-    private decimal[] MacdLine(decimal[] closes)
+    // không tạo mảng trung gian. Ghi vào line, dài closes.Length − SlowPeriod + 1.
+    private void FillMacdLine(ReadOnlySpan<decimal> closes, Span<decimal> line)
     {
         (decimal fastAlpha, decimal fastKeep) = Ema.Weights(FastPeriod);
         (decimal slowAlpha, decimal slowKeep) = Ema.Weights(SlowPeriod);
@@ -111,7 +127,6 @@ public sealed class MacdIndicator : ICustomIndicator
         decimal slowEma = Ema.Seed(closes, SlowPeriod);
 
         int first = SlowPeriod - 1;
-        decimal[] line = new decimal[closes.Length - first];
         line[0] = fastEma - slowEma;
         for (int index = SlowPeriod; index < closes.Length; index++)
         {
@@ -119,6 +134,5 @@ public sealed class MacdIndicator : ICustomIndicator
             slowEma = Ema.Step(slowEma, closes[index], slowAlpha, slowKeep);
             line[index - first] = fastEma - slowEma;
         }
-        return line;
     }
 }
