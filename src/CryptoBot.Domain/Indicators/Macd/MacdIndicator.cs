@@ -100,18 +100,38 @@ public sealed class MacdIndicator : ICustomIndicator
             ArrayPool<decimal>.Shared.Return(macdBuffer);
         }
 
+        decimal macdShown = RoundForDisplay(macdNow);
+        decimal signalShown = RoundForDisplay(signalNow);
         Dictionary<string, decimal?> values = new Dictionary<string, decimal?>
         {
-            ["macd"] = Math.Round(macdNow, 4),
-            ["signal"] = Math.Round(signalNow, 4),
+            ["macd"] = macdShown,
+            ["signal"] = signalShown,
         };
-        string move = $"MACD {macdNow:0.##}, tín hiệu {signalNow:0.##}";
+        string move = $"MACD {macdShown.ToString(DisplayFormat)}, tín hiệu {signalShown.ToString(DisplayFormat)}";
 
         if (Crossover.Up(macdPrev, signalPrev, macdNow, signalNow))
             return new IndicatorResult(values, IndicatorSignal.Long, $"MACD cắt lên đường tín hiệu: {move}.");
         if (Crossover.Down(macdPrev, signalPrev, macdNow, signalNow))
             return new IndicatorResult(values, IndicatorSignal.Short, $"MACD cắt xuống đường tín hiệu: {move}.");
         return IndicatorResult.None($"{move}, không cắt nhau.", values);
+    }
+
+    // In mọi chữ số đã giữ sau khi làm tròn, bỏ số 0 thừa ở cuối.
+    private const string DisplayFormat = "0.############################";
+
+    // MACD có cùng đơn vị với giá, nên làm tròn cố định vài chữ số thập phân sẽ biến nó thành 0 với coin giá thấp
+    // (giá 0.00002 cho MACD khoảng 1e-7). Giữ ít nhất 4 chữ số thập phân như các chỉ báo khác, và thêm chữ số cho tới
+    // khi còn ít nhất 4 chữ số có nghĩa. Ví dụ 7.22222 → 7.2222; 0.000000123456 → 0.0000001235.
+    private static decimal RoundForDisplay(decimal value)
+    {
+        int decimals = 4;
+        decimal magnitude = Math.Abs(value);
+        while (magnitude != 0m && magnitude < 0.1m && decimals < 28)
+        {
+            magnitude *= 10m;
+            decimals++;
+        }
+        return Math.Round(value, decimals);
     }
 
     // Đường MACD = EMA nhanh − EMA chậm, từ nến đầu tiên có EMA chậm (vị trí SlowPeriod − 1) đến nến cuối.
