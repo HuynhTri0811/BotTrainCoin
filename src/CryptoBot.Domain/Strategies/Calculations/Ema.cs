@@ -83,7 +83,7 @@ public static class Ema
     }
 
     /// <summary>Giá trị EMA đầu tiên: trung bình cộng của <paramref name="period"/> giá đầu tiên.</summary>
-    private static decimal Seed(ReadOnlySpan<decimal> values, int period)
+    internal static decimal Seed(ReadOnlySpan<decimal> values, int period)
     {
         decimal sum = 0m;
         for (int index = 0; index < period; index++)
@@ -92,13 +92,13 @@ public static class Ema
     }
 
     /// <summary>alpha = 2 / (period + 1); keep = 1 − alpha (tính một lần thay vì mỗi vòng lặp).</summary>
-    private static (decimal Alpha, decimal Keep) Weights(int period)
+    internal static (decimal Alpha, decimal Keep) Weights(int period)
     {
         decimal alpha = 2m / (period + 1);
         return (alpha, 1 - alpha);
     }
 
     /// <summary>Một bước cập nhật: trộn giá mới (tỷ lệ alpha) với EMA cũ (tỷ lệ keep).</summary>
-    private static decimal Step(decimal ema, decimal value, decimal alpha, decimal keep) =>
+    internal static decimal Step(decimal ema, decimal value, decimal alpha, decimal keep) =>
         alpha * value + keep * ema;
 }

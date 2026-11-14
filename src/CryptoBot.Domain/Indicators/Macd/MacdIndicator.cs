@@ -99,35 +99,26 @@ public sealed class MacdIndicator : ICustomIndicator
     }
 
     // Đường MACD = EMA nhanh − EMA chậm, từ nến đầu tiên có EMA chậm (vị trí SlowPeriod − 1) đến nến cuối.
-    // Một vòng lặp cập nhật cả hai EMA, cùng công thức với Ema.Calculate (seed bằng trung bình cộng, rồi
-    // EMA = alpha × giá + (1 − alpha) × EMA cũ), nên ra đúng giá trị như Ema.Calculate mà không tạo mảng trung gian.
+    // Một vòng lặp cập nhật cả hai EMA bằng chính Ema.Seed/Weights/Step, nên ra đúng giá trị như Ema.Calculate mà
+    // không tạo mảng trung gian.
     private decimal[] MacdLine(decimal[] closes)
     {
-        decimal fastAlpha = 2m / (FastPeriod + 1);
-        decimal slowAlpha = 2m / (SlowPeriod + 1);
-        decimal fastEma = Average(closes, FastPeriod);
+        (decimal fastAlpha, decimal fastKeep) = Ema.Weights(FastPeriod);
+        (decimal slowAlpha, decimal slowKeep) = Ema.Weights(SlowPeriod);
+        decimal fastEma = Ema.Seed(closes, FastPeriod);
         for (int index = FastPeriod; index < SlowPeriod; index++)
-            fastEma = fastAlpha * closes[index] + (1 - fastAlpha) * fastEma;
-        decimal slowEma = Average(closes, SlowPeriod);
+            fastEma = Ema.Step(fastEma, closes[index], fastAlpha, fastKeep);
+        decimal slowEma = Ema.Seed(closes, SlowPeriod);
 
         int first = SlowPeriod - 1;
         decimal[] line = new decimal[closes.Length - first];
         line[0] = fastEma - slowEma;
         for (int index = SlowPeriod; index < closes.Length; index++)
         {
-            fastEma = fastAlpha * closes[index] + (1 - fastAlpha) * fastEma;
-            slowEma = slowAlpha * closes[index] + (1 - slowAlpha) * slowEma;
+            fastEma = Ema.Step(fastEma, closes[index], fastAlpha, fastKeep);
+            slowEma = Ema.Step(slowEma, closes[index], slowAlpha, slowKeep);
             line[index - first] = fastEma - slowEma;
         }
         return line;
-    }
-
-    // Trung bình cộng của count giá đầu tiên: điểm bắt đầu của EMA.
-    private static decimal Average(decimal[] closes, int count)
-    {
-        decimal sum = 0m;
-        for (int index = 0; index < count; index++)
-            sum += closes[index];
-        return sum / count;
     }
 }
