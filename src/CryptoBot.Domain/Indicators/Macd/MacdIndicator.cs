@@ -56,7 +56,8 @@ public sealed class MacdIndicator : ICustomIndicator
         // EMA 1 của đường MACD chính là đường MACD: hai đường trùng nhau, không bao giờ cắt nên không có tín hiệu.
         if (SignalPeriod < 2) return "SignalPeriod phải >= 2.";
         // Đường MACD có từ nến thứ SlowPeriod; đường tín hiệu cần thêm SignalPeriod + 1 giá trị MACD để có 2 điểm cuối.
-        if (LookbackCandles < SlowPeriod + SignalPeriod)
+        // Cộng bằng long: hai chu kỳ rất lớn cộng bằng int sẽ tràn thành số âm và lọt qua kiểm tra.
+        if (LookbackCandles < (long)SlowPeriod + SignalPeriod)
             return "LookbackCandles phải >= SlowPeriod + SignalPeriod.";
         return null;
     }
