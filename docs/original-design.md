@@ -188,6 +188,7 @@ public interface IExecutionAdapter
     Task<IReadOnlyList<OrderSnapshot>> GetOpenOrdersAsync(string? symbol, CancellationToken ct);
     Task<FillPage> GetFillsAsync(string symbol, FillCheckpoint since, CancellationToken ct);
     Task<IReadOnlyList<AssetBalance>> GetBalancesAsync(CancellationToken ct);
+    Task<IReadOnlyList<Transfer>> GetTransfersAsync(DateTime sinceUtc, CancellationToken ct); // nạp/rút, mục 8.1
 }
 ```
 
@@ -209,9 +210,9 @@ Hosted worker tạo DI scope cho mỗi đơn vị xử lý hoặc dùng `IDbCont
 | Order | AccountId, Environment, Symbol, IntentId, ExchangeOrderId, ClientOrderId, Status, RequestedQty, FilledQty |
 | Fill | AccountId, Exchange, Environment, Symbol, ExchangeTradeId, OrderId, Price, Qty, FeeAmount, FeeAsset |
 | Position | AccountId, Environment, StrategyInstanceId, Symbol, Qty, AverageCost |
-| LedgerEntry | Asset, Amount, EntryType, SourceId, Environment |
+| LedgerEntry | AccountId, Environment, TimeUtc, Asset, Amount, EntryType (Fill/Fee/Deposit/Withdrawal/Adjustment), SourceId |
 | EquitySnapshot | TimeUtc, Environment, Equity, RealizedPnl, UnrealizedPnl |
-| RiskState | DayUtc, DayStartEquity, LossLimitBreached, KillSwitch |
+| RiskState | AccountId, DayUtc, DayStartEquity, NetTransfersToday, LossLimitBreached, KillSwitch |
 | BacktestRun | DatasetId, StrategyVersion, ConfigSnapshot, Metrics, Status |
 | NotificationOutbox | EventKey, Payload, Attempts, NextAttemptAt, SentAt |
 | AuditEvent | Actor, Action, OldValue, NewValue, TimeUtc, CorrelationId |
@@ -336,6 +337,18 @@ Có thể dùng retry với exponential backoff và jitter cho truy vấn an to�
 - Spread/slippage tối đa chấp nhận, độ mới của dữ liệu và số lỗi liên tiếp.
 - Chặn entry khi thiếu stop hợp lệ, chưa đối chiếu xong hoặc có Unknown order.
 - Hạn mức lỗ ngày được lưu bền vững, restart không reset. Quy ước ngày UTC rõ trên UI.
+
+Công thức lỗ ngày, có trừ nạp/rút:
+
+```text
+NetTransfersToday = Σ Deposit − Σ Withdrawal (LedgerEntry trong ngày UTC, quy ra đồng định giá)
+DailyPnl          = Equity hiện tại − DayStartEquity − NetTransfersToday
+Khóa entry khi    DailyPnl ≤ −DailyLossLimit
+```
+
+Ví dụ: đầu ngày 1.000 USDT, rút 300 USDT, giá không đổi. Equity còn 700, `NetTransfersToday = −300`, nên `DailyPnl = 700 − 1.000 − (−300) = 0`. Không khóa nhầm.
+
+Nạp/rút được ghi thành `LedgerEntry` loại `Deposit`/`Withdrawal`, lấy qua `IExecutionAdapter.GetTransfersAsync` trong bước đối chiếu (Paper ghi trực tiếp khi người dùng nạp/rút vốn giả). Nếu số dư thay đổi mà không giải thích được bằng fill hay nạp/rút đã biết, đó là chênh lệch: chặn entry và yêu cầu người dùng xác nhận, giống trường hợp giao dịch thủ công ở mục 12.3. `NetTransfersToday` được cập nhật trong cùng transaction với bút toán và reset khi sang ngày UTC mới.
 
 Các ngưỡng phải do người dùng cấu hình sau thử nghiệm. Ví dụ sau chỉ để kiểm tra phép tính, không phải phân bổ vốn được khuyến nghị.
 
