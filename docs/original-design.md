@@ -228,12 +228,14 @@ Mọi bảng giao dịch phải phân biệt Paper/Testnet/Live. `Environment` v
 - Unique lệnh điều khiển: `(CommandId) WHERE CommandId IS NOT NULL`.
 - Unique entry đang hoạt động: `(StrategyInstanceId, Environment) WHERE Purpose = 'Entry' AND Status` thuộc nhóm còn hoạt động. Đây là ràng buộc cứng; kiểm tra "chưa có vị thế/pending entry" trong code chỉ là lớp thứ hai.
 
-Exit từ `ClosePositions`, stop, take-profit hay kill switch không có signal, nên `SignalId = NULL`. SQLite coi các NULL là khác nhau, vì vậy khóa theo signal không chặn được exit trùng. Mọi exit, bất kể nguồn, phải đi qua **một chỗ exit duy nhất cho mỗi vị thế** (partial unique index ở trên). Nếu đã có exit đang chạy mà một nguồn khác cũng muốn thoát (ví dụ stop chạm khi lệnh `ClosePositions` đang chờ), OMS cập nhật hoặc hủy-rồi-thay exit hiện có sau khi sàn xác nhận, không tạo intent thứ hai. Lượng exit luôn ≤ `Position.Qty` trừ lượng của exit đang chờ. `CommandId` do dashboard sinh cho mỗi lần bấm, nên bấm hai lần chỉ tạo một yêu cầu.
 - Unique ClientOrderId: `(AccountId, ClientOrderId)`; account đã xác định sàn và môi trường.
 - Unique Fill: `(AccountId, Symbol, ExchangeTradeId)`; trade id của Binance chỉ duy nhất trong một symbol.
 
-Mọi cột trong các khóa trên phải có trong bảng entity ở mục 5.1; khi đổi entity thì sửa khóa trong cùng thay đổi.
 - Index truy vấn theo trạng thái lệnh, thời gian và strategy instance.
+
+Mọi cột trong các khóa trên phải có trong bảng entity ở mục 5.1; khi đổi entity thì sửa khóa trong cùng thay đổi.
+
+Exit từ `ClosePositions`, stop, take-profit hay kill switch không có signal, nên `SignalId = NULL`. SQLite coi các NULL là khác nhau, vì vậy khóa theo signal không chặn được exit trùng. Mọi exit, bất kể nguồn, phải đi qua **một chỗ exit duy nhất cho mỗi vị thế** (partial unique index ở trên). Nếu đã có exit đang chạy mà một nguồn khác cũng muốn thoát (ví dụ stop chạm khi lệnh `ClosePositions` đang chờ), OMS cập nhật hoặc hủy-rồi-thay exit hiện có sau khi sàn xác nhận, không tạo intent thứ hai. Lượng exit luôn ≤ `Position.Qty` trừ lượng của exit đang chờ. `CommandId` do dashboard sinh cho mỗi lần bấm, nên bấm hai lần chỉ tạo một yêu cầu.
 
 Trong một transaction: ghi signal và outbox; khi xử lý fill, ghi fill, ledger và vị thế cùng nhau. Unique constraint ngăn webhook/stream event lặp làm tăng số dư hai lần.
 
