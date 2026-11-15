@@ -196,13 +196,14 @@ Hosted worker tạo DI scope cho mỗi đơn vị xử lý hoặc dùng `IDbCont
 
 | Entity | Trường quan trọng / trách nhiệm |
 | --- | --- |
+| Account | Id, Exchange, Environment, Name; một tài khoản sàn (hoặc sổ Paper) trong đúng một môi trường |
 | Candle | Exchange, Symbol, Interval, OpenTimeUtc, OHLCV, IsClosed |
 | StrategyInstance | Id, Name, Version, Parameters, Symbol, Interval, Enabled |
 | TradingSignal | StrategyInstanceId, CandleOpenTimeUtc, Action, Reason, ConfigVersion |
-| OrderIntent | SignalId, Environment, Side, Quantity, PlannedStop, ClientOrderId |
-| Order | ExchangeOrderId, ClientOrderId, Status, RequestedQty, FilledQty |
-| Fill | ExchangeTradeId, OrderId, Price, Qty, FeeAmount, FeeAsset |
-| Position | Environment, StrategyInstanceId, Symbol, Qty, AverageCost |
+| OrderIntent | AccountId, Environment, Symbol, SignalId, Purpose (Entry/Exit), Side, Quantity, PlannedStop, ClientOrderId |
+| Order | AccountId, Environment, Symbol, IntentId, ExchangeOrderId, ClientOrderId, Status, RequestedQty, FilledQty |
+| Fill | AccountId, Exchange, Environment, Symbol, ExchangeTradeId, OrderId, Price, Qty, FeeAmount, FeeAsset |
+| Position | AccountId, Environment, StrategyInstanceId, Symbol, Qty, AverageCost |
 | LedgerEntry | Asset, Amount, EntryType, SourceId, Environment |
 | EquitySnapshot | TimeUtc, Environment, Equity, RealizedPnl, UnrealizedPnl |
 | RiskState | DayUtc, DayStartEquity, LossLimitBreached, KillSwitch |
@@ -210,15 +211,17 @@ Hosted worker tạo DI scope cho mỗi đơn vị xử lý hoặc dùng `IDbCont
 | NotificationOutbox | EventKey, Payload, Attempts, NextAttemptAt, SentAt |
 | AuditEvent | Actor, Action, OldValue, NewValue, TimeUtc, CorrelationId |
 
-Mọi bảng giao dịch phải phân biệt Paper/Testnet/Live. Backtest dùng `RunId` và portfolio riêng. Lệnh thủ công trên sàn được xem là dữ liệu bên ngoài; không tự gán chúng cho chiến lược của bot.
+Mọi bảng giao dịch phải phân biệt Paper/Testnet/Live. `Environment` và `Exchange` trên Order/Fill/Intent là bản sao từ `Account` để index và lọc không cần join; khi ghi phải khớp với account. Backtest dùng `RunId` và portfolio riêng. Lệnh thủ công trên sàn được xem là dữ liệu bên ngoài; không tự gán chúng cho chiến lược của bot.
 
 ### 5.2 Index và tính nhất quán
 
 - Unique Candle: `(Exchange, Symbol, Interval, OpenTimeUtc)`.
 - Unique Signal: `(StrategyInstanceId, ConfigVersion, CandleOpenTimeUtc, Action)`.
 - Unique Intent: `(SignalId, Environment, Purpose)`; `Purpose` phân biệt entry/exit.
-- Unique ClientOrderId trong phạm vi account/environment phù hợp.
-- Unique Fill: `(Exchange, AccountId, Environment, Symbol, ExchangeTradeId)`.
+- Unique ClientOrderId: `(AccountId, ClientOrderId)`; account đã xác định sàn và môi trường.
+- Unique Fill: `(AccountId, Symbol, ExchangeTradeId)`; trade id của Binance chỉ duy nhất trong một symbol.
+
+Mọi cột trong các khóa trên phải có trong bảng entity ở mục 5.1; khi đổi entity thì sửa khóa trong cùng thay đổi.
 - Index truy vấn theo trạng thái lệnh, thời gian và strategy instance.
 
 Trong một transaction: ghi signal và outbox; khi xử lý fill, ghi fill, ledger và vị thế cùng nhau. Unique constraint ngăn webhook/stream event lặp làm tăng số dư hai lần.
