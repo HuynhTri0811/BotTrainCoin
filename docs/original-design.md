@@ -224,9 +224,9 @@ Mọi bảng giao dịch phải phân biệt Paper/Testnet/Live. `Environment` v
 - Unique Candle: `(Exchange, Symbol, Interval, OpenTimeUtc)`.
 - Unique Signal: `(StrategyInstanceId, CandleOpenTimeUtc, Action)`. `ConfigVersion` vẫn được lưu trên signal để truy vết, nhưng **không** nằm trong khóa: nếu có, đổi cấu hình sẽ cho phép cùng một nến sinh signal thứ hai.
 - Unique Intent theo signal: `(SignalId, Environment, Purpose) WHERE SignalId IS NOT NULL`.
-- Unique exit đang hoạt động: `(PositionId) WHERE Purpose = 'Exit' AND Status` thuộc nhóm còn hoạt động (chưa Filled/Canceled/Rejected/Expired).
+- Unique exit đang hoạt động: `(PositionId) WHERE Purpose = 'Exit' AND Status` còn hoạt động, tức là chưa ở trạng thái kết thúc của mục 7.2 (Filled, Canceled, Expired, Rejected, NotPlaced).
 - Unique lệnh điều khiển: `(CommandId) WHERE CommandId IS NOT NULL`.
-- Unique entry đang hoạt động: `(StrategyInstanceId, Environment) WHERE Purpose = 'Entry' AND Status` thuộc nhóm còn hoạt động. Đây là ràng buộc cứng; kiểm tra "chưa có vị thế/pending entry" trong code chỉ là lớp thứ hai.
+- Unique entry đang hoạt động: `(StrategyInstanceId, Environment) WHERE Purpose = 'Entry' AND Status` còn hoạt động (như trên). Đây là ràng buộc cứng; kiểm tra "chưa có vị thế/pending entry" trong code chỉ là lớp thứ hai.
 
 - Unique ClientOrderId: `(AccountId, ClientOrderId)`; account đã xác định sàn và môi trường.
 - Unique Fill: `(AccountId, Symbol, ExchangeTradeId)`; trade id của Binance chỉ duy nhất trong một symbol.
