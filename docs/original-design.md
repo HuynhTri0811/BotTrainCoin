@@ -198,9 +198,9 @@ Hosted worker tạo DI scope cho mỗi đơn vị xử lý hoặc dùng `IDbCont
 | --- | --- |
 | Account | Id, Exchange, Environment, Name; một tài khoản sàn (hoặc sổ Paper) trong đúng một môi trường |
 | Candle | Exchange, Symbol, Interval, OpenTimeUtc, OHLCV, IsClosed |
-| StrategyInstance | Id, Name, Version, Parameters, Symbol, Interval, Enabled |
+| StrategyInstance | Id, Name, Version, VersionEffectiveFromUtc, Parameters, Symbol, Interval, Enabled |
 | TradingSignal | StrategyInstanceId, CandleOpenTimeUtc, Action, Reason, ConfigVersion |
-| OrderIntent | AccountId, Environment, Symbol, SignalId, PositionId, Purpose (Entry/Exit), Source (Signal/Stop/TakeProfit/Manual/KillSwitch), CommandId, Status, Side, Quantity, PlannedStop, ClientOrderId |
+| OrderIntent | AccountId, Environment, Symbol, StrategyInstanceId, SignalId, PositionId, Purpose (Entry/Exit), Source (Signal/Stop/TakeProfit/Manual/KillSwitch), CommandId, Status, Side, Quantity, PlannedStop, ClientOrderId |
 | Order | AccountId, Environment, Symbol, IntentId, ExchangeOrderId, ClientOrderId, Status, RequestedQty, FilledQty |
 | Fill | AccountId, Exchange, Environment, Symbol, ExchangeTradeId, OrderId, Price, Qty, FeeAmount, FeeAsset |
 | Position | AccountId, Environment, StrategyInstanceId, Symbol, Qty, AverageCost |
@@ -216,10 +216,11 @@ Mọi bảng giao dịch phải phân biệt Paper/Testnet/Live. `Environment` v
 ### 5.2 Index và tính nhất quán
 
 - Unique Candle: `(Exchange, Symbol, Interval, OpenTimeUtc)`.
-- Unique Signal: `(StrategyInstanceId, ConfigVersion, CandleOpenTimeUtc, Action)`.
+- Unique Signal: `(StrategyInstanceId, CandleOpenTimeUtc, Action)`. `ConfigVersion` vẫn được lưu trên signal để truy vết, nhưng **không** nằm trong khóa: nếu có, đổi cấu hình sẽ cho phép cùng một nến sinh signal thứ hai.
 - Unique Intent theo signal: `(SignalId, Environment, Purpose) WHERE SignalId IS NOT NULL`.
 - Unique exit đang hoạt động: `(PositionId) WHERE Purpose = 'Exit' AND Status` thuộc nhóm còn hoạt động (chưa Filled/Canceled/Rejected/Expired).
 - Unique lệnh điều khiển: `(CommandId) WHERE CommandId IS NOT NULL`.
+- Unique entry đang hoạt động: `(StrategyInstanceId, Environment) WHERE Purpose = 'Entry' AND Status` thuộc nhóm còn hoạt động. Đây là ràng buộc cứng; kiểm tra "chưa có vị thế/pending entry" trong code chỉ là lớp thứ hai.
 
 Exit từ `ClosePositions`, stop, take-profit hay kill switch không có signal, nên `SignalId = NULL`. SQLite coi các NULL là khác nhau, vì vậy khóa theo signal không chặn được exit trùng. Mọi exit, bất kể nguồn, phải đi qua **một chỗ exit duy nhất cho mỗi vị thế** (partial unique index ở trên). Nếu đã có exit đang chạy mà một nguồn khác cũng muốn thoát (ví dụ stop chạm khi lệnh `ClosePositions` đang chờ), OMS cập nhật hoặc hủy-rồi-thay exit hiện có sau khi sàn xác nhận, không tạo intent thứ hai. Lượng exit luôn ≤ `Position.Qty` trừ lượng của exit đang chờ. `CommandId` do dashboard sinh cho mỗi lần bấm, nên bấm hai lần chỉ tạo một yêu cầu.
 - Unique ClientOrderId: `(AccountId, ClientOrderId)`; account đã xác định sàn và môi trường.
@@ -266,7 +267,8 @@ Chọn seed EMA bằng SMA của `period` nến đầu và dùng cùng một cá
 - Entry BUY khi EMA9 trước đó ≤ EMA21 và EMA9 hiện tại > EMA21, đồng thời chưa có vị thế/pending entry.
 - Exit SELL khi EMA9 trước đó ≥ EMA21 và EMA9 hiện tại < EMA21, nếu có lượng tài sản bot sở hữu.
 - Không giao cắt: `Hold`.
-- Mỗi nến đóng được đánh giá một lần cho mỗi strategy instance/config version.
+- Mỗi nến đóng được đánh giá đúng một lần cho mỗi strategy instance, theo config version đang hiệu lực tại nến đó.
+- Lưu cấu hình mới đặt `VersionEffectiveFromUtc` = thời điểm mở của nến **kế tiếp** chưa đóng. Nến đã đánh giá không bao giờ được đánh giá lại với version mới.
 
 Nếu chạy 15m và 1h độc lập trên cùng cặp, phải tách strategy instance và phân bổ vốn. MVP đơn giản hơn bằng cách chỉ cho một instance quản lý một cặp. Nếu dùng 1h làm bộ lọc của 15m, chỉ dùng nến 1h đã đóng tại thời điểm ra quyết định.
 
