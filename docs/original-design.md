@@ -369,7 +369,7 @@ Stop không bảo đảm mức lỗ tối đa khi giá gap hoặc thiếu thanh 
 
 Paper MVP mô phỏng stop/take-profit. Trước live phải triển khai và kiểm thử lệnh bảo vệ phía sàn phù hợp với khả năng API/account tại thời điểm tích hợp, kể cả partial fill và phần lượng còn lại.
 
-Nếu dùng stop do ứng dụng theo dõi, phải thể hiện rõ stop có thể không chạy khi tiến trình/mạng hỏng. Không xem đây là bảo vệ tương đương lệnh đang tồn tại trên sàn.
+Nếu dùng stop do ứng dụng theo dõi, phải thể hiện rõ stop có thể không chạy khi tiến trình/mạng/DB hỏng. Không xem đây là bảo vệ tương đương lệnh đang tồn tại trên sàn. Stop do ứng dụng theo dõi chỉ dùng cho Paper và Testnet; Live bắt buộc có lệnh bảo vệ phía sàn (gate mục 14.2).
 
 Risk Manager có chính sách riêng cho exit giảm vị thế: giới hạn lỗ ngày không được vô tình chặn thoát lệnh. Exit vẫn kiểm tra quyền sở hữu tài sản, lượng còn lại, step size và lệnh exit đang pending. Tránh signal exit cạnh tranh với stop và bán hai lần.
 
@@ -488,7 +488,8 @@ Notification Telegram là tùy chọn do người dùng cấu hình. Gửi qua o
 | Mất market stream | Đánh dấu stale, chặn entry, reconnect và tải bù |
 | Mất user stream | Đối chiếu lệnh/fill qua REST có kiểm soát rate limit |
 | Timeout submit | Unknown, tra cứu lại, không submit lại mù |
-| DB không ghi được | Chặn entry; dựa vào lệnh bảo vệ trên sàn, báo lỗi |
+| DB không ghi được, vị thế có lệnh bảo vệ trên sàn (Live) | Chặn entry, không gửi lệnh mới; lệnh bảo vệ trên sàn tiếp tục giữ vị thế; báo lỗi |
+| DB không ghi được, stop do ứng dụng theo dõi (Paper/Testnet) | Chặn entry. Vẫn theo dõi stop/TP trong bộ nhớ; khi chạm thì ghi intent (kèm `ClientOrderId`) vào journal file append-only cục bộ **trước**, rồi gửi exit (Testnet) hoặc mô phỏng fill (Paper). Khi DB ghi lại được: nhập journal, đối chiếu theo `ClientOrderId`, rồi mới `Ready`. Báo rõ "vị thế không có bảo vệ phía sàn". Nếu journal cũng không ghi được thì chuyển `Paused` và báo lỗi nghiêm trọng |
 | Restart sau fill | Deduplicate fill, dựng lại trạng thái từ DB và sàn |
 | Cấu hình sai | Từ chối áp dụng, giữ config version đã hợp lệ |
 | Đạt giới hạn lỗ | Lưu trạng thái khóa entry, tiếp tục quản lý exit |
@@ -550,6 +551,8 @@ Dùng unit test cho thuật toán và state transition; integration test với S
 - [ ] Không phát sinh entry trùng khi lặp nến, signal, request hoặc restart.
 - [ ] Fill/ledger/position đối chiếu được; quy tắc phí và giá vốn đã công bố.
 - [ ] Có flow xử lý Unknown, partial fill và lệnh bảo vệ bị từ chối.
+- [ ] Mọi vị thế Live có lệnh bảo vệ phía sàn; không dùng stop do ứng dụng theo dõi cho Live.
+- [ ] Đã diễn tập "DB không ghi được" với cả hai cách bảo vệ ở mục 12.3.
 - [ ] Kill switch và daily loss lock hoạt động, tồn tại qua restart.
 - [ ] Stop/exit không bán vượt lượng bot sở hữu và không bị chặn nhầm bởi entry risk.
 - [ ] Có backup/restore đã diễn tập và theo dõi lỗi nghiêm trọng.
