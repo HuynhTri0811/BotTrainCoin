@@ -36,6 +36,12 @@ Cập nhật lần cuối: 2026-10-29, sau PR #60 (`develop` và `main` giống 
 | --- | --- |
 | [analysis/btc-prediction-and-rebounds/](analysis/btc-prediction-and-rebounds/README.md) | Vì sao hàm dự đoán sai, nhịp hồi sau nến sập, DCA trên một năm nến BTCUSDT 1h; kèm dữ liệu Binance và script chạy lại |
 
+## Lịch sử thiết kế
+
+| File | Nội dung |
+| --- | --- |
+| [original-design.md](original-design.md) | Thiết kế ban đầu (18/10/2026): phạm vi MVP, domain, OMS, rủi ro, paper/backtest, lộ trình. Không phải hiện trạng code |
+
 ## Giữ tài liệu đúng với code
 
 - PR đổi hành vi (luật vào lệnh, cấu hình mới, endpoint mới, thư mục mới) cập nhật luôn file tài liệu liên quan
