@@ -75,7 +75,7 @@ Mặc định khởi tạo là `SignalOnly + Paper`, live bị khóa. Không t�
 | Đóng gói | Docker Compose | Khởi động và sao lưu nhất quán |
 | Kiểm thử | xUnit và kiểm thử tích hợp SQLite | Kiểm tra logic tiền, trạng thái và unique constraint |
 
-C# phù hợp làm engine/API vì bạn đã quen hệ sinh thái này. Python có thể bổ sung cho nghiên cứu thống kê sau này; chưa cần đưa vào đường xử lý lệnh của MVP.
+C# phù hợp làm engine/API vì dự án tận dụng kinh nghiệm sẵn có với hệ sinh thái .NET. Python có thể bổ sung cho nghiên cứu thống kê sau này; chưa cần đưa vào đường xử lý lệnh của MVP.
 
 Chọn **Modular Monolith**: chia module trong code, triển khai cùng một backend. Chưa cần Redis, RabbitMQ, Kafka hay Kubernetes. Khi triển khai có thể build React rồi phục vụ file tĩnh cùng ASP.NET Core để chỉ còn một ứng dụng và file SQLite.
 
