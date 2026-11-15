@@ -183,10 +183,15 @@ public interface IExecutionAdapter
     Task<SubmitResult> SubmitAsync(OrderIntent intent, CancellationToken ct);
     Task<OrderSnapshot?> FindAsync(OrderLookup lookup, CancellationToken ct);
     Task<CancelResult> CancelAsync(OrderLookup lookup, CancellationToken ct);
+
+    // Dùng cho đối chiếu khi khởi động lại / mất user stream (mục 7.3).
+    Task<IReadOnlyList<OrderSnapshot>> GetOpenOrdersAsync(string? symbol, CancellationToken ct);
+    Task<FillPage> GetFillsAsync(string symbol, FillCheckpoint since, CancellationToken ct);
+    Task<IReadOnlyList<AssetBalance>> GetBalancesAsync(CancellationToken ct);
 }
 ```
 
-`StrategyContext` chứa nến đã đóng, vị thế của strategy instance và phiên bản cấu hình. `SubmitResult` phải phân biệt đã chấp nhận, bị từ chối và chưa biết kết quả. Tất cả I/O hỗ trợ timeout và cancellation.
+`StrategyContext` chứa nến đã đóng, vị thế của strategy instance và phiên bản cấu hình. Ba hàm cuối của `IExecutionAdapter` phục vụ bước đồng bộ số dư, lệnh mở và fill trong mục 7.3. `FillCheckpoint` gồm thời điểm và trade id cuối đã ghi; `FillPage` có con trỏ trang tiếp theo vì sàn giới hạn số fill mỗi lần gọi. Paper adapter cũng phải triển khai đủ cả ba hàm từ sổ mô phỏng của nó, để recovery chạy cùng một đường cho Paper và Live. `SubmitResult` phải phân biệt đã chấp nhận, bị từ chối và chưa biết kết quả. Tất cả I/O hỗ trợ timeout và cancellation.
 
 Hosted worker tạo DI scope cho mỗi đơn vị xử lý hoặc dùng `IDbContextFactory`; không chia sẻ một DbContext giữa nhiều tác vụ. Xem [hướng dẫn hosted services của Microsoft](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/host/hosted-services).
 
@@ -313,7 +318,7 @@ Do đó, không retry mù lệnh đặt mua/bán. Tra cứu theo client/exchange
 
 1. Khởi động ở `Recovering`, chưa nhận entry.
 2. Đọc intent chưa hoàn tất, lệnh mở, vị thế và risk state từ DB.
-3. Đồng bộ số dư, open orders và lịch sử fill kể từ checkpoint có khoảng chồng lấn.
+3. Đồng bộ số dư (`GetBalancesAsync`), open orders (`GetOpenOrdersAsync`) và lịch sử fill (`GetFillsAsync`) kể từ checkpoint có khoảng chồng lấn.
 4. Deduplicate fill, xử lý chênh lệch, khôi phục lệnh bảo vệ.
 5. Kiểm tra dữ liệu thị trường và cấu hình hiện hành.
 6. Chuyển `Ready`; nếu không đối chiếu được thì ở `Paused/Degraded` và báo rõ lý do.
