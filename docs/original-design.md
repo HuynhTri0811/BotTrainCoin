@@ -227,10 +227,8 @@ Mọi bảng giao dịch phải phân biệt Paper/Testnet/Live. `Environment` v
 - Unique exit đang hoạt động: `(PositionId) WHERE Purpose = 'Exit' AND Status` còn hoạt động, tức là chưa ở trạng thái kết thúc của mục 7.2 (Filled, Canceled, Expired, Rejected, NotPlaced).
 - Unique lệnh điều khiển: `(CommandId) WHERE CommandId IS NOT NULL`.
 - Unique entry đang hoạt động: `(StrategyInstanceId, Environment) WHERE Purpose = 'Entry' AND Status` còn hoạt động (như trên). Đây là ràng buộc cứng; kiểm tra "chưa có vị thế/pending entry" trong code chỉ là lớp thứ hai.
-
 - Unique ClientOrderId: `(AccountId, ClientOrderId)`; account đã xác định sàn và môi trường.
 - Unique Fill: `(AccountId, Symbol, ExchangeTradeId)`; trade id của Binance chỉ duy nhất trong một symbol.
-
 - Index truy vấn theo trạng thái lệnh, thời gian và strategy instance.
 
 Mọi cột trong các khóa trên phải có trong bảng entity ở mục 5.1; khi đổi entity thì sửa khóa trong cùng thay đổi.
