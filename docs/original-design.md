@@ -200,7 +200,7 @@ Hosted worker tạo DI scope cho mỗi đơn vị xử lý hoặc dùng `IDbCont
 | Candle | Exchange, Symbol, Interval, OpenTimeUtc, OHLCV, IsClosed |
 | StrategyInstance | Id, Name, Version, Parameters, Symbol, Interval, Enabled |
 | TradingSignal | StrategyInstanceId, CandleOpenTimeUtc, Action, Reason, ConfigVersion |
-| OrderIntent | AccountId, Environment, Symbol, SignalId, Purpose (Entry/Exit), Side, Quantity, PlannedStop, ClientOrderId |
+| OrderIntent | AccountId, Environment, Symbol, SignalId, PositionId, Purpose (Entry/Exit), Source (Signal/Stop/TakeProfit/Manual/KillSwitch), CommandId, Status, Side, Quantity, PlannedStop, ClientOrderId |
 | Order | AccountId, Environment, Symbol, IntentId, ExchangeOrderId, ClientOrderId, Status, RequestedQty, FilledQty |
 | Fill | AccountId, Exchange, Environment, Symbol, ExchangeTradeId, OrderId, Price, Qty, FeeAmount, FeeAsset |
 | Position | AccountId, Environment, StrategyInstanceId, Symbol, Qty, AverageCost |
@@ -217,7 +217,11 @@ Mọi bảng giao dịch phải phân biệt Paper/Testnet/Live. `Environment` v
 
 - Unique Candle: `(Exchange, Symbol, Interval, OpenTimeUtc)`.
 - Unique Signal: `(StrategyInstanceId, ConfigVersion, CandleOpenTimeUtc, Action)`.
-- Unique Intent: `(SignalId, Environment, Purpose)`; `Purpose` phân biệt entry/exit.
+- Unique Intent theo signal: `(SignalId, Environment, Purpose) WHERE SignalId IS NOT NULL`.
+- Unique exit đang hoạt động: `(PositionId) WHERE Purpose = 'Exit' AND Status` thuộc nhóm còn hoạt động (chưa Filled/Canceled/Rejected/Expired).
+- Unique lệnh điều khiển: `(CommandId) WHERE CommandId IS NOT NULL`.
+
+Exit từ `ClosePositions`, stop, take-profit hay kill switch không có signal, nên `SignalId = NULL`. SQLite coi các NULL là khác nhau, vì vậy khóa theo signal không chặn được exit trùng. Mọi exit, bất kể nguồn, phải đi qua **một chỗ exit duy nhất cho mỗi vị thế** (partial unique index ở trên). Nếu đã có exit đang chạy mà một nguồn khác cũng muốn thoát (ví dụ stop chạm khi lệnh `ClosePositions` đang chờ), OMS cập nhật hoặc hủy-rồi-thay exit hiện có sau khi sàn xác nhận, không tạo intent thứ hai. Lượng exit luôn ≤ `Position.Qty` trừ lượng của exit đang chờ. `CommandId` do dashboard sinh cho mỗi lần bấm, nên bấm hai lần chỉ tạo một yêu cầu.
 - Unique ClientOrderId: `(AccountId, ClientOrderId)`; account đã xác định sàn và môi trường.
 - Unique Fill: `(AccountId, Symbol, ExchangeTradeId)`; trade id của Binance chỉ duy nhất trong một symbol.
 
