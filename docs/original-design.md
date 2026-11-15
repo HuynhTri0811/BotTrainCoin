@@ -301,15 +301,32 @@ Khóa xử lý theo account/symbol hoặc dùng một consumer cho OMS trong MVP
 
 ### 7.2 Vòng đời lệnh
 
-```text
-IntentCreated -> Submitting -> New -> PartiallyFilled -> Filled
-                      |         |           |
-                      |         +-----------+-> Canceled / Expired
-                      +-> Rejected
-                      +-> Unknown -> Reconciliation -> trạng thái xác nhận
-```
+| Từ | Sự kiện | Đến |
+| --- | --- | --- |
+| IntentCreated | Dispatcher bắt đầu gửi | Submitting |
+| Submitting | Sàn chấp nhận (ACK) | New |
+| Submitting | Sàn từ chối | Rejected |
+| Submitting | **Fill đến trước ACK** | PartiallyFilled hoặc Filled (theo `FilledQty`) |
+| Submitting | Timeout, lỗi mạng, phản hồi không rõ | Unknown |
+| New | Sàn từ chối/hết hạn sau khi đã nhận (ví dụ kiểm tra phía sàn, IOC/FOK, self-trade prevention) | Rejected / Expired |
+| New, PartiallyFilled | Có fill | PartiallyFilled hoặc Filled |
+| New, PartiallyFilled | Hủy được xác nhận | Canceled |
+| New, PartiallyFilled | Hết hạn | Expired |
+| Unknown | Tra cứu thấy lệnh trên sàn | Đúng trạng thái sàn báo (New, PartiallyFilled, Filled, Canceled, Expired, Rejected) |
+| Unknown | Có fill (từ stream hoặc tra cứu fill) | PartiallyFilled hoặc Filled |
+| Unknown | Sàn xác nhận không có lệnh và không có fill, sau thời gian chờ đã cấu hình | NotPlaced (giải phóng tiền giữ chỗ) |
+| Unknown | Chưa phân giải được | Giữ Unknown, khóa entry liên quan, tra cứu lại theo lịch |
 
-`Unknown` là trạng thái nội bộ khi chưa biết sàn có nhận lệnh hay chưa. Lệnh đã hủy vẫn có thể có fill trước khi hủy; không xóa fill hoặc hoàn toàn bộ tiền giữ chỗ nếu đã khớp một phần.
+Trạng thái kết thúc: Filled, Canceled, Expired, Rejected, NotPlaced.
+
+Quy tắc áp dụng event:
+
+1. **Fill luôn được ghi trước**, bất kể lệnh đang ở trạng thái nào: ghi fill, ledger, vị thế trong một transaction, chống trùng bằng khóa unique Fill. Trạng thái lệnh được suy ra sau đó. Không bao giờ bỏ một fill vì "chuyển trạng thái không hợp lệ".
+2. **Chỉ tiến, không lùi.** `FilledQty` không giảm, trạng thái kết thúc không quay về trạng thái mở. Event đến muộn (ví dụ ACK `New` đến sau fill) chỉ bổ sung dữ liệu như `ExchangeOrderId`, không kéo trạng thái lùi.
+3. Lệnh Canceled/Expired vẫn có thể nhận fill đến muộn (khớp trước khi hủy): tăng `FilledQty`, giữ trạng thái, và không hoàn toàn bộ tiền giữ chỗ.
+4. Event không khớp dòng nào trong bảng (ví dụ fill cho lệnh Rejected hoặc NotPlaced) không bị bỏ qua: ghi `AuditEvent`, chặn entry trên symbol đó và đưa lệnh vào đối chiếu.
+
+`Unknown` là trạng thái nội bộ khi chưa biết sàn có nhận lệnh hay chưa.
 
 Binance nêu rằng timeout có thể để trạng thái thực thi chưa xác định. Không kết luận lệnh thất bại chỉ từ timeout; xem [tài liệu REST chính thức](https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md).
 
@@ -536,7 +553,7 @@ Không cần tạo project microservices hoặc tích hợp AI trong các bướ
 | --- | --- |
 | Strategy | EMA seed trong cửa sổ cố định (cùng giá trị khi nạp 500 nến hay toàn bộ lịch sử), crossover, warm-up, nến chưa đóng, thiếu lịch sử |
 | Risk | Stop sai phía, không đủ tiền, min notional, rounding, vốn giữ chỗ |
-| OMS | Duplicate signal, timeout submit, fill trước ACK, cancel/partial-fill race |
+| OMS | Mỗi dòng của bảng chuyển trạng thái ở mục 7.2, duplicate signal, timeout submit, fill trước ACK, ACK đến sau fill, cancel/partial-fill race, fill đến sau Canceled |
 | Accounting | Phí hai phía, phí bằng asset khác, duplicate fill, partial exit |
 | Database | Unique constraint, transaction rollback, migration và restore |
 | Recovery | Crash trước/sau gửi lệnh, restart sau fill, mất stream |
