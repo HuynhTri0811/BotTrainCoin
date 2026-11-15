@@ -248,7 +248,7 @@ Giữ transaction ngắn, bật WAL khi phù hợp và cấu hình busy timeout.
 ### 6.1 Pipeline dữ liệu
 
 1. Tải metadata của symbol, quy tắc số lượng/giá và nến lịch sử qua REST.
-2. Nạp đủ nến warm-up; không dùng EMA khi lịch sử chưa đủ theo quy tắc đã chọn.
+2. Nạp ít nhất `LookbackCandles` nến đã đóng (mục 6.2); chưa đủ thì trả `Hold` với lý do "Warm-up".
 3. Kết nối stream để cập nhật nến đang chạy cho UI.
 4. Chỉ phát sự kiện phân tích khi nến được xác nhận đóng.
 5. Upsert theo khóa nến; phát hiện nến trùng, thiếu, sai thứ tự và giá trị không hợp lệ.
@@ -262,7 +262,13 @@ Chi tiết giao thức stream cần đối chiếu [tài liệu market streams c
 
 Công thức: `EMA_t = alpha × Close_t + (1 − alpha) × EMA_(t−1)`, với `alpha = 2 / (period + 1)`.
 
-Chọn seed EMA bằng SMA của `period` nến đầu và dùng cùng một cách khởi tạo trong live, paper và backtest.
+**Cửa sổ cố định.** Mỗi nến `t` được đánh giá trên **đúng `N = LookbackCandles` nến đã đóng gần nhất kết thúc tại `t`**, không phụ thuộc đã nạp bao nhiêu lịch sử. Trong cửa sổ đó, seed EMA bằng SMA của `period` nến đầu cửa sổ, rồi cập nhật tuần tự tới `t`. EMA tại nến `t−1` (cần cho giao cắt) được tính trên cửa sổ kết thúc tại `t−1`.
+
+Nếu seed theo nến đầu tiên của toàn bộ lịch sử đã nạp, EMA sẽ phụ thuộc điểm bắt đầu. Live nạp 500 nến gần nhất, còn backtest bắt đầu từ đầu dataset, nên hai bên ra EMA lệch nhau ở cùng một nến, và một lần gần giao cắt có thể phát tín hiệu ở chế độ này mà không ở chế độ kia. Cửa sổ cố định giúp chart, paper, backtest và live ra cùng giá trị trên cùng dữ liệu.
+
+- `LookbackCandles` là tham số của strategy instance, nằm trong config version và được lưu cùng mỗi backtest.
+- Bắt buộc `N ≥ periodChậm + 1` để có EMA của nến trước. Khuyến nghị `N ≥ 4 × periodChậm` (ví dụ 84 với EMA21) để ảnh hưởng của seed còn dưới khoảng 0,5%.
+- Cửa sổ có nến thiếu hoặc sai thứ tự → `Hold`, không nội suy.
 
 - Entry BUY khi EMA9 trước đó ≤ EMA21 và EMA9 hiện tại > EMA21, đồng thời chưa có vị thế/pending entry.
 - Exit SELL khi EMA9 trước đó ≥ EMA21 và EMA9 hiện tại < EMA21, nếu có lượng tài sản bot sở hữu.
@@ -509,7 +515,7 @@ Không cần tạo project microservices hoặc tích hợp AI trong các bướ
 
 | Nhóm | Tình huống cần kiểm tra |
 | --- | --- |
-| Strategy | EMA seed, crossover, warm-up, nến chưa đóng, thiếu lịch sử |
+| Strategy | EMA seed trong cửa sổ cố định (cùng giá trị khi nạp 500 nến hay toàn bộ lịch sử), crossover, warm-up, nến chưa đóng, thiếu lịch sử |
 | Risk | Stop sai phía, không đủ tiền, min notional, rounding, vốn giữ chỗ |
 | OMS | Duplicate signal, timeout submit, fill trước ACK, cancel/partial-fill race |
 | Accounting | Phí hai phía, phí bằng asset khác, duplicate fill, partial exit |
