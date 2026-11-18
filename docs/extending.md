@@ -17,6 +17,8 @@ Không cần sửa Application, Api hay dashboard: registry tự tìm class, cha
    - **`RequiredCandles` + `Lines`:** số nến của cửa sổ cố định; các đường vẽ (`Overlay: true` vẽ trên nến, `false` vẽ
      khung riêng, `Levels` là mức ngang).
    - **`Compute(closedCandles)`:** trả `IndicatorResult(values, signal, reason)`. Khóa của `values` trùng `Lines.Key`.
+   - **`PossibleSignals`** (tùy chọn): chỉ báo chỉ phát một chiều thì ghi đè, ví dụ `[IndicatorSignal.Long]`, để
+     backtest yêu cầu TP/SL (xem `LongFlushIndicator`). Mặc định Long và Short.
 4. Quy tắc bắt buộc: chỉ đọc `closedCandles` (nến cuối là nến vừa đóng); không gọi API, không đọc đồng hồ, không lưu
    gì vào field giữa các lần gọi; chưa đủ nến → `IndicatorResult.None("Warm-up: ...")`. Không dùng `var`.
 5. Dùng khối có sẵn thay vì tự viết vòng lặp: `IndicatorWindow.LastCloses`, `Ema.LastTwo`, `Rsi.LastTwo`,

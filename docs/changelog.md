@@ -3,6 +3,14 @@
 Những gì đã làm, theo PR đã merge vào `develop`, mới nhất ở trên. Số trong ngoặc là issue.
 Chi tiết từng tính năng: [features.md](features.md).
 
+## 2026-11-15
+
+- **#223 Đưa thiết kế ban đầu vào docs và sửa theo review** (#213–#222). Thêm
+  [original-design.md](original-design.md), thiết kế viết trước khi code, ghi rõ không phải hiện trạng. Sửa theo review:
+  exit dùng khóa theo vị thế và `CommandId`, khóa signal bỏ `ConfigVersion`, EMA theo cửa sổ cố định, entity có
+  `Account` và đủ cột cho các khóa, adapter có hàm đối chiếu, lỗ ngày trừ nạp/rút, quy trình DB lỗi theo cách bảo vệ
+  vị thế, bảng chuyển trạng thái lệnh đầy đủ.
+
 ## 2026-11-10
 
 - **#145 Đánh dấu giờ mở cửa sàn chứng khoán trên bảng Dự đoán** (#144). `MarketOpenings` tìm các lần mở cửa của sàn

@@ -81,6 +81,7 @@ Chi tiết thuật toán: [signal-functions.md](signal-functions.md).
 [`MyRsiIndicator`](../src/CryptoBot.Domain/Indicators/Rsi/MyRsiIndicator.cs) (ví dụ đầy đủ),
 [`FlowRsiIndicator`](../src/CryptoBot.Domain/Indicators/FlowRsi/FlowRsiIndicator.cs),
 [`MacdIndicator`](../src/CryptoBot.Domain/Indicators/Macd/MacdIndicator.cs),
+[`LongFlushIndicator`](../src/CryptoBot.Domain/Indicators/LongFlush/LongFlushIndicator.cs),
 [`TemplateIndicator`](../src/CryptoBot.Domain/Indicators/Template/TemplateIndicator.cs) (khung trống),
 [`IndicatorRegistry`](../src/CryptoBot.Application/Indicators/Registry/IndicatorRegistry.cs),
 [`IndicatorService`](../src/CryptoBot.Application/Indicators/Computation/IndicatorService.cs).
@@ -107,8 +108,16 @@ Chi tiết thuật toán: [signal-functions.md](signal-functions.md).
   MACD. MACD cắt lên đường tín hiệu → Long, cắt xuống → Short. Mặc định là bản chậm 96/208/72 (MACD chuẩn 12/26/9
   kéo dài 8 lần) với cửa sổ 600 nến, vì 12/26/9 trên nến 1h cho quá nhiều tín hiệu nhiễu. Khác MyRsi đảo chiều,
   chỉ báo này đi theo xu hướng: tỉ lệ thắng thấp, lãi đến từ số ít lệnh đi xa, nên hợp với chốt lời xa hơn cắt lỗ.
-- Mặc định có 4 chỉ báo: `btc-1h-myrsi` (đảo chiều), `eth-15m-myrsi-trend` (hồi trong xu hướng, EMA50),
-  `btc-1h-flowrsi` (RSI mua/bán chủ động) và `btc-1h-macd` (MACD chậm 96/208/72).
+- **LongFlush**: bắt đáy sau cú xả Long (thanh lý Long hàng loạt). App chưa có dữ liệu thanh lý nên cú xả được nhận ra
+  từ nến: giá đâm từ giá mở xuống đáy ít nhất `DropAtr` (2) lần ATR và khối lượng ít nhất `VolumeMultiplier` (2) lần
+  trung bình 20 nến trước. Đối chiếu với thanh lý coin-margined của Binance 06/2023–10/2024: 54% nến như vậy trên BTC
+  1h và 62% trên ETH 1h rơi vào giờ thanh lý Long lớn nhất (top 5%). Không mua ngay vì giá hay rơi tiếp: chờ tối đa `ConfirmCandles`
+  (6) nến để có nến xanh đầu tiên đóng trên mức hồi (giữa giá mở và đáy nến xả) → Long; thủng đáy nến xả thì bỏ. Chỉ
+  phát Long, nên khi backtest chọn "chỉ Long" và đặt TP/SL. Backtest BTC và ETH 1h 2020–2026 (50 USDT × 2x, phí +
+  trượt): TP 6% / SL 3% gần hòa vốn (hệ số lãi 0,97), TP/SL chặt hơn thì lỗ — chưa phải lợi thế.
+- Mặc định có 5 chỉ báo: `btc-1h-myrsi` (đảo chiều), `eth-15m-myrsi-trend` (hồi trong xu hướng, EMA50),
+  `btc-1h-flowrsi` (RSI mua/bán chủ động), `btc-1h-macd` (MACD chậm 96/208/72) và `btc-1h-longflush` (bắt đáy sau cú xả
+  Long).
 
 ## 4. Paper Futures (Long/Short có đòn bẩy, tiền giả lập)
 
@@ -419,7 +428,9 @@ Trang Backtest có ô **Kiểu backtest**:
     của class ([`BacktestOptionsService`](../src/CryptoBot.Application/Backtesting/Options/BacktestOptionsService.cs)).
   - **Hướng lệnh:** chỉ Long, chỉ Short hoặc cả hai. Bật **đóng khi tín hiệu đảo chiều** (giống "Tự đóng khi đảo
     chiều" của quy tắc tự động): tín hiệu ngược chiều đóng lệnh, và với cả hai chiều thì mở luôn chiều kia ở cùng giá
-    mở. Tắt thì lệnh chỉ đóng ở TP/SL/thanh lý; cần ít nhất một cách đóng lệnh.
+    mở. Tắt thì lệnh chỉ đóng ở TP/SL/thanh lý; cần ít nhất một cách đóng lệnh. Chỉ báo chỉ phát một chiều
+    (`ICustomIndicator.PossibleSignals`, ví dụ LongFlush chỉ Long) không có tín hiệu ngược chiều để đóng lệnh, nên cần
+    TP hoặc SL; hướng lệnh không khớp chiều chỉ báo phát được (LongFlush với "chỉ Short") cũng bị từ chối.
   - **Khớp lệnh:** margin = khối lượng mỗi lệnh (% tiền đang có hoặc USDT cố định), giá trị vị thế = margin × đòn bẩy
     (1–125), phí tính trên giá trị vị thế ở cả lần mở và đóng, trượt giá bất lợi mỗi lần khớp, lỗ một lệnh tối đa bằng
     margin. Giá thanh lý theo ký quỹ duy trì (`FuturesMath.LiquidationPrice`); cắt lỗ phải nằm trước giá thanh lý. Giá

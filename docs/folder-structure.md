@@ -106,6 +106,8 @@ CryptoBot.Domain/
 │   │   └── MyRsiIndicator.cs     # Chỉ báo mẫu đầy đủ (đọc file này trước khi viết chỉ báo mới)
 │   ├── Macd/
 │   │   └── MacdIndicator.cs      # MACD chậm bám xu hướng (EMA nhanh − EMA chậm cắt đường tín hiệu)
+│   ├── LongFlush/
+│   │   └── LongFlushIndicator.cs # Bắt đáy sau cú xả Long (đâm mạnh + khối lượng lớn, chờ nến hồi xác nhận)
 │   ├── Template/
 │   │   └── TemplateIndicator.cs  # Khung trống để copy (không có [Indicator] nên không được đăng ký)
 │   └── Enums/                    # IndicatorSignal
