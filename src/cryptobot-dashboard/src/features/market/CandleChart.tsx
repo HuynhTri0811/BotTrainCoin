@@ -18,6 +18,7 @@ import {
   type UTCTimestamp,
 } from 'lightweight-charts';
 import type { ChartPoint, FuturesPosition, IndicatorChart, Signal } from '../../api/client';
+import { gappedLineData, visibleRange } from '../../components/gappedLine';
 import { useChartColors } from '../../theme';
 import { formatVnTick, formatVnUnix } from '../../time';
 
@@ -177,12 +178,20 @@ export function CandleChart({ candles, signals, fastLabel, slowLabel, position, 
   }, [linesKey, fastLabel, slowLabel, colors]);
 
   useEffect(() => {
+    const chart = handles.current?.chart;
+    const points = indicator?.points ?? [];
+    const times = points.map((point) => point.time);
     for (const [key, series] of indicatorSeries.current) {
-      series.setData(
-        (indicator?.points ?? [])
-          .filter((point) => point.values[key] != null)
-          .map((point) => ({ time: point.time as UTCTimestamp, value: point.values[key]! })),
-      );
+      const values = points.map((point) => point.values[key] ?? null);
+      // Đoạn đi qua nến không có giá trị (warm-up, thiếu nến, mức hồi LongFlush giữa hai cú xả) được tô ẩn, để không
+      // nối hai đoạn cách xa nhau bằng đường xiên; điểm ẩn không tính vào thang giá, nhãn giá chỉ hiện khi nến cuối
+      // có giá trị.
+      const line = gappedLineData(times, values, (index) => values[index] != null && values[index + 1] != null);
+      series.applyOptions({
+        lastValueVisible: values.at(-1) != null,
+        autoscaleInfoProvider: () => (chart ? visibleRange(chart, line) : null),
+      });
+      series.setData(values.some((value) => value != null) ? line.data : []);
     }
   }, [indicator, linesKey, fastLabel, slowLabel, colors]);
 

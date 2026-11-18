@@ -3,6 +3,7 @@ using CryptoBot.Application.Abstractions;
 using CryptoBot.Application.Indicators;
 using CryptoBot.Application.Signals;
 using CryptoBot.Domain.Backtesting;
+using CryptoBot.Domain.Indicators;
 using CryptoBot.Domain.MarketData;
 using CryptoBot.Domain.Strategies;
 
@@ -114,9 +115,37 @@ public sealed class BacktestService(IStrategyInstanceStore instances, ICandleSto
                 $"{string.Join(", ", IndicatorRegistry.AvailableTypes.Keys)}.");
         var indicator = IndicatorRegistry.Create(type,
             request.SignalParameters ?? new Dictionary<string, string?>());
+        if (OneSidedError(type, indicator.PossibleSignals, request.Settings) is { } sidesError)
+            throw new ArgumentException(sidesError);
         return new Signal(new IndicatorSignalSource(indicator),
             new BacktestSignalSpec(type, IndicatorRegistry.ReadParameters(indicator), indicator.RequiredCandles), null,
             null);
+    }
+
+    /// <summary>
+    /// Lỗi khi chỉ báo chỉ phát một chiều mà thiết lập Futures không bao giờ mở được lệnh (hướng lệnh không khớp), hoặc
+    /// mở rồi không bao giờ đóng (không có tín hiệu ngược chiều, không TP/SL); null nếu dùng được.
+    /// </summary>
+    private static string? OneSidedError(string type, IReadOnlyList<IndicatorSignal> signals, BacktestSettings settings)
+    {
+        var canLong = signals.Contains(IndicatorSignal.Long);
+        var canShort = signals.Contains(IndicatorSignal.Short);
+        if (canLong && canShort)
+            return null;
+
+        var only = canLong ? "Long" : "Short";
+        var opens = settings.Futures!.Direction switch
+        {
+            BacktestDirection.LongOnly => canLong,
+            BacktestDirection.ShortOnly => canShort,
+            _ => canLong || canShort,
+        };
+        if (!opens)
+            return $"Chỉ báo {type} chỉ phát {only}, hướng lệnh đã chọn không mở được lệnh nào.";
+        if (settings.TakeProfitPercent is null && settings.StopLossPercent is null)
+            return $"Chỉ báo {type} chỉ phát {only}, không có tín hiệu ngược chiều để đóng lệnh: hãy đặt chốt lời " +
+                   "hoặc cắt lỗ.";
+        return null;
     }
 
     /// <summary>Nến đã đóng có OpenTime trong [from, to], tăng dần, đọc theo trang.</summary>

@@ -110,8 +110,8 @@ Chi tiết thuật toán: [signal-functions.md](signal-functions.md).
   chỉ báo này đi theo xu hướng: tỉ lệ thắng thấp, lãi đến từ số ít lệnh đi xa, nên hợp với chốt lời xa hơn cắt lỗ.
 - **LongFlush**: bắt đáy sau cú xả Long (thanh lý Long hàng loạt). App chưa có dữ liệu thanh lý nên cú xả được nhận ra
   từ nến: giá đâm từ giá mở xuống đáy ít nhất `DropAtr` (2) lần ATR và khối lượng ít nhất `VolumeMultiplier` (2) lần
-  trung bình 20 nến trước. Trên BTC 1h 06/2023–10/2024, khoảng 60% nến như vậy trùng giờ thanh lý Long lớn nhất (top
-  5%, theo dữ liệu thanh lý coin-margined của Binance). Không mua ngay vì giá hay rơi tiếp: chờ tối đa `ConfirmCandles`
+  trung bình 20 nến trước. Đối chiếu với thanh lý coin-margined của Binance 06/2023–10/2024: 54% nến như vậy trên BTC
+  1h và 62% trên ETH 1h rơi vào giờ thanh lý Long lớn nhất (top 5%). Không mua ngay vì giá hay rơi tiếp: chờ tối đa `ConfirmCandles`
   (6) nến để có nến xanh đầu tiên đóng trên mức hồi (giữa giá mở và đáy nến xả) → Long; thủng đáy nến xả thì bỏ. Chỉ
   phát Long, nên khi backtest chọn "chỉ Long" và đặt TP/SL. Backtest BTC và ETH 1h 2020–2026 (50 USDT × 2x, phí +
   trượt): TP 6% / SL 3% gần hòa vốn (hệ số lãi 0,97), TP/SL chặt hơn thì lỗ — chưa phải lợi thế.
@@ -428,7 +428,9 @@ Trang Backtest có ô **Kiểu backtest**:
     của class ([`BacktestOptionsService`](../src/CryptoBot.Application/Backtesting/Options/BacktestOptionsService.cs)).
   - **Hướng lệnh:** chỉ Long, chỉ Short hoặc cả hai. Bật **đóng khi tín hiệu đảo chiều** (giống "Tự đóng khi đảo
     chiều" của quy tắc tự động): tín hiệu ngược chiều đóng lệnh, và với cả hai chiều thì mở luôn chiều kia ở cùng giá
-    mở. Tắt thì lệnh chỉ đóng ở TP/SL/thanh lý; cần ít nhất một cách đóng lệnh.
+    mở. Tắt thì lệnh chỉ đóng ở TP/SL/thanh lý; cần ít nhất một cách đóng lệnh. Chỉ báo chỉ phát một chiều
+    (`ICustomIndicator.PossibleSignals`, ví dụ LongFlush chỉ Long) không có tín hiệu ngược chiều để đóng lệnh, nên cần
+    TP hoặc SL; hướng lệnh không khớp chiều chỉ báo phát được (LongFlush với "chỉ Short") cũng bị từ chối.
   - **Khớp lệnh:** margin = khối lượng mỗi lệnh (% tiền đang có hoặc USDT cố định), giá trị vị thế = margin × đòn bẩy
     (1–125), phí tính trên giá trị vị thế ở cả lần mở và đóng, trượt giá bất lợi mỗi lần khớp, lỗ một lệnh tối đa bằng
     margin. Giá thanh lý theo ký quỹ duy trì (`FuturesMath.LiquidationPrice`); cắt lỗ phải nằm trước giá thanh lý. Giá

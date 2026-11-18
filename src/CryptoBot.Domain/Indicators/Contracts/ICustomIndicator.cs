@@ -35,6 +35,13 @@ public interface ICustomIndicator
     IReadOnlyList<IndicatorLine> Lines { get; }
 
     /// <summary>
+    /// Các tín hiệu chỉ báo có thể phát. Mặc định cả <see cref="IndicatorSignal.Long"/> và
+    /// <see cref="IndicatorSignal.Short"/>; chỉ báo một chiều (ví dụ <see cref="LongFlushIndicator"/> chỉ phát Long)
+    /// ghi đè để backtest từ chối thiết lập không bao giờ mở hoặc đóng được lệnh.
+    /// </summary>
+    IReadOnlyList<IndicatorSignal> PossibleSignals => [IndicatorSignal.Long, IndicatorSignal.Short];
+
+    /// <summary>
     /// Kiểm tra tham số sau khi đã đọc cấu hình. Gọi một lần lúc khởi động.
     /// </summary>
     /// <returns>

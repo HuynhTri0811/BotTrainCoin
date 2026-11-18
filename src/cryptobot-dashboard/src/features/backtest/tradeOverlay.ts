@@ -2,10 +2,8 @@ import {
   createSeriesMarkers,
   LineSeries,
   LineStyle,
-  type AutoscaleInfo,
   type IChartApi,
   type ISeriesApi,
-  type LineData,
   type SeriesMarker,
   type Time,
   type UTCTimestamp,
@@ -18,6 +16,7 @@ import type {
   StrategyParameters,
   TradeSide,
 } from '../../api/client';
+import { gappedLineData, visibleRange, type GappedLine } from '../../components/gappedLine';
 import { fmtPrice2, fmtSignedPercent } from '../futures/format';
 import { tradeLevels } from './describe';
 
@@ -34,7 +33,6 @@ export const sideColor = (side: TradeSide) => (side === 'Long' ? ENTRY_COLOR : S
 export const EMA_FAST_COLOR = 'rgba(217, 119, 6, 0.75)';
 export const EMA_SLOW_COLOR = 'rgba(37, 99, 235, 0.75)';
 const EXIT_TEXT = { TakeProfit: 'TP', StopLoss: 'SL', Signal: 'SELL', Liquidation: 'THANH LÝ' } as const;
-const HIDDEN = 'transparent';
 
 /** Lệnh để vẽ: lệnh đã đóng, hoặc lệnh còn mở ở cuối kỳ (exit null). */
 export interface OverlayTrade {
@@ -67,52 +65,12 @@ function barIndexAt(times: number[], unix: number): number {
 }
 
 /**
- * Dữ liệu cho một series có đoạn hiện, đoạn ẩn. Lightweight Charts 5 nối mọi điểm (khoảng trống không làm đứt
- * đường) và tô đoạn i → i+1 bằng màu của điểm i, nên đoạn i → i+1 chỉ hiện khi `connects(i)`; điểm không có giá trị
- * lấy giá của điểm có giá trị gần nhất phía trước (hoặc phía sau) để đoạn ẩn nằm ngang. `shown` đánh dấu điểm đang
- * hiện, dùng để tính thang giá.
- */
-function lineData(
-  times: number[],
-  values: (number | null)[],
-  connects: (index: number) => boolean,
-): { data: LineData[]; shown: boolean[] } {
-  const filled = [...values];
-  for (let index = 1; index < filled.length; index++) filled[index] ??= filled[index - 1];
-  for (let index = filled.length - 2; index >= 0; index--) filled[index] ??= filled[index + 1];
-
-  const drawsToNext = times.map((_, index) => index + 1 < times.length && connects(index));
-  const shown = times.map((_, index) => drawsToNext[index] || (index > 0 && drawsToNext[index - 1]));
-  const data = times.map((time, index) => ({
-    time: time as UTCTimestamp,
-    value: filled[index] ?? 0,
-    ...(drawsToNext[index] ? {} : { color: HIDDEN }),
-  }));
-  return { data, shown };
-}
-
-/** Khoảng giá của các điểm đang hiện trong vùng đang xem; null nếu không có (thang giá theo nến). */
-function visibleRange(chart: IChartApi, data: LineData[], shown: boolean[]): AutoscaleInfo | null {
-  const range = chart.timeScale().getVisibleLogicalRange();
-  const from = Math.max(0, Math.floor(range?.from ?? 0));
-  const to = Math.min(data.length - 1, Math.ceil(range?.to ?? data.length - 1));
-  let minValue = Infinity;
-  let maxValue = -Infinity;
-  for (let index = from; index <= to; index++) {
-    if (!shown[index]) continue;
-    minValue = Math.min(minValue, data[index].value);
-    maxValue = Math.max(maxValue, data[index].value);
-  }
-  return minValue <= maxValue ? { priceRange: { minValue, maxValue } } : null;
-}
-
-/**
- * Thêm một series đường từ `lineData`; điểm ẩn không được tính vào thang giá. `scale: false` thì cả đường không
+ * Thêm một series đường từ `gappedLineData`; điểm ẩn không được tính vào thang giá. `scale: false` thì cả đường không
  * được tính (giá thanh lý ở đòn bẩy thấp rất xa giá, sẽ ép dẹt nến).
  */
 function addLine(
   chart: IChartApi,
-  line: { data: LineData[]; shown: boolean[] },
+  line: GappedLine,
   { scale = true, ...options }: { color: string; lineStyle?: LineStyle; title?: string; scale?: boolean },
 ) {
   chart
@@ -122,7 +80,7 @@ function addLine(
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerVisible: false,
-      autoscaleInfoProvider: () => (scale ? visibleRange(chart, line.data, line.shown) : null),
+      autoscaleInfoProvider: () => (scale ? visibleRange(chart, line) : null),
     })
     .setData(line.data);
 }
@@ -138,7 +96,7 @@ export function addEmaLines(chart: IChartApi, bars: BacktestBar[], parameters: S
   const add = (pick: (bar: BacktestBar) => number | null, color: string, title: string) => {
     const values = bars.map(pick);
     if (values.every((value) => value == null)) return;
-    addLine(chart, lineData(times, values, (index) => values[index] != null && values[index + 1] != null), {
+    addLine(chart, gappedLineData(times, values, (index) => values[index] != null && values[index + 1] != null), {
       color,
       title,
     });
@@ -164,7 +122,7 @@ function segmentLine(times: number[], segments: Segment[]) {
     for (let index = segment.from; index <= segment.to; index++) owner[index] = segmentIndex;
   });
   const values = owner.map((segmentIndex) => (segmentIndex >= 0 ? segments[segmentIndex].price : null));
-  return lineData(times, values, (index) => owner[index] >= 0 && owner[index] === owner[index + 1]);
+  return gappedLineData(times, values, (index) => owner[index] >= 0 && owner[index] === owner[index + 1]);
 }
 
 /**

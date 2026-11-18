@@ -124,18 +124,67 @@ public class LongFlushIndicatorTests
     }
 
     [Fact]
-    public void Never_signals_short_even_after_a_spike_up()
+    public void Declares_only_long_and_ignores_a_spike_up()
     {
         LongFlushIndicator indicator = Small();
-        // Cú bơm lên đối xứng với cú xả, rồi giá rơi.
-        List<Candle> candles = Build(Calm, Calm, Calm, Calm, Calm, (100m, 106m, 100m, 105m, 30m),
-            (105m, 105.5m, 102m, 102.5m, 12m), (102.5m, 103m, 95m, 95.5m, 30m), Confirm);
+        // Nến bơm lên khối lượng lớn: giá mở bằng đáy nên không đâm xuống, không phải cú xả.
+        IndicatorResult result = indicator.Compute(Build(Calm, Calm, Calm, Calm, Calm, (100m, 106m, 100m, 105m, 30m),
+            (105m, 107m, 104.5m, 106.5m, 12m)));
 
-        List<IndicatorSignal> signals = Enumerable.Range(indicator.LookbackCandles, candles.Count - 6)
-            .Select(count => indicator.Compute(candles.GetRange(0, count)).Signal)
-            .ToList();
+        Assert.Equal([IndicatorSignal.Long], indicator.PossibleSignals);
+        Assert.Equal(IndicatorSignal.None, result.Signal);
+        Assert.Null(result.Values["reclaim"]);
+    }
 
-        Assert.DoesNotContain(IndicatorSignal.Short, signals);
+    [Fact]
+    public void Confirmation_exactly_at_the_waiting_limit_is_long()
+    {
+        // Xả ở nến 6, xác nhận ở nến 9: cách đúng ConfirmCandles = 3 nến.
+        IndicatorResult result = Small(lookback: 10).Compute(Build(Calm, Calm, Calm, Calm, Calm, Calm, Flush,
+            Waiting, Waiting, Confirm));
+
+        Assert.Equal(IndicatorSignal.Long, result.Signal);
+        Assert.Equal(97m, result.Values["reclaim"]);
+    }
+
+    [Fact]
+    public void The_reclaim_shown_on_a_signal_belongs_to_the_flush_that_fired()
+    {
+        // Xả f1 ở nến 5 (mức hồi 97), rồi xả nông hơn f2 ở nến 6 (đáy 96, mức hồi 100). Nến cuối đóng 98:
+        // xác nhận f1 nhưng chưa xác nhận f2 → Long theo f1, chart phải vẽ mức hồi 97 chứ không phải 100.
+        IndicatorResult result = Small(lookback: 8).Compute(Build(Calm, Calm, Calm, Calm, Calm, Flush,
+            (104m, 104m, 96m, 97m, 40m), (97m, 98.5m, 96.5m, 98m, 12m)));
+
+        Assert.Equal(IndicatorSignal.Long, result.Signal);
+        Assert.Equal(97m, result.Values["reclaim"]);
+        Assert.Contains("05:00 UTC", result.Reason);
+        Assert.Contains("đóng trên 97", result.Reason);
+    }
+
+    [Fact]
+    public void Flat_candles_say_the_measures_cannot_be_computed()
+    {
+        (decimal, decimal, decimal, decimal, decimal) flat = (100m, 100m, 100m, 100m, 10m);
+
+        IndicatorResult result = Small().Compute(Build(flat, flat, flat, flat, flat, flat, flat));
+
+        Assert.Equal(IndicatorSignal.None, result.Signal);
+        Assert.Null(result.Values["drop"]);
+        Assert.Contains("chưa tính được độ đâm (ATR bằng 0)", result.Reason);
+        Assert.DoesNotContain("  ", result.Reason);
+    }
+
+    [Fact]
+    public void Invalid_parameters_return_none_instead_of_throwing()
+    {
+        // ConfirmCandles 150 với cửa sổ 100 nến: trước đây đọc ra ngoài mảng.
+        LongFlushIndicator indicator = new() { ConfirmCandles = 150 };
+        List<Candle> candles = Build(Enumerable.Repeat(Calm, 120).ToArray());
+
+        IndicatorResult result = indicator.Compute(candles);
+
+        Assert.Equal(IndicatorSignal.None, result.Signal);
+        Assert.Contains("Tham số sai", result.Reason);
     }
 
     [Fact]
