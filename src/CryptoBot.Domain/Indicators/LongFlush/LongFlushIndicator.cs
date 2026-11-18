@@ -10,7 +10,8 @@ namespace CryptoBot.Domain.Indicators;
 ///   - giá đâm từ giá mở xuống đáy nến ít nhất <see cref="DropAtr"/> lần ATR (ATR của các nến trước đó), và
 ///   - khối lượng ít nhất <see cref="VolumeMultiplier"/> lần khối lượng trung bình của <see cref="VolumePeriod"/>
 ///     nến trước.
-/// Trên BTC 1h (06/2023 → 10/2024), khoảng 60% nến như vậy trùng với giờ thanh lý Long lớn nhất (top 5%).
+/// Đối chiếu với thanh lý coin-margined của Binance (06/2023 → 10/2024): 54% nến như vậy trên BTC 1h và 62% trên
+/// ETH 1h rơi vào giờ thanh lý Long lớn nhất (top 5%).
 ///
 /// Không mua ngay ở cú xả: giá thường còn rơi tiếp. Chỉ báo chờ tối đa <see cref="ConfirmCandles"/> nến để có nến
 /// xác nhận đầu tiên — nến xanh (đóng cao hơn mở) và đóng trên mức hồi = giữa giá mở và đáy của nến xả → Long.
