@@ -137,6 +137,17 @@ public class LongFlushIndicatorTests
     }
 
     [Fact]
+    public void Confirmation_exactly_at_the_waiting_limit_is_long()
+    {
+        // Xả ở nến 6, xác nhận ở nến 9: cách đúng ConfirmCandles = 3 nến.
+        IndicatorResult result = Small(lookback: 10).Compute(Build(Calm, Calm, Calm, Calm, Calm, Calm, Flush,
+            Waiting, Waiting, Confirm));
+
+        Assert.Equal(IndicatorSignal.Long, result.Signal);
+        Assert.Equal(97m, result.Values["reclaim"]);
+    }
+
+    [Fact]
     public void The_reclaim_shown_on_a_signal_belongs_to_the_flush_that_fired()
     {
         // Xả f1 ở nến 5 (mức hồi 97), rồi xả nông hơn f2 ở nến 6 (đáy 96, mức hồi 100). Nến cuối đóng 98:
