@@ -92,7 +92,8 @@ public sealed class LongFlushIndicator : ICustomIndicator
         Measure[] tail = MeasureTail(window, first);
 
         int? signalFlush = SignalFlush(window, tail, first, last);
-        int? shownFlush = LatestLiveFlush(window, tail, first, last);
+        // Có tín hiệu thì vẽ mức hồi của chính cú xả phát tín hiệu, không thì của cú xả mới nhất còn đang chờ.
+        int? shownFlush = signalFlush ?? LatestLiveFlush(window, tail, first, last);
         decimal? reclaim = shownFlush is { } shown ? ReclaimLevel(window[shown]) : null;
         Measure now = tail[^1];
         Dictionary<string, decimal?> values = new Dictionary<string, decimal?>

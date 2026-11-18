@@ -139,6 +139,20 @@ public class LongFlushIndicatorTests
     }
 
     [Fact]
+    public void The_reclaim_shown_on_a_signal_belongs_to_the_flush_that_fired()
+    {
+        // Xả f1 ở nến 5 (mức hồi 97), rồi xả nông hơn f2 ở nến 6 (đáy 96, mức hồi 100). Nến cuối đóng 98:
+        // xác nhận f1 nhưng chưa xác nhận f2 → Long theo f1, chart phải vẽ mức hồi 97 chứ không phải 100.
+        IndicatorResult result = Small(lookback: 8).Compute(Build(Calm, Calm, Calm, Calm, Calm, Flush,
+            (104m, 104m, 96m, 97m, 40m), (97m, 98.5m, 96.5m, 98m, 12m)));
+
+        Assert.Equal(IndicatorSignal.Long, result.Signal);
+        Assert.Equal(97m, result.Values["reclaim"]);
+        Assert.Contains("05:00 UTC", result.Reason);
+        Assert.Contains("đóng trên 97", result.Reason);
+    }
+
+    [Fact]
     public void Lines_match_the_value_keys()
     {
         LongFlushIndicator indicator = Small();
