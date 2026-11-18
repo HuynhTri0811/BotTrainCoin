@@ -103,4 +103,77 @@ public class LongFlushIndicatorTests
         Assert.Equal(IndicatorSignal.None, result.Signal);
     }
 
+    [Fact]
+    public void Uses_only_the_last_lookback_candles()
+    {
+        IndicatorResult result = Small().Compute(Build((500m, 900m, 1m, 2m, 9999m), (2m, 3m, 1m, 2m, 1m),
+            Calm, Calm, Calm, Calm, Calm, Flush, Confirm));
+
+        Assert.Equal(IndicatorSignal.Long, result.Signal);
+        Assert.Equal(97m, result.Values["reclaim"]);
+    }
+
+    [Fact]
+    public void Warm_up_without_enough_candles()
+    {
+        IndicatorResult result = Small().Compute(Build(Calm, Calm, Flush, Confirm));
+
+        Assert.Equal(IndicatorSignal.None, result.Signal);
+        Assert.Contains("Warm-up", result.Reason);
+        Assert.Empty(result.Values);
+    }
+
+    [Fact]
+    public void Never_signals_short_even_after_a_spike_up()
+    {
+        LongFlushIndicator indicator = Small();
+        // Cú bơm lên đối xứng với cú xả, rồi giá rơi.
+        List<Candle> candles = Build(Calm, Calm, Calm, Calm, Calm, (100m, 106m, 100m, 105m, 30m),
+            (105m, 105.5m, 102m, 102.5m, 12m), (102.5m, 103m, 95m, 95.5m, 30m), Confirm);
+
+        List<IndicatorSignal> signals = Enumerable.Range(indicator.LookbackCandles, candles.Count - 6)
+            .Select(count => indicator.Compute(candles.GetRange(0, count)).Signal)
+            .ToList();
+
+        Assert.DoesNotContain(IndicatorSignal.Short, signals);
+    }
+
+    [Fact]
+    public void Lines_match_the_value_keys()
+    {
+        LongFlushIndicator indicator = Small();
+
+        IndicatorResult result = indicator.Compute(Build(Calm, Calm, Calm, Calm, Calm, Flush, Confirm));
+
+        Assert.Equal(indicator.Lines.Select(line => line.Key).Order(), result.Values.Keys.Order());
+    }
+
+    [Fact]
+    public void Default_parameters_are_valid()
+    {
+        LongFlushIndicator indicator = new();
+
+        Assert.Null(indicator.Validate());
+        Assert.Equal((14, 2m, 20, 2m, 6, 100), (indicator.AtrPeriod, indicator.DropAtr, indicator.VolumePeriod,
+            indicator.VolumeMultiplier, indicator.ConfirmCandles, indicator.RequiredCandles));
+    }
+
+    [Theory]
+    [InlineData(0, 2, 2, 2, 3, 7)]   // AtrPeriod < 1
+    [InlineData(2, 0, 2, 2, 3, 7)]   // DropAtr <= 0
+    [InlineData(2, 2, 0, 2, 3, 7)]   // VolumePeriod < 1
+    [InlineData(2, 2, 2, 0, 3, 7)]   // VolumeMultiplier <= 0
+    [InlineData(2, 2, 2, 2, 0, 7)]   // ConfirmCandles < 1
+    [InlineData(2, 2, 2, 2, 3, 6)]   // LookbackCandles < max(AtrPeriod + 1, VolumePeriod) + ConfirmCandles + 1
+    public void Validate_rejects_bad_parameters(int atr, int drop, int volumePeriod, int volumeMultiplier, int confirm,
+        int lookback)
+    {
+        LongFlushIndicator indicator = new()
+        {
+            AtrPeriod = atr, DropAtr = drop, VolumePeriod = volumePeriod, VolumeMultiplier = volumeMultiplier,
+            ConfirmCandles = confirm, LookbackCandles = lookback,
+        };
+
+        Assert.NotNull(indicator.Validate());
+    }
 }
