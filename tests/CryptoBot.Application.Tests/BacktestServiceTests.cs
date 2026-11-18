@@ -327,6 +327,35 @@ public class BacktestServiceTests
         Assert.Equal("MyRsi", run!.Signal.Type);
     }
 
+    private static readonly Dictionary<string, string?> SmallFlush = new()
+    {
+        ["AtrPeriod"] = "2", ["VolumePeriod"] = "2", ["ConfirmCandles"] = "3", ["LookbackCandles"] = "7",
+    };
+
+    [Fact]
+    public async Task Long_only_indicators_need_a_take_profit_or_stop_loss_and_a_long_direction()
+    {
+        AddCandles(Waves(60));
+        var service = CreateService();
+        var shortOnly = FuturesBoth with
+        {
+            TakeProfitPercent = 2m,
+            Futures = FuturesBoth.Futures! with { Direction = BacktestDirection.ShortOnly },
+        };
+
+        var noExit = await Assert.ThrowsAsync<ArgumentException>(() => service.RunAsync(
+            new BacktestRequest(1, null, null, null, FuturesBoth, "LongFlush", SmallFlush), CancellationToken.None));
+        var noEntry = await Assert.ThrowsAsync<ArgumentException>(() => service.RunAsync(
+            new BacktestRequest(1, null, null, null, shortOnly, "LongFlush", SmallFlush), CancellationToken.None));
+        var run = await service.RunAsync(new BacktestRequest(1, null, null, null,
+            FuturesBoth with { TakeProfitPercent = 2m }, "LongFlush", SmallFlush), CancellationToken.None);
+
+        Assert.Contains("chỉ phát Long", noExit.Message);
+        Assert.Contains("chốt lời hoặc cắt lỗ", noExit.Message);
+        Assert.Contains("không mở được lệnh nào", noEntry.Message);
+        Assert.Equal("LongFlush", run!.Signal.Type);
+    }
+
     [Fact]
     public async Task Indicators_need_futures_and_a_known_type()
     {

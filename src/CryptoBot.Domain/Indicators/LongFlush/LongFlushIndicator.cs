@@ -71,6 +71,9 @@ public sealed class LongFlushIndicator : ICustomIndicator
 
     public int RequiredCandles => LookbackCandles;
 
+    /// <summary>Chỉ phát Long: không có tín hiệu nào đóng lệnh, nên backtest cần chốt lời hoặc cắt lỗ.</summary>
+    public IReadOnlyList<IndicatorSignal> PossibleSignals => [IndicatorSignal.Long];
+
     // ── 3. CÁCH VẼ ─────────────────────────────────────────────────────────────
     public IReadOnlyList<IndicatorLine> Lines =>
     [

@@ -428,7 +428,9 @@ Trang Backtest có ô **Kiểu backtest**:
     của class ([`BacktestOptionsService`](../src/CryptoBot.Application/Backtesting/Options/BacktestOptionsService.cs)).
   - **Hướng lệnh:** chỉ Long, chỉ Short hoặc cả hai. Bật **đóng khi tín hiệu đảo chiều** (giống "Tự đóng khi đảo
     chiều" của quy tắc tự động): tín hiệu ngược chiều đóng lệnh, và với cả hai chiều thì mở luôn chiều kia ở cùng giá
-    mở. Tắt thì lệnh chỉ đóng ở TP/SL/thanh lý; cần ít nhất một cách đóng lệnh.
+    mở. Tắt thì lệnh chỉ đóng ở TP/SL/thanh lý; cần ít nhất một cách đóng lệnh. Chỉ báo chỉ phát một chiều
+    (`ICustomIndicator.PossibleSignals`, ví dụ LongFlush chỉ Long) không có tín hiệu ngược chiều để đóng lệnh, nên cần
+    TP hoặc SL; hướng lệnh không khớp chiều chỉ báo phát được (LongFlush với "chỉ Short") cũng bị từ chối.
   - **Khớp lệnh:** margin = khối lượng mỗi lệnh (% tiền đang có hoặc USDT cố định), giá trị vị thế = margin × đòn bẩy
     (1–125), phí tính trên giá trị vị thế ở cả lần mở và đóng, trượt giá bất lợi mỗi lần khớp, lỗ một lệnh tối đa bằng
     margin. Giá thanh lý theo ký quỹ duy trì (`FuturesMath.LiquidationPrice`); cắt lỗ phải nằm trước giá thanh lý. Giá
