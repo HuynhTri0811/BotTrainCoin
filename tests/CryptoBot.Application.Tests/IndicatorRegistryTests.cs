@@ -41,6 +41,17 @@ public class IndicatorRegistryTests
             ("FastPeriod", "60"))));
     }
 
+    [Fact]
+    public void Creates_long_flush_from_its_configuration_keys()
+    {
+        var ind = Assert.IsType<LongFlushIndicator>(IndicatorRegistry.Create("LongFlush",
+            P(("DropAtr", "2.5"), ("VolumeMultiplier", "3"), ("ConfirmCandles", "4"), ("LookbackCandles", "60"))));
+
+        Assert.Equal((2.5m, 3m, 4, 60, 14), (ind.DropAtr, ind.VolumeMultiplier, ind.ConfirmCandles,
+            ind.RequiredCandles, ind.AtrPeriod));
+        Assert.Throws<ArgumentException>(() => IndicatorRegistry.Create("LongFlush", P(("LookbackCandles", "10"))));
+    }
+
     [Theory]
     [InlineData("Nope", "Period", "14", "Không có chỉ báo loại")]
     [InlineData("MyRsi", "Peroid", "14", "không tồn tại")]
