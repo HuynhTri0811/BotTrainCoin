@@ -88,6 +88,9 @@ Tham số của `FlowRsi`: `Period` (14), `Oversold` (30), `Overbought` (70), `L
 Tham số của `Macd`: `FastPeriod` (96), `SlowPeriod` (208, > `FastPeriod`), `SignalPeriod` (72, ≥ 2),
 `LookbackCandles` (600, ≥ `SlowPeriod + SignalPeriod`, tối đa 1000 khi backtest; một nến thiếu làm chỉ báo im lặng
 đúng bằng số nến này).
+Tham số của `LongFlush`: `AtrPeriod` (14), `DropAtr` (2, nến xả phải đâm từ giá mở xuống đáy ít nhất bấy nhiêu ATR),
+`VolumePeriod` (20), `VolumeMultiplier` (2, khối lượng nến xả so với trung bình), `ConfirmCandles` (6, chờ nến xác nhận
+tối đa bấy nhiêu nến), `LookbackCandles` (100, ≥ `max(AtrPeriod + 1, VolumePeriod) + ConfirmCandles + 1`).
 Lỗi (loại không tồn tại, tham số sai tên/kiểu, `Validate()` trả lỗi, interval sai) hiện trong
 `GET /api/indicators` → `errors` và log.
 
