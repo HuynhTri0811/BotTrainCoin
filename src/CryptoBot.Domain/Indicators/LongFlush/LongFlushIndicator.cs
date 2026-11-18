@@ -109,13 +109,13 @@ public sealed class LongFlushIndicator : ICustomIndicator
             Measure measure = tail[flush - first];
             return new IndicatorResult(values, IndicatorSignal.Long,
                 $"Xả Long lúc {flushCandle.OpenTimeUtc:yyyy-MM-dd HH:mm} UTC " +
-                $"(đâm {measure.Drop:0.#} ATR, khối lượng {measure.VolumeRatio:0.#}× TB), " +
+                $"({DescribeDrop(measure.Drop)}, {DescribeVolume(measure.VolumeRatio)}), " +
                 $"nến hồi đóng trên {ReclaimLevel(flushCandle):0.########}.");
         }
 
         string reason = reclaim is { } level
             ? $"Có cú xả, chờ nến xanh đóng trên {level:0.########}."
-            : $"Chưa có cú xả: đâm {now.Drop:0.##} ATR, khối lượng {now.VolumeRatio:0.##}× TB.";
+            : $"Chưa có cú xả: {DescribeDrop(now.Drop)}, {DescribeVolume(now.VolumeRatio)}.";
         return IndicatorResult.None(reason, values);
     }
 
@@ -175,6 +175,12 @@ public sealed class LongFlushIndicator : ICustomIndicator
 
     private bool IsFlush(Measure measure) =>
         measure.Drop is { } drop && drop >= DropAtr && measure.VolumeRatio is { } ratio && ratio >= VolumeMultiplier;
+
+    private static string DescribeDrop(decimal? drop) =>
+        drop is { } value ? $"đâm {value:0.##} ATR" : "chưa tính được độ đâm (ATR bằng 0)";
+
+    private static string DescribeVolume(decimal? ratio) =>
+        ratio is { } value ? $"khối lượng {value:0.##}× TB" : "chưa tính được khối lượng (trung bình bằng 0)";
 
     // Mức hồi = giữa giá mở và đáy của nến xả.
     private static decimal ReclaimLevel(Candle flush) => (flush.Open + flush.Low) / 2;

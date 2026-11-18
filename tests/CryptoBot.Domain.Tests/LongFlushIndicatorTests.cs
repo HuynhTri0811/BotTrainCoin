@@ -153,6 +153,19 @@ public class LongFlushIndicatorTests
     }
 
     [Fact]
+    public void Flat_candles_say_the_measures_cannot_be_computed()
+    {
+        (decimal, decimal, decimal, decimal, decimal) flat = (100m, 100m, 100m, 100m, 10m);
+
+        IndicatorResult result = Small().Compute(Build(flat, flat, flat, flat, flat, flat, flat));
+
+        Assert.Equal(IndicatorSignal.None, result.Signal);
+        Assert.Null(result.Values["drop"]);
+        Assert.Contains("chưa tính được độ đâm (ATR bằng 0)", result.Reason);
+        Assert.DoesNotContain("  ", result.Reason);
+    }
+
+    [Fact]
     public void Lines_match_the_value_keys()
     {
         LongFlushIndicator indicator = Small();
