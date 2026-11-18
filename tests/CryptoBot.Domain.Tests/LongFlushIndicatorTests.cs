@@ -166,6 +166,19 @@ public class LongFlushIndicatorTests
     }
 
     [Fact]
+    public void Invalid_parameters_return_none_instead_of_throwing()
+    {
+        // ConfirmCandles 150 với cửa sổ 100 nến: trước đây đọc ra ngoài mảng.
+        LongFlushIndicator indicator = new() { ConfirmCandles = 150 };
+        List<Candle> candles = Build(Enumerable.Repeat(Calm, 120).ToArray());
+
+        IndicatorResult result = indicator.Compute(candles);
+
+        Assert.Equal(IndicatorSignal.None, result.Signal);
+        Assert.Contains("Tham số sai", result.Reason);
+    }
+
+    [Fact]
     public void Lines_match_the_value_keys()
     {
         LongFlushIndicator indicator = Small();

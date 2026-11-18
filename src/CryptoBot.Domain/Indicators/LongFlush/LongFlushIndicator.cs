@@ -82,6 +82,9 @@ public sealed class LongFlushIndicator : ICustomIndicator
     // ── 4. CÔNG THỨC ───────────────────────────────────────────────────────────
     public IndicatorResult Compute(IReadOnlyList<Candle> closedCandles)
     {
+        // Registry luôn gọi Validate trước; kiểm tra lại để gọi trực tiếp với tham số sai không đọc ra ngoài cửa sổ.
+        if (Validate() is { } error)
+            return IndicatorResult.None($"Tham số sai: {error}");
         if (closedCandles.Count < LookbackCandles)
             return IndicatorResult.None($"Warm-up: có {closedCandles.Count}/{LookbackCandles} nến.");
 
