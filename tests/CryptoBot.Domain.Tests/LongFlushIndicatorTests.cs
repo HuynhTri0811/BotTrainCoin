@@ -124,18 +124,16 @@ public class LongFlushIndicatorTests
     }
 
     [Fact]
-    public void Never_signals_short_even_after_a_spike_up()
+    public void Declares_only_long_and_ignores_a_spike_up()
     {
         LongFlushIndicator indicator = Small();
-        // Cú bơm lên đối xứng với cú xả, rồi giá rơi.
-        List<Candle> candles = Build(Calm, Calm, Calm, Calm, Calm, (100m, 106m, 100m, 105m, 30m),
-            (105m, 105.5m, 102m, 102.5m, 12m), (102.5m, 103m, 95m, 95.5m, 30m), Confirm);
+        // Nến bơm lên khối lượng lớn: giá mở bằng đáy nên không đâm xuống, không phải cú xả.
+        IndicatorResult result = indicator.Compute(Build(Calm, Calm, Calm, Calm, Calm, (100m, 106m, 100m, 105m, 30m),
+            (105m, 107m, 104.5m, 106.5m, 12m)));
 
-        List<IndicatorSignal> signals = Enumerable.Range(indicator.LookbackCandles, candles.Count - 6)
-            .Select(count => indicator.Compute(candles.GetRange(0, count)).Signal)
-            .ToList();
-
-        Assert.DoesNotContain(IndicatorSignal.Short, signals);
+        Assert.Equal([IndicatorSignal.Long], indicator.PossibleSignals);
+        Assert.Equal(IndicatorSignal.None, result.Signal);
+        Assert.Null(result.Values["reclaim"]);
     }
 
     [Fact]
