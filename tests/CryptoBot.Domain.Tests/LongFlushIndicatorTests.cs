@@ -64,4 +64,43 @@ public class LongFlushIndicatorTests
         Assert.Contains("chờ nến xanh đóng trên 97", result.Reason);
     }
 
+    [Fact]
+    public void A_new_low_below_the_flush_cancels_it()
+    {
+        IndicatorResult result = Small().Compute(Build(Calm, Calm, Calm, Calm, Flush,
+            (95m, 95.5m, 93m, 94m, 12m), (94m, 99m, 93.5m, 99m, 12m)));
+
+        Assert.Equal(IndicatorSignal.None, result.Signal);
+        Assert.Null(result.Values["reclaim"]);
+    }
+
+    [Fact]
+    public void A_drop_without_a_volume_spike_is_not_a_flush()
+    {
+        IndicatorResult result = Small().Compute(Build(Calm, Calm, Calm, Calm, Calm,
+            (100m, 100m, 94m, 95m, 12m), Confirm));
+
+        Assert.Equal(IndicatorSignal.None, result.Signal);
+        Assert.Contains("Chưa có cú xả", result.Reason);
+    }
+
+    [Fact]
+    public void A_small_drop_with_high_volume_is_not_a_flush()
+    {
+        IndicatorResult result = Small().Compute(Build(Calm, Calm, Calm, Calm, Calm,
+            (100m, 100m, 97m, 98m, 30m), (98m, 99.5m, 97.5m, 99m, 12m)));
+
+        Assert.Equal(IndicatorSignal.None, result.Signal);
+    }
+
+    [Fact]
+    public void Confirmation_after_the_waiting_limit_is_ignored()
+    {
+        // Xả ở nến 5, xác nhận ở nến 9: cách 4 nến, quá ConfirmCandles = 3.
+        IndicatorResult result = Small(lookback: 10).Compute(Build(Calm, Calm, Calm, Calm, Calm, Flush,
+            Waiting, Waiting, Waiting, Confirm));
+
+        Assert.Equal(IndicatorSignal.None, result.Signal);
+    }
+
 }
