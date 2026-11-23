@@ -1,6 +1,8 @@
+using CryptoBot.Application.Abstractions;
 using CryptoBot.Application.Futures;
 using CryptoBot.Domain.Futures;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace CryptoBot.Infrastructure.Persistence;
 
@@ -13,8 +15,24 @@ public sealed class PaperFuturesStore(BotDbContext db) : IPaperFuturesStore
             .Where(position => position.Environment == Env && position.Status == PositionStatus.Open)
             .OrderBy(position => position.Id).ToListAsync(ct);
 
-    public Task<FuturesPosition?> GetAsync(long id, CancellationToken ct) =>
-        db.FuturesPositions.FirstOrDefaultAsync(position => position.Environment == Env && position.Id == id, ct);
+    /// <summary>
+    /// Đọc vị thế với trạng thái mới nhất trong database. Truy vấn lại không làm mới entity đã tracking, nên vị thế
+    /// đã được DbContext này đọc trước đó (ví dụ khi worker kiểm tra SL/TP) được tải lại để không quyết định đóng
+    /// trên trạng thái cũ.
+    /// </summary>
+    public async Task<FuturesPosition?> GetAsync(long id, CancellationToken ct)
+    {
+        FuturesPosition? tracked = db.FuturesPositions.Local.FirstOrDefault(position => position.Id == id);
+        if (tracked is null)
+            return await db.FuturesPositions.FirstOrDefaultAsync(
+                position => position.Environment == Env && position.Id == id, ct);
+
+        EntityEntry<FuturesPosition> entry = db.Entry(tracked);
+        if (entry.State == EntityState.Added)
+            return tracked;
+        await entry.ReloadAsync(ct);
+        return entry.State == EntityState.Detached ? null : tracked;
+    }
 
     public Task<FuturesPosition?> FindByOpenCommandAsync(Guid commandId, CancellationToken ct) =>
         db.FuturesPositions.FirstOrDefaultAsync(
@@ -51,5 +69,38 @@ public sealed class PaperFuturesStore(BotDbContext db) : IPaperFuturesStore
 
     public void AddLedger(PaperLedgerEntry entry) => db.PaperLedger.Add(entry);
 
-    public Task SaveAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
+    /// <summary>
+    /// Lưu vị thế và bút toán trong một transaction. Vị thế mang concurrency token (xmin của PostgreSQL): nếu bên
+    /// khác đã đổi vị thế sau khi đọc (ví dụ đã đóng), cả lần lưu bị hủy, các thay đổi Paper chưa lưu bị bỏ và vị thế
+    /// được đọc lại, rồi ném <see cref="ConcurrentUpdateException"/>. Nhờ vậy không thể ghi bút toán đóng hai lần.
+    /// </summary>
+    public async Task SaveAsync(CancellationToken ct)
+    {
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            await DiscardPendingAsync(ct);
+            throw new ConcurrentUpdateException("Vị thế đã bị thay đổi bởi thao tác khác; không lưu thay đổi.",
+                exception);
+        }
+    }
+
+    private async Task DiscardPendingAsync(CancellationToken ct)
+    {
+        foreach (EntityEntry<PaperLedgerEntry> entry in db.ChangeTracker.Entries<PaperLedgerEntry>()
+                     .Where(tracked => tracked.State == EntityState.Added).ToList())
+            entry.State = EntityState.Detached;
+
+        foreach (EntityEntry<FuturesPosition> entry in db.ChangeTracker.Entries<FuturesPosition>()
+                     .Where(tracked => tracked.State is EntityState.Added or EntityState.Modified).ToList())
+        {
+            if (entry.State == EntityState.Added)
+                entry.State = EntityState.Detached;
+            else
+                await entry.ReloadAsync(ct);
+        }
+    }
 }
