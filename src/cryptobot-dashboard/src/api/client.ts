@@ -656,6 +656,8 @@ export interface SavedDailyReport {
   interval: string;
   createdAtUtc: string;
   report: DailyMoveReport;
+  /** false khi sàn mới trả một phần nến của khoảng; bot sẽ lập lại khi đủ. */
+  isComplete: boolean;
 }
 
 export interface DailyReportList {
