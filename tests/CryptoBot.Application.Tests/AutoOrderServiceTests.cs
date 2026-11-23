@@ -20,7 +20,11 @@ public class AutoOrderServiceTests
         TakerFeeRate = 0.0005m,
         SlippageRate = 0m,
         MaxLeverage = 10,
-        Symbols = [new FuturesSymbolOptions { Symbol = "BTCUSDT", QuantityStep = 0.001m, TickSize = 0.1m, MinNotional = 50m, MaintenanceMarginRate = 0.004m }],
+        Symbols =
+        [
+            new FuturesSymbolOptions { Symbol = "BTCUSDT", QuantityStep = 0.001m, TickSize = 0.1m, MinNotional = 50m, MaintenanceMarginRate = 0.004m },
+            new FuturesSymbolOptions { Symbol = "ETHUSDT", QuantityStep = 0.001m, TickSize = 0.1m, MinNotional = 50m, MaintenanceMarginRate = 0.004m },
+        ],
     };
     private readonly AutoOrderOptions _options = new();
     private readonly MarkPriceCache _marks;
@@ -221,6 +225,35 @@ public class AutoOrderServiceTests
 
         Assert.Empty(_paperStore.Positions);
         Assert.False((await _svc.CancelAsync(rule.Id, default)).Cancelled);
+    }
+
+    [Fact]
+    public async Task Daily_loss_limit_is_rechecked_after_each_opening_fee()
+    {
+        Assert.Equal(5m, _options.DailyLossLimitPercent);
+        // Lỗ hôm nay 49,9 USDT: chưa chạm giới hạn 50 USDT (5% của 1000).
+        _paperStore.Ledger.Add(new PaperLedgerEntry(-49.9m, LedgerEntryType.RealizedPnl, null, "test", T0));
+        _marks.Set(new MarkPrice("BTCUSDT", 100m, T0));
+        _marks.Set(new MarkPrice("ETHUSDT", 100m, T0));
+        foreach (var symbol in new[] { "BTCUSDT", "ETHUSDT" })
+            Assert.NotNull((await _svc.CreateAsync(new CreateRuleRequest(symbol, PositionSide.Long,
+                TriggerCondition.AtOrBelow, 99m, 200m, 2, 1m, 2m), default)).Rule);
+        _marks.Set(new MarkPrice("BTCUSDT", 99m, T0));
+        _marks.Set(new MarkPrice("ETHUSDT", 99m, T0));
+
+        Assert.Equal(1, await _svc.EvaluateAsync(default));
+
+        // Phí mở lệnh đầu (0,19998 USDT) đẩy lỗ lên 50,09998 USDT: lệnh thứ hai bị chặn, quy tắc vẫn chờ.
+        var position = Assert.Single(_paperStore.Positions);
+        Assert.Equal("BTCUSDT", position.Symbol);
+        Assert.Equal(0.19998m, position.OpenFee);
+        var blocked = _ruleStore.Rules.Single(rule => rule.Symbol == "ETHUSDT");
+        Assert.Equal(AutoRuleStatus.Active, blocked.Status);
+        Assert.Contains("Bị chặn", blocked.Note);
+        Assert.True((await _svc.GetRiskAsync(default)).Blocked);
+
+        // Đóng lệnh vẫn được phép khi đã chạm giới hạn.
+        Assert.True((await _paper.CloseAsync(position.Id, Guid.NewGuid(), default)).Ok);
     }
 
     [Fact]
