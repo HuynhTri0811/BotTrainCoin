@@ -13,6 +13,15 @@ public sealed class MarketDataOptions
     /// <summary>Số batch tối đa mỗi lần sync, tránh một lần sync kéo dài vô hạn.</summary>
     public int MaxBatchesPerSync { get; set; } = 20;
 
+    /// <summary>Số khoảng thiếu (giữa các nến đã lưu trong cửa sổ gần đây) được tải lại tối đa mỗi lần sync.</summary>
+    public int MaxGapRepairsPerSync { get; set; } = 5;
+
+    /// <summary>Số lần tải lại tối đa cho một khoảng thiếu; sàn vẫn không có nến thì bỏ, không tải lại mãi.</summary>
+    public int MaxGapRepairAttempts { get; set; } = 12;
+
+    /// <summary>Khoảng cách giữa hai lần tải lại cùng một khoảng thiếu.</summary>
+    public TimeSpan GapRepairRetryInterval { get; set; } = TimeSpan.FromMinutes(5);
+
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(15);
 
     /// <summary>Không sync thành công trong khoảng này thì dữ liệu bị coi là stale.</summary>

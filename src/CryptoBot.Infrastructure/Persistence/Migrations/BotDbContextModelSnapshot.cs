@@ -230,6 +230,12 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                     b.Property<decimal?>("TriggeredMarkPrice")
                         .HasColumnType("numeric");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CommandId")
@@ -316,6 +322,12 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
 
                     b.Property<decimal?>("TakeProfit")
                         .HasColumnType("numeric");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.HasKey("Id");
 
@@ -459,6 +471,9 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)");
+
+                    b.Property<bool>("IsComplete")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("PeriodEndUtc")
                         .HasColumnType("timestamp with time zone");

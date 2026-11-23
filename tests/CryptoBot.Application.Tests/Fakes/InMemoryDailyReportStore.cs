@@ -8,8 +8,8 @@ internal sealed class InMemoryDailyReportStore : IDailyReportStore
     public readonly List<DailyReport> Reports = [];
     private readonly List<DailyReport> _pending = [];
 
-    public Task<bool> ExistsAsync(string symbol, DateTime periodEndUtc, CancellationToken ct) =>
-        Task.FromResult(Reports.Any(report => report.Symbol == symbol && report.PeriodEndUtc == periodEndUtc));
+    public Task<DailyReport?> FindAsync(string symbol, DateTime periodEndUtc, CancellationToken ct) =>
+        Task.FromResult(Reports.FirstOrDefault(report => report.Symbol == symbol && report.PeriodEndUtc == periodEndUtc));
 
     public Task<IReadOnlyList<DailyReport>> GetRecentAsync(string? symbol, int limit, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<DailyReport>>(Reports

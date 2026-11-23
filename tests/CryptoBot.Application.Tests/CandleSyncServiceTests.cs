@@ -12,12 +12,13 @@ public class CandleSyncServiceTests
 
     private readonly FakeClock _clock = new(T0);
     private readonly InMemoryCandleStore _store = new();
+    private readonly CandleGapTracker _gaps = new();
     private readonly FakeMarketDataClient _client;
 
     public CandleSyncServiceTests() => _client = new FakeMarketDataClient(_clock);
 
     private CandleSyncService CreateService(int batchSize = 1000, int bootstrap = 10) =>
-        new(_client, _store, new MarketDataOptions { BatchSize = batchSize, BootstrapCandles = bootstrap },
+        new(_client, _store, _gaps, new MarketDataOptions { BatchSize = batchSize, BootstrapCandles = bootstrap },
             NullLogger<CandleSyncService>.Instance);
 
     private void AddKlines(int from, int count, decimal price = 100)
@@ -146,5 +147,67 @@ public class CandleSyncServiceTests
         await CreateService().SyncAsync(Key, CancellationToken.None);
 
         Assert.All(_store.Candles.Values, candle => Assert.Equal(0.25m, candle.TakerBuyVolume));
+    }
+
+    private static readonly DateTime GapServerTime = new(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+
+    /// <summary>Nến 1h đã đóng, đủ số giao dịch và khối lượng mua chủ động (không đi vào nhánh bổ sung thống kê).</summary>
+    private static KlineDto FullKline(int hour, decimal price = 100) =>
+        new(GapServerTime.AddHours(hour), price, price, price, price, 1, TradeCount: 5, TakerBuyVolume: 0.5m);
+
+    [Fact]
+    public async Task Sync_recovers_a_gap_after_the_exchange_restores_the_missing_candle()
+    {
+        _clock.UtcNow = GapServerTime;
+        _client.Klines.AddRange([FullKline(-4), FullKline(-2)]); // 20:00 và 22:00, thiếu 21:00
+        await CreateService().SyncAsync(Key, CancellationToken.None);
+        Assert.Equal([GapServerTime.AddHours(-4), GapServerTime.AddHours(-2)], _store.Candles.Keys);
+
+        _client.Klines.Insert(1, FullKline(-3));
+        var result = await CreateService().SyncAsync(Key, CancellationToken.None);
+
+        Assert.Equal(1, result.Inserted);
+        Assert.Equal([GapServerTime.AddHours(-4), GapServerTime.AddHours(-3), GapServerTime.AddHours(-2)],
+            _store.Candles.Keys);
+    }
+
+    [Fact]
+    public async Task Sync_replaces_a_rejected_candle_once_the_exchange_serves_a_valid_one()
+    {
+        _clock.UtcNow = GapServerTime;
+        _client.Klines.AddRange([FullKline(-4), FullKline(-3) with { High = 50 }, FullKline(-2)]); // High < Open
+        await CreateService().SyncAsync(Key, CancellationToken.None);
+        Assert.DoesNotContain(GapServerTime.AddHours(-3), _store.Candles.Keys);
+
+        _client.Klines[1] = FullKline(-3, price: 101);
+        await CreateService().SyncAsync(Key, CancellationToken.None);
+
+        Assert.Equal(101, _store.Candles[GapServerTime.AddHours(-3)].Close);
+    }
+
+    [Fact]
+    public async Task Permanent_gap_is_retried_a_limited_number_of_times()
+    {
+        _clock.UtcNow = GapServerTime;
+        _client.Klines.AddRange([FullKline(-4), FullKline(-2)]);
+        var options = new MarketDataOptions
+        {
+            BootstrapCandles = 10, MaxGapRepairAttempts = 2, GapRepairRetryInterval = TimeSpan.FromMinutes(5),
+        };
+        CandleSyncService Service() => new(_client, _store, _gaps, options, NullLogger<CandleSyncService>.Instance);
+        await Service().SyncAsync(Key, CancellationToken.None);
+
+        async Task<int> CallsDuringSyncAt(TimeSpan offset)
+        {
+            _clock.UtcNow = GapServerTime + offset;
+            var before = _client.Calls;
+            await Service().SyncAsync(Key, CancellationToken.None);
+            return _client.Calls - before;
+        }
+
+        Assert.Equal(2, await CallsDuringSyncAt(TimeSpan.Zero));                 // tải lại khoảng thiếu + nến mới
+        Assert.Equal(1, await CallsDuringSyncAt(TimeSpan.FromMinutes(1)));       // chưa đến lần thử kế tiếp
+        Assert.Equal(2, await CallsDuringSyncAt(TimeSpan.FromMinutes(5)));       // lần thử thứ hai
+        Assert.Equal(1, await CallsDuringSyncAt(TimeSpan.FromMinutes(30)));      // hết lượt thử: bỏ khoảng thiếu
     }
 }

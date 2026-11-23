@@ -4,7 +4,8 @@ namespace CryptoBot.Application.Reports;
 
 public interface IDailyReportStore
 {
-    Task<bool> ExistsAsync(string symbol, DateTime periodEndUtc, CancellationToken ct);
+    /// <summary>Báo cáo của (symbol, giờ lập) để cập nhật; null khi chưa có.</summary>
+    Task<DailyReport?> FindAsync(string symbol, DateTime periodEndUtc, CancellationToken ct);
 
     /// <summary>Tối đa <paramref name="limit"/> báo cáo mới nhất (theo cuối khoảng), mới → cũ.</summary>
     Task<IReadOnlyList<DailyReport>> GetRecentAsync(string? symbol, int limit, CancellationToken ct);

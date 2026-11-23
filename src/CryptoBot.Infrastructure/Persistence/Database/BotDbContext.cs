@@ -9,6 +9,9 @@ namespace CryptoBot.Infrastructure.Persistence;
 
 public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbContext(options)
 {
+    /// <summary>Shadow property ánh xạ tới cột hệ thống xmin của PostgreSQL, dùng làm concurrency token.</summary>
+    public const string RowVersion = "Version";
+
     public DbSet<Candle> Candles => Set<Candle>();
     public DbSet<StrategyInstance> StrategyInstances => Set<StrategyInstance>();
     public DbSet<TradingSignal> Signals => Set<TradingSignal>();
@@ -73,6 +76,8 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
             entity.Property(position => position.Status).HasConversion<string>().HasMaxLength(16);
             entity.Property(position => position.CloseReason).HasConversion<string>().HasMaxLength(16);
             entity.Ignore(position => position.NetPnl);
+            // Concurrency token (cột hệ thống xmin): hai DbContext không thể cùng đóng một vị thế.
+            entity.Property<uint>(RowVersion).IsRowVersion();
             // Chống mở trùng khi cùng một lệnh được gửi lại.
             entity.HasIndex(position => new { position.Environment, position.OpenCommandId }).IsUnique();
             entity.HasIndex(position => new { position.Environment, position.Status, position.Symbol });
@@ -92,6 +97,8 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
             entity.Property(rule => rule.TriggerDetail).HasMaxLength(500);
             entity.Property(rule => rule.CloseDetail).HasMaxLength(500);
             entity.Ignore(rule => rule.IsWatchingClose);
+            // Concurrency token (cột hệ thống xmin): không ghi đè trạng thái quy tắc từ bản đọc cũ.
+            entity.Property<uint>(RowVersion).IsRowVersion();
             entity.HasIndex(rule => rule.CommandId).IsUnique();
             entity.HasIndex(rule => new { rule.Environment, rule.Status });
         });

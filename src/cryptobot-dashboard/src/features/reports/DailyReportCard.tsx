@@ -32,7 +32,11 @@ export function DailyReportCard({ saved }: { saved: SavedDailyReport }) {
   });
 
   return (
-    <Card size="small" title={`${coin} · ${formatVn(result.fromUtc)} → ${formatVn(result.toUtc)}`}>
+    <Card
+      size="small"
+      title={`${coin} · ${formatVn(result.fromUtc)} → ${formatVn(result.toUtc)}`}
+      extra={!saved.isComplete && <Tag color="orange">Chưa đủ nến ({result.candleCount}) · sẽ lập lại</Tag>}
+    >
       <Typography.Paragraph>
         {coin} {verb}{' '}
         <Typography.Text strong style={{ color: pctColor(result.changePercent) }}>

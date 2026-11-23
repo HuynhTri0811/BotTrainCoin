@@ -44,6 +44,7 @@ public static class DependencyInjection
         services.AddSingleton(config.GetSection("MarketData").Get<MarketDataOptions>() ?? new MarketDataOptions());
         services.AddSingleton(config.GetSection("Signals").Get<SignalOptions>() ?? new SignalOptions());
         services.AddSingleton<MarketDataStatusRegistry>();
+        services.AddSingleton<CandleGapTracker>();
         services.AddScoped<CandleSyncService>();
         // Tải nến cũ cho backtest (chỉ đi lùi về trước nến sớm nhất đã lưu).
         services.AddScoped<CandleBackfillService>();
@@ -72,6 +73,7 @@ public static class DependencyInjection
         services.AddScoped<IPaperFuturesStore, PaperFuturesStore>();
         services.AddScoped<PaperFuturesService>();
         services.AddSingleton(config.GetSection("AutoOrders").Get<AutoOrderOptions>() ?? new AutoOrderOptions());
+        services.AddSingleton<AutoOrderLock>();
         services.AddScoped<IAutoOrderStore, AutoOrderStore>();
         services.AddScoped<AutoOrderService>();
         services.AddHttpClient<IMarkPriceClient, BinanceFuturesMarkPriceClient>((sp, http) =>

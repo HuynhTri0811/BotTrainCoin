@@ -9,6 +9,10 @@ public interface ICandleStore
     /// <summary>OpenTime sớm nhất (từ <paramref name="fromUtc"/>) của nến chưa có số giao dịch hoặc khối lượng mua chủ động; null nếu đủ.</summary>
     Task<DateTime?> GetFirstMissingStatsOpenTimeAsync(CandleKey key, DateTime fromUtc, CancellationToken ct);
 
+    /// <summary>OpenTime của mọi nến đã lưu trong [<paramref name="fromUtc"/>, <paramref name="toUtc"/>], tăng dần.</summary>
+    Task<IReadOnlyList<DateTime>> GetOpenTimesAsync(CandleKey key, DateTime fromUtc, DateTime toUtc,
+        CancellationToken ct);
+
     /// <summary>
     /// Thêm/cập nhật một lô nến. Các lần gọi cùng khóa nến chạy lần lượt (kể cả từ DbContext khác), nên các bên ghi
     /// chồng khoảng nhau không cùng chèn một nến.
