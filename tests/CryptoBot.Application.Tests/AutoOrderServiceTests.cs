@@ -42,7 +42,7 @@ public class AutoOrderServiceTests
                 Parameters = new() { ["Period"] = "2", ["LookbackCandles"] = "5" },
             },
         ], NullLogger<IndicatorRegistry>.Instance);
-        _svc = new AutoOrderService(_ruleStore, _paperStore, _paper, _marks, new IndicatorService(registry, _candles),
+        _svc = new AutoOrderService(_ruleStore, _paperStore, _paper, new AutoOrderLock(), _marks, new IndicatorService(registry, _candles),
             registry, _paperOptions, _options, _clock, NullLogger<AutoOrderService>.Instance);
         SetMark(100_000m);
         _paper.EnsureFundedAsync(default).GetAwaiter().GetResult();
@@ -214,13 +214,13 @@ public class AutoOrderServiceTests
     public async Task Cancelled_rule_never_fires()
     {
         var rule = await CreateRule();
-        Assert.True(await _svc.CancelAsync(rule.Id, default));
+        Assert.True((await _svc.CancelAsync(rule.Id, default)).Cancelled);
         SetMark(97_900m);
 
         await _svc.EvaluateAsync(default);
 
         Assert.Empty(_paperStore.Positions);
-        Assert.False(await _svc.CancelAsync(rule.Id, default));
+        Assert.False((await _svc.CancelAsync(rule.Id, default)).Cancelled);
     }
 
     [Theory]

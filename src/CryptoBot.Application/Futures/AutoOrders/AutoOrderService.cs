@@ -15,6 +15,7 @@ public sealed class AutoOrderService(
     IAutoOrderStore store,
     IPaperFuturesStore paperStore,
     PaperFuturesService paper,
+    AutoOrderLock ruleGate,
     MarkPriceCache marks,
     IndicatorService indicators,
     IndicatorRegistry indicatorRegistry,
@@ -86,14 +87,35 @@ public sealed class AutoOrderService(
         return new CreateRuleResult(rule, []);
     }
 
-    public async Task<bool> CancelAsync(long id, CancellationToken ct)
+    /// <summary>
+    /// Hủy quy tắc đang chờ. Chạy chung khóa với lúc kích hoạt và đọc lại trạng thái trong database: hủy thành công
+    /// thì worker không còn mở lệnh từ quy tắc này; quy tắc đã kích hoạt trước thì không hủy được.
+    /// </summary>
+    public async Task<CancelRuleResult> CancelAsync(long id, CancellationToken ct)
     {
-        var rule = await store.GetAsync(id, ct);
-        if (rule is null || rule.Status != AutoRuleStatus.Active)
-            return false;
-        rule.Cancel();
-        await store.SaveAsync(ct);
-        return true;
+        await ruleGate.Semaphore.WaitAsync(ct);
+        try
+        {
+            var rule = await store.GetAsync(id, ct);
+            if (rule is null || rule.Status != AutoRuleStatus.Active)
+                return new CancelRuleResult(false, rule);
+            rule.Cancel();
+            try
+            {
+                await store.SaveAsync(ct);
+            }
+            catch (ConcurrentUpdateException)
+            {
+                // Bên khác (tiến trình khác) vừa đổi quy tắc: báo theo trạng thái thật, không báo hủy thành công.
+                return new CancelRuleResult(false, await store.GetAsync(id, ct));
+            }
+
+            return new CancelRuleResult(true, rule);
+        }
+        finally
+        {
+            ruleGate.Semaphore.Release();
+        }
     }
 
     /// <summary>
@@ -114,9 +136,7 @@ public sealed class AutoOrderService(
         if (active.Count == 0)
             return 0;
 
-        DailyRiskState? risk = null;
         var fired = 0;
-        var changed = false;
 
         foreach (var rule in active)
         {
@@ -136,35 +156,58 @@ public sealed class AutoOrderService(
                 continue;
             }
 
-            risk ??= await GetRiskAsync(ct);
+            if (await TryFireAsync(rule, mark.Price, detail, ct))
+                fired++;
+        }
+
+        return fired;
+    }
+
+    /// <summary>
+    /// Kích hoạt một quy tắc đã thỏa điều kiện. Trong khóa quy tắc, trạng thái được đọc lại từ database ngay trước khi
+    /// mở lệnh, nên quy tắc vừa bị hủy ở request khác không mở vị thế, và quy tắc được lưu ngay sau khi mở.
+    /// Trả về true khi đã mở vị thế.
+    /// </summary>
+    private async Task<bool> TryFireAsync(AutoOrderRule rule, decimal markPrice, string? detail, CancellationToken ct)
+    {
+        await ruleGate.Semaphore.WaitAsync(ct);
+        try
+        {
+            if (await store.GetAsync(rule.Id, ct) is not { Status: AutoRuleStatus.Active })
+                return false;
+
+            var risk = await GetRiskAsync(ct);
             if (risk.Blocked)
             {
-                changed |= rule.SetBlockedNote(
-                    $"Bị chặn: lỗ hôm nay {risk.TodayRealizedPnl:0.##} USDT đã chạm giới hạn −{risk.LossLimit:0.##} USDT.");
-                continue;
+                if (rule.SetBlockedNote(
+                        $"Bị chặn: lỗ hôm nay {risk.TodayRealizedPnl:0.##} USDT đã chạm giới hạn −{risk.LossLimit:0.##} USDT."))
+                    await store.SaveAsync(ct);
+                return false;
             }
 
-            var request = BuildRequest(rule, mark.Price);
+            var request = BuildRequest(rule, markPrice);
             var result = await paper.OpenAsync(request, ct);
+            var opened = false;
             if (result.Position is { } position)
             {
-                rule.MarkTriggered(mark.Price, position.Id, clock.UtcNow, detail);
-                fired++;
+                rule.MarkTriggered(markPrice, position.Id, clock.UtcNow, detail);
+                opened = true;
                 logger.LogWarning("Auto rule #{Id} KÍCH HOẠT: {Symbol} mark {Mark} -> {Side} {Qty} @ {Entry}",
-                    rule.Id, rule.Symbol, mark.Price, position.Side, position.Quantity, position.EntryPrice);
+                    rule.Id, rule.Symbol, markPrice, position.Side, position.Quantity, position.EntryPrice);
             }
             else
             {
-                rule.MarkRejected(mark.Price, string.Join(" ", result.Quote.Errors), clock.UtcNow, detail);
+                rule.MarkRejected(markPrice, string.Join(" ", result.Quote.Errors), clock.UtcNow, detail);
                 logger.LogWarning("Auto rule #{Id} bị từ chối: {Reason}", rule.Id, rule.Note);
             }
 
-            changed = true;
-        }
-
-        if (changed)
             await store.SaveAsync(ct);
-        return fired;
+            return opened;
+        }
+        finally
+        {
+            ruleGate.Semaphore.Release();
+        }
     }
 
     /// <summary>
