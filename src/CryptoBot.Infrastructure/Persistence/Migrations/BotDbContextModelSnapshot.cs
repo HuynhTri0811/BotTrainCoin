@@ -472,6 +472,9 @@ namespace CryptoBot.Infrastructure.Persistence.Migrations
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)");
 
+                    b.Property<bool>("IsComplete")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("PeriodEndUtc")
                         .HasColumnType("timestamp with time zone");
 
