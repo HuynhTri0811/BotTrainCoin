@@ -67,21 +67,32 @@ public sealed class PaperFuturesService(
         await gate.Semaphore.WaitAsync(ct);
         try
         {
+            // Đọc lại trong vùng khóa: vị thế có thể đã được request/DbContext khác đóng sau lần đọc trước.
             var position = await store.GetAsync(positionId, ct);
             if (position is null)
                 return new CloseResult(false, "Không tìm thấy vị thế.", null);
             if (position.Status != PositionStatus.Open)
-            {
-                return position.CloseCommandId == commandId
-                    ? new CloseResult(true, null, position)
-                    : new CloseResult(false, $"Vị thế đã {position.Status} ({position.CloseReason}).", position);
-            }
+                return AlreadyEnded(position, commandId);
 
             if (marks.GetFresh(position.Symbol) is not { } mark)
                 return new CloseResult(false, "Chưa có mark price mới; không thể ước lượng giá đóng.", position);
 
             CloseAt(position, reason, mark.Price, commandId);
-            await store.SaveAsync(ct);
+            try
+            {
+                await store.SaveAsync(ct);
+            }
+            catch (ConcurrentUpdateException)
+            {
+                // Bên khác đã đổi vị thế trước khi lưu: không ghi PnL/phí lần hai, báo theo trạng thái thật.
+                position = await store.GetAsync(positionId, ct);
+                return position is null
+                    ? new CloseResult(false, "Không tìm thấy vị thế.", null)
+                    : position.Status == PositionStatus.Open
+                        ? new CloseResult(false, "Vị thế vừa bị thay đổi bởi thao tác khác; thử lại.", position)
+                        : AlreadyEnded(position, commandId);
+            }
+
             return new CloseResult(true, null, position);
         }
         finally
@@ -127,7 +138,19 @@ public sealed class PaperFuturesService(
             }
 
             if (triggered > 0)
-                await store.SaveAsync(ct);
+            {
+                try
+                {
+                    await store.SaveAsync(ct);
+                }
+                catch (ConcurrentUpdateException exception)
+                {
+                    // Vị thế vừa được đóng ở nơi khác: bỏ cả lượt, lần kiểm tra sau xét lại theo trạng thái mới.
+                    logger.LogWarning("Paper futures trigger bỏ qua: {Error}", exception.Message);
+                    return 0;
+                }
+            }
+
             return triggered;
         }
         finally
@@ -166,6 +189,12 @@ public sealed class PaperFuturesService(
             "Vốn giả lập ban đầu", clock.UtcNow));
         await store.SaveAsync(ct);
     }
+
+    /// <summary>Vị thế đã kết thúc: retry đúng lệnh đóng cũ nhận lại kết quả cũ, lệnh khác bị từ chối.</summary>
+    private static CloseResult AlreadyEnded(FuturesPosition position, Guid commandId) =>
+        position.CloseCommandId == commandId
+            ? new CloseResult(true, null, position)
+            : new CloseResult(false, $"Vị thế đã {position.Status} ({position.CloseReason}).", position);
 
     private void CloseAt(FuturesPosition position, CloseReason reason, decimal markPrice, Guid? commandId)
     {
