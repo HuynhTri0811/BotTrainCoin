@@ -165,8 +165,8 @@ public sealed class AutoOrderService(
 
     /// <summary>
     /// Kích hoạt một quy tắc đã thỏa điều kiện. Trong khóa quy tắc, trạng thái được đọc lại từ database ngay trước khi
-    /// mở lệnh, nên quy tắc vừa bị hủy ở request khác không mở vị thế, và quy tắc được lưu ngay sau khi mở.
-    /// Trả về true khi đã mở vị thế.
+    /// mở lệnh, nên quy tắc vừa bị hủy ở request khác không mở vị thế, và quy tắc được lưu ngay sau khi mở. Bị chặn
+    /// bởi giới hạn lỗ ngày thì quy tắc vẫn Active, kèm ghi chú. Trả về true khi đã mở vị thế.
     /// </summary>
     private async Task<bool> TryFireAsync(AutoOrderRule rule, decimal markPrice, string? detail, CancellationToken ct)
     {
@@ -176,17 +176,17 @@ public sealed class AutoOrderService(
             if (await store.GetAsync(rule.Id, ct) is not { Status: AutoRuleStatus.Active })
                 return false;
 
-            var risk = await GetRiskAsync(ct);
-            if (risk.Blocked)
+            // Giới hạn lỗ ngày được xét lại trước mỗi lần mở, trong khóa của sàn giả lập: phí mở của quy tắc vừa
+            // kích hoạt (và PnL/phí mới từ thao tác khác) đã nằm trong sổ vốn khi xét quy tắc kế tiếp.
+            var request = BuildRequest(rule, markPrice);
+            var result = await paper.OpenAsync(request, DailyLossBlockAsync, ct);
+            if (result.BlockedReason is { } blocked)
             {
-                if (rule.SetBlockedNote(
-                        $"Bị chặn: lỗ hôm nay {risk.TodayRealizedPnl:0.##} USDT đã chạm giới hạn −{risk.LossLimit:0.##} USDT."))
+                if (rule.SetBlockedNote(blocked))
                     await store.SaveAsync(ct);
                 return false;
             }
 
-            var request = BuildRequest(rule, markPrice);
-            var result = await paper.OpenAsync(request, ct);
             var opened = false;
             if (result.Position is { } position)
             {
@@ -306,6 +306,15 @@ public sealed class AutoOrderService(
         if (values.Length > 0)
             text += $" [{values}]";
         return text.Length <= 500 ? text : text[..500];
+    }
+
+    /// <summary>Lý do chặn mở lệnh mới khi lỗ hôm nay đã chạm giới hạn; null khi còn được mở.</summary>
+    private async Task<string?> DailyLossBlockAsync(CancellationToken ct)
+    {
+        var risk = await GetRiskAsync(ct);
+        return risk.Blocked
+            ? $"Bị chặn: lỗ hôm nay {risk.TodayRealizedPnl:0.##} USDT đã chạm giới hạn −{risk.LossLimit:0.##} USDT."
+            : null;
     }
 
     public async Task<AutoOrderSummary> GetSummaryAsync(CancellationToken ct) =>
