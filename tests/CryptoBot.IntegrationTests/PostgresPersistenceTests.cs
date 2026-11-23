@@ -87,6 +87,19 @@ public sealed class PostgresPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Open_times_are_returned_in_range_and_ascending()
+    {
+        await using (var db = NewContext())
+            await new CandleStore(db).UpsertAsync(Key, [MakeCandle(0, 10), MakeCandle(2, 10), MakeCandle(5, 10)],
+                default);
+
+        await using var check = NewContext();
+        var openTimes = await new CandleStore(check).GetOpenTimesAsync(Key, T0, T0.AddHours(2), default);
+
+        Assert.Equal([T0, T0.AddHours(2)], openTimes);
+    }
+
+    [Fact]
     public async Task Upsert_updates_open_candle_and_keeps_closed_candle()
     {
         await using (var db = NewContext())
