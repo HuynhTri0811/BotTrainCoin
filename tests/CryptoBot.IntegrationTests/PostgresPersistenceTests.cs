@@ -258,8 +258,8 @@ public sealed class PostgresPersistenceTests : IAsyncLifetime
         await using (var db = NewContext())
         {
             var store = new DailyReportStore(db);
-            Assert.True(await store.ExistsAsync("BTCUSDT", T0.AddDays(2), default));
-            Assert.False(await store.ExistsAsync("BTCUSDT", T0.AddDays(3), default));
+            Assert.NotNull(await store.FindAsync("BTCUSDT", T0.AddDays(2), default));
+            Assert.Null(await store.FindAsync("BTCUSDT", T0.AddDays(3), default));
             Assert.Equal([T0.AddDays(2), T0.AddDays(1)],
                 (await store.GetRecentAsync("BTCUSDT", 10, default)).Select(report => report.PeriodEndUtc));
             Assert.Equal(3, (await store.GetRecentAsync(null, 10, default)).Count);

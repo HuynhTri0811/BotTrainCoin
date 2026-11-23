@@ -24,7 +24,7 @@ public static class ReportEndpoints
             return Results.Ok(new DailyReportListDto(options.Symbols, options.RunAt.ToString(@"hh\:mm"),
                 options.TimeZone, svc.NextRunUtc(clock.UtcNow),
                 reports.Select(saved => new DailyReportDto(saved.Symbol, saved.Interval, saved.CreatedAtUtc,
-                    saved.Report)).ToList()));
+                    saved.Report, saved.IsComplete)).ToList()));
         });
 
         // Lập ngay báo cáo còn thiếu của giờ lập gần nhất (không tạo trùng nếu đã có).
