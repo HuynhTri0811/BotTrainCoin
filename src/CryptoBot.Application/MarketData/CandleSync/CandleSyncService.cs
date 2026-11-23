@@ -6,11 +6,13 @@ namespace CryptoBot.Application.MarketData;
 
 /// <summary>
 /// Tải nến qua REST và upsert theo khóa nến. Luôn tải lại từ nến mới nhất đã lưu (bao gồm)
-/// nên khoảng thiếu sau reconnect/restart được tải bù tự động.
+/// nên khoảng thiếu sau reconnect/restart được tải bù tự động. Khoảng thiếu nằm giữa các nến đã lưu trong cửa sổ gần
+/// đây (sàn chưa trả hoặc nến bị loại do sai dữ liệu) được tải lại có giới hạn qua <see cref="CandleGapTracker"/>.
 /// </summary>
 public sealed class CandleSyncService(
     IMarketDataClient client,
     ICandleStore store,
+    CandleGapTracker gaps,
     MarketDataOptions options,
     ILogger<CandleSyncService> logger)
 {
@@ -30,6 +32,13 @@ public sealed class CandleSyncService(
         var updated = 0;
         var issues = new List<CandleIssue>();
         DateTime? latestClosed = null;
+
+        if (latest is { } latestOpen)
+        {
+            var repaired = await RepairGapsAsync(key, windowStart, latestOpen, serverTime, issues, ct);
+            inserted += repaired.Inserted;
+            updated += repaired.Updated;
+        }
 
         for (var batch = 0; batch < options.MaxBatchesPerSync; batch++)
         {
@@ -70,5 +79,49 @@ public sealed class CandleSyncService(
             logger.LogInformation("Market data {Key}: +{Inserted} nến, cập nhật {Updated}", key, inserted, updated);
 
         return new SyncResult(key, inserted, updated, latestClosed, serverTime, issues);
+    }
+
+    /// <summary>
+    /// Tải lại các khoảng thiếu giữa hai nến đã lưu trong [<paramref name="fromUtc"/>, <paramref name="toUtc"/>]
+    /// (tối đa <see cref="MarketDataOptions.MaxGapRepairsPerSync"/> khoảng). Chỉ chèn nến thiếu; nến đã đóng không bị
+    /// ghi đè (theo quy tắc upsert).
+    /// </summary>
+    private async Task<(int Inserted, int Updated)> RepairGapsAsync(CandleKey key, DateTime fromUtc, DateTime toUtc,
+        DateTime serverTime, List<CandleIssue> issues, CancellationToken ct)
+    {
+        var step = key.Interval.Duration;
+        var stored = await store.GetOpenTimesAsync(key, fromUtc, toUtc, ct);
+        var inserted = 0;
+        var updated = 0;
+        var repairs = 0;
+
+        for (var index = 1; index < stored.Count && repairs < options.MaxGapRepairsPerSync; index++)
+        {
+            var gapStart = stored[index - 1] + step;
+            var gapEnd = stored[index];
+            if (gapStart >= gapEnd || !gaps.TryBeginRepair(key, gapStart, serverTime, options))
+                continue;
+
+            repairs++;
+            var missing = (int)Math.Min((gapEnd - gapStart) / step, options.BatchSize);
+            var klines = await client.GetKlinesAsync(key.Symbol, key.Interval, gapStart, missing, ct);
+            var candles = klines.Select(kline => kline.ToCandle(key, serverTime))
+                .Where(candle => candle.OpenTimeUtc >= gapStart && candle.OpenTimeUtc < gapEnd).ToList();
+            var batchIssues = CandleSeriesValidator.Validate(candles, key.Interval);
+            issues.AddRange(batchIssues);
+
+            var result = await store.UpsertAsync(key, CandleSeriesValidator.WithoutRejected(candles, batchIssues), ct);
+            inserted += result.Inserted;
+            updated += result.Updated;
+            issues.AddRange(result.Conflicts);
+
+            if (result.Inserted > 0)
+                logger.LogInformation("Market data {Key}: tải bù {Inserted} nến thiếu từ {GapStart:O}",
+                    key, result.Inserted, gapStart);
+            if (result.Inserted == (gapEnd - gapStart) / step)
+                gaps.Resolved(key, gapStart);
+        }
+
+        return (inserted, updated);
     }
 }

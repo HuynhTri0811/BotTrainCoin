@@ -12,12 +12,13 @@ public class CandleSyncServiceTests
 
     private readonly FakeClock _clock = new(T0);
     private readonly InMemoryCandleStore _store = new();
+    private readonly CandleGapTracker _gaps = new();
     private readonly FakeMarketDataClient _client;
 
     public CandleSyncServiceTests() => _client = new FakeMarketDataClient(_clock);
 
     private CandleSyncService CreateService(int batchSize = 1000, int bootstrap = 10) =>
-        new(_client, _store, new MarketDataOptions { BatchSize = batchSize, BootstrapCandles = bootstrap },
+        new(_client, _store, _gaps, new MarketDataOptions { BatchSize = batchSize, BootstrapCandles = bootstrap },
             NullLogger<CandleSyncService>.Instance);
 
     private void AddKlines(int from, int count, decimal price = 100)
@@ -147,4 +148,5 @@ public class CandleSyncServiceTests
 
         Assert.All(_store.Candles.Values, candle => Assert.Equal(0.25m, candle.TakerBuyVolume));
     }
+
 }
