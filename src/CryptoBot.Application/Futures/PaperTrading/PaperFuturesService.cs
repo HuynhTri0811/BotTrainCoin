@@ -23,7 +23,15 @@ public sealed class PaperFuturesService(
         return BuildQuote(request, available, open);
     }
 
-    public async Task<OpenResult> OpenAsync(OpenPositionRequest request, CancellationToken ct)
+    public Task<OpenResult> OpenAsync(OpenPositionRequest request, CancellationToken ct) =>
+        OpenAsync(request, null, ct);
+
+    /// <summary>
+    /// Mở vị thế. <paramref name="admission"/> (nếu có) chạy trong vùng khóa, sau mọi thay đổi số dư trước đó (phí,
+    /// PnL), và trả lý do chặn hoặc null; bị chặn thì không mở và trả <see cref="OpenResult.BlockedReason"/>.
+    /// </summary>
+    public async Task<OpenResult> OpenAsync(OpenPositionRequest request,
+        Func<CancellationToken, Task<string?>>? admission, CancellationToken ct)
     {
         await gate.Semaphore.WaitAsync(ct);
         try
@@ -35,6 +43,8 @@ public sealed class PaperFuturesService(
             await EnsureFundedAsync(ct);
             var (_, available) = await BalancesAsync(ct);
             var quote = BuildQuote(request, available, await store.GetOpenPositionsAsync(ct));
+            if (admission is not null && await admission(ct) is { } blocked)
+                return new OpenResult(quote, null, false, blocked);
             if (!quote.Accepted)
                 return new OpenResult(quote, null, false);
 
