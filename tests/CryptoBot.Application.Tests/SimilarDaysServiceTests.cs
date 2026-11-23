@@ -145,6 +145,10 @@ public class SimilarDaysServiceTests
         public Task<DateTime?> GetFirstMissingStatsOpenTimeAsync(CandleKey key, DateTime fromUtc, CancellationToken ct) =>
             Inner.GetFirstMissingStatsOpenTimeAsync(key, fromUtc, ct);
 
+        public Task<IReadOnlyList<DateTime>> GetOpenTimesAsync(CandleKey key, DateTime fromUtc, DateTime toUtc,
+            CancellationToken ct) =>
+            Inner.GetOpenTimesAsync(key, fromUtc, toUtc, ct);
+
         public Task<UpsertResult> UpsertAsync(CandleKey key, IReadOnlyList<Candle> candles, CancellationToken ct) =>
             Inner.UpsertAsync(key, candles, ct);
 

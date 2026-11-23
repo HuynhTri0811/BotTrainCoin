@@ -10,50 +10,25 @@ using CryptoBot.Domain.News;
 using CryptoBot.Domain.Strategies;
 using CryptoBot.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace CryptoBot.IntegrationTests;
 
 /// <summary>
-/// Chạy trên PostgreSQL thật với migration thật. Mỗi lớp test tạo một database tạm riêng rồi xóa khi xong.
-/// Cần container cryptobot-postgres đang chạy (<c>docker compose up -d</c>); đổi server bằng biến môi trường
-/// <c>CRYPTOBOT_TEST_DB</c> (chuỗi kết nối không có Database).
+/// Chạy trên PostgreSQL thật với migration thật. Mỗi lớp test tạo một database tạm riêng rồi xóa khi xong
+/// (<see cref="PostgresTestDatabase"/>).
 /// </summary>
 public sealed class PostgresPersistenceTests : IAsyncLifetime
 {
     private static readonly DateTime T0 = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
     private static readonly CandleKey Key = new("Binance", "BTCUSDT", CandleInterval.H1);
 
-    private static readonly string ServerConnection = Environment.GetEnvironmentVariable("CRYPTOBOT_TEST_DB")
-        ?? "Host=localhost;Port=5433;Username=cryptobot;Password=cryptobot";
+    private readonly PostgresTestDatabase _database = new();
 
-    private readonly string _database = $"cryptobot_test_{Guid.NewGuid():N}";
+    private BotDbContext NewContext() => _database.NewContext();
 
-    private string ConnectionString => new NpgsqlConnectionStringBuilder(ServerConnection)
-    {
-        Database = _database,
-        // Không giữ kết nối trong pool, để xóa được database khi xong.
-        Pooling = false,
-    }.ConnectionString;
+    public Task InitializeAsync() => _database.CreateAsync();
 
-    private BotDbContext NewContext() =>
-        new(new DbContextOptionsBuilder<BotDbContext>().UseNpgsql(ConnectionString).Options);
-
-    public async Task InitializeAsync()
-    {
-        await using var db = NewContext();
-        await db.Database.MigrateAsync();
-    }
-
-    public async Task DisposeAsync()
-    {
-        await using var connection = new NpgsqlConnection(
-            new NpgsqlConnectionStringBuilder(ServerConnection) { Database = "postgres", Pooling = false }
-                .ConnectionString);
-        await connection.OpenAsync();
-        await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_database}\" WITH (FORCE)", connection);
-        await drop.ExecuteNonQueryAsync();
-    }
+    public Task DisposeAsync() => _database.DropAsync();
 
     private static Candle MakeCandle(int hour, decimal close, bool closed = true) =>
         new("Binance", "BTCUSDT", CandleInterval.H1, T0 + TimeSpan.FromHours(hour),
@@ -109,6 +84,19 @@ public sealed class PostgresPersistenceTests : IAsyncLifetime
         Assert.Equal(200, results.Sum(result => result.Inserted));
         await using var check = NewContext();
         Assert.Equal(200, await check.Candles.CountAsync());
+    }
+
+    [Fact]
+    public async Task Open_times_are_returned_in_range_and_ascending()
+    {
+        await using (var db = NewContext())
+            await new CandleStore(db).UpsertAsync(Key, [MakeCandle(0, 10), MakeCandle(2, 10), MakeCandle(5, 10)],
+                default);
+
+        await using var check = NewContext();
+        var openTimes = await new CandleStore(check).GetOpenTimesAsync(Key, T0, T0.AddHours(2), default);
+
+        Assert.Equal([T0, T0.AddHours(2)], openTimes);
     }
 
     [Fact]
@@ -270,8 +258,8 @@ public sealed class PostgresPersistenceTests : IAsyncLifetime
         await using (var db = NewContext())
         {
             var store = new DailyReportStore(db);
-            Assert.True(await store.ExistsAsync("BTCUSDT", T0.AddDays(2), default));
-            Assert.False(await store.ExistsAsync("BTCUSDT", T0.AddDays(3), default));
+            Assert.NotNull(await store.FindAsync("BTCUSDT", T0.AddDays(2), default));
+            Assert.Null(await store.FindAsync("BTCUSDT", T0.AddDays(3), default));
             Assert.Equal([T0.AddDays(2), T0.AddDays(1)],
                 (await store.GetRecentAsync("BTCUSDT", 10, default)).Select(report => report.PeriodEndUtc));
             Assert.Equal(3, (await store.GetRecentAsync(null, 10, default)).Count);

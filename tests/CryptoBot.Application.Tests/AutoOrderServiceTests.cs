@@ -20,7 +20,11 @@ public class AutoOrderServiceTests
         TakerFeeRate = 0.0005m,
         SlippageRate = 0m,
         MaxLeverage = 10,
-        Symbols = [new FuturesSymbolOptions { Symbol = "BTCUSDT", QuantityStep = 0.001m, TickSize = 0.1m, MinNotional = 50m, MaintenanceMarginRate = 0.004m }],
+        Symbols =
+        [
+            new FuturesSymbolOptions { Symbol = "BTCUSDT", QuantityStep = 0.001m, TickSize = 0.1m, MinNotional = 50m, MaintenanceMarginRate = 0.004m },
+            new FuturesSymbolOptions { Symbol = "ETHUSDT", QuantityStep = 0.001m, TickSize = 0.1m, MinNotional = 50m, MaintenanceMarginRate = 0.004m },
+        ],
     };
     private readonly AutoOrderOptions _options = new();
     private readonly MarkPriceCache _marks;
@@ -42,7 +46,7 @@ public class AutoOrderServiceTests
                 Parameters = new() { ["Period"] = "2", ["LookbackCandles"] = "5" },
             },
         ], NullLogger<IndicatorRegistry>.Instance);
-        _svc = new AutoOrderService(_ruleStore, _paperStore, _paper, _marks, new IndicatorService(registry, _candles),
+        _svc = new AutoOrderService(_ruleStore, _paperStore, _paper, new AutoOrderLock(), _marks, new IndicatorService(registry, _candles),
             registry, _paperOptions, _options, _clock, NullLogger<AutoOrderService>.Instance);
         SetMark(100_000m);
         _paper.EnsureFundedAsync(default).GetAwaiter().GetResult();
@@ -214,13 +218,56 @@ public class AutoOrderServiceTests
     public async Task Cancelled_rule_never_fires()
     {
         var rule = await CreateRule();
-        Assert.True(await _svc.CancelAsync(rule.Id, default));
+        Assert.True((await _svc.CancelAsync(rule.Id, default)).Cancelled);
         SetMark(97_900m);
 
         await _svc.EvaluateAsync(default);
 
         Assert.Empty(_paperStore.Positions);
-        Assert.False(await _svc.CancelAsync(rule.Id, default));
+        Assert.False((await _svc.CancelAsync(rule.Id, default)).Cancelled);
+    }
+
+    [Fact]
+    public async Task Daily_loss_limit_is_rechecked_after_each_opening_fee()
+    {
+        Assert.Equal(5m, _options.DailyLossLimitPercent);
+        // Lỗ hôm nay 49,9 USDT: chưa chạm giới hạn 50 USDT (5% của 1000).
+        _paperStore.Ledger.Add(new PaperLedgerEntry(-49.9m, LedgerEntryType.RealizedPnl, null, "test", T0));
+        _marks.Set(new MarkPrice("BTCUSDT", 100m, T0));
+        _marks.Set(new MarkPrice("ETHUSDT", 100m, T0));
+        foreach (var symbol in new[] { "BTCUSDT", "ETHUSDT" })
+            Assert.NotNull((await _svc.CreateAsync(new CreateRuleRequest(symbol, PositionSide.Long,
+                TriggerCondition.AtOrBelow, 99m, 200m, 2, 1m, 2m), default)).Rule);
+        _marks.Set(new MarkPrice("BTCUSDT", 99m, T0));
+        _marks.Set(new MarkPrice("ETHUSDT", 99m, T0));
+
+        Assert.Equal(1, await _svc.EvaluateAsync(default));
+
+        // Phí mở lệnh đầu (0,19998 USDT) đẩy lỗ lên 50,09998 USDT: lệnh thứ hai bị chặn, quy tắc vẫn chờ.
+        var position = Assert.Single(_paperStore.Positions);
+        Assert.Equal("BTCUSDT", position.Symbol);
+        Assert.Equal(0.19998m, position.OpenFee);
+        var blocked = _ruleStore.Rules.Single(rule => rule.Symbol == "ETHUSDT");
+        Assert.Equal(AutoRuleStatus.Active, blocked.Status);
+        Assert.Contains("Bị chặn", blocked.Note);
+        Assert.True((await _svc.GetRiskAsync(default)).Blocked);
+
+        // Đóng lệnh vẫn được phép khi đã chạm giới hạn.
+        Assert.True((await _paper.CloseAsync(position.Id, Guid.NewGuid(), default)).Ok);
+    }
+
+    [Fact]
+    public async Task Cancel_after_the_rule_fired_reports_the_opened_position()
+    {
+        var rule = await CreateRule();
+        SetMark(97_900m);
+        Assert.Equal(1, await _svc.EvaluateAsync(default));
+
+        var result = await _svc.CancelAsync(rule.Id, default);
+
+        Assert.False(result.Cancelled);
+        Assert.Equal(AutoRuleStatus.Triggered, result.Rule!.Status);
+        Assert.Equal(_paperStore.Positions.Single().Id, result.Rule.PositionId);
     }
 
     [Theory]

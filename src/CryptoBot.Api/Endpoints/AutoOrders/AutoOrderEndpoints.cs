@@ -44,9 +44,22 @@ public static class AutoOrderEndpoints
         });
 
         api.MapPost("/{id:long}/cancel", async (long id, AutoOrderService svc, CancellationToken ct) =>
-            await svc.CancelAsync(id, ct)
-                ? Results.Ok(new { cancelled = true })
-                : Results.UnprocessableEntity(new { error = "Không tìm thấy quy tắc đang chạy." }));
+        {
+            var result = await svc.CancelAsync(id, ct);
+            if (result.Cancelled)
+                return Results.Ok(new { cancelled = true });
+            // Kích hoạt đến trước thì báo đúng trạng thái (đã mở vị thế), không báo hủy thành công.
+            return result.Rule is not { } rule
+                ? Results.UnprocessableEntity(new { error = "Không tìm thấy quy tắc." })
+                : Results.UnprocessableEntity(new
+                {
+                    error = rule.Status == AutoRuleStatus.Triggered
+                        ? $"Quy tắc đã kích hoạt và mở vị thế #{rule.PositionId}; không thể hủy."
+                        : $"Quy tắc đã {rule.Status}; không thể hủy.",
+                    status = rule.Status.ToString(),
+                    positionId = rule.PositionId,
+                });
+        });
     }
 
     private static AutoRuleDto ToDto(AutoOrderRule rule) => new(rule.Id, rule.Environment, rule.Symbol,

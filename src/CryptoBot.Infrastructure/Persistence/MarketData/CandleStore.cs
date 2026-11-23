@@ -34,6 +34,14 @@ public sealed class CandleStore(BotDbContext db) : ICandleStore
             .Select(candle => (DateTime?)candle.OpenTimeUtc)
             .FirstOrDefaultAsync(ct);
 
+    public async Task<IReadOnlyList<DateTime>> GetOpenTimesAsync(CandleKey key, DateTime fromUtc, DateTime toUtc,
+        CancellationToken ct) =>
+        await ForKey(key)
+            .Where(candle => candle.OpenTimeUtc >= fromUtc && candle.OpenTimeUtc <= toUtc)
+            .OrderBy(candle => candle.OpenTimeUtc)
+            .Select(candle => candle.OpenTimeUtc)
+            .ToListAsync(ct);
+
     /// <summary>
     /// Thêm nến mới và cập nhật nến đã có trong một lần lưu. Nến đã đóng không bị ghi đè: bản khác giá trị được báo
     /// trong <see cref="UpsertResult.Conflicts"/>, bản khớp chỉ được bổ sung các số còn thiếu và tính là Unchanged.

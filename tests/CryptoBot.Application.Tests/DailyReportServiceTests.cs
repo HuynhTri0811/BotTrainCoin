@@ -111,4 +111,55 @@ public class DailyReportServiceTests
         Assert.Contains("BTCUSDT", Assert.Single(run.Errors));
         Assert.Empty(_store.Reports);
     }
+
+    [Theory]
+    [InlineData(1)]   // thiếu nến cuối kỳ
+    [InlineData(12)]  // thiếu nến giữa kỳ
+    public async Task Partial_report_is_not_final_and_is_completed_once_the_candle_appears(int hoursBeforeEnd)
+    {
+        AddRisingKlines(50);
+        var missing = _client.Klines.Single(kline => kline.OpenTimeUtc == RunUtc.AddHours(-hoursBeforeEnd));
+        _client.Klines.Remove(missing);
+
+        var first = await _service.RunDueAsync(default);
+
+        // Vẫn lưu để xem được, nhưng đánh dấu chưa đủ và báo lỗi để worker thử lại.
+        Assert.Contains("BTCUSDT", Assert.Single(first.Errors));
+        var partial = Assert.Single(await _service.GetRecentAsync("BTCUSDT", 10, default));
+        Assert.False(partial.IsComplete);
+        Assert.Equal(23, partial.Report.CandleCount);
+
+        _client.Klines.Add(missing);
+        var second = await _service.RunDueAsync(default);
+
+        Assert.Empty(second.Errors);
+        Assert.Single(_store.Reports);
+        var complete = Assert.Single(await _service.GetRecentAsync("BTCUSDT", 10, default));
+        Assert.True(complete.IsComplete);
+        Assert.Equal(24, complete.Report.CandleCount);
+
+        // Đã đủ thì không tải hay lập lại nữa.
+        var calls = _client.Calls;
+        Assert.Equal(0, (await _service.RunDueAsync(default)).Created);
+        Assert.Equal(calls, _client.Calls);
+    }
+
+    [Fact]
+    public async Task Rejected_candle_leaves_the_report_incomplete_until_the_exchange_fixes_it()
+    {
+        AddRisingKlines(50);
+        var index = _client.Klines.FindIndex(kline => kline.OpenTimeUtc == RunUtc.AddHours(-5));
+        var valid = _client.Klines[index];
+        _client.Klines[index] = valid with { High = valid.Open - 1 }; // High < Open: bị loại
+
+        await _service.RunDueAsync(default);
+        Assert.False(Assert.Single(await _service.GetRecentAsync("BTCUSDT", 10, default)).IsComplete);
+
+        _client.Klines[index] = valid;
+        await _service.RunDueAsync(default);
+
+        var report = Assert.Single(await _service.GetRecentAsync("BTCUSDT", 10, default));
+        Assert.True(report.IsComplete);
+        Assert.Equal(24, report.Report.CandleCount);
+    }
 }

@@ -54,8 +54,12 @@ public sealed class DailyReportService(
         {
             try
             {
-                if (await GenerateAsync(symbol, periodEnd, ct))
+                var outcome = await GenerateAsync(symbol, periodEnd, ct);
+                if (outcome != DailyReportOutcome.AlreadyComplete)
                     created++;
+                // Báo cáo thiếu nến được tính là lỗi để worker thử lại sau RetryAfter thay vì đợi đến hôm sau.
+                if (outcome == DailyReportOutcome.SavedIncomplete)
+                    errors.Add($"{symbol}: sàn mới trả một phần nến của khoảng; báo cáo chưa đủ và sẽ được lập lại.");
             }
             catch (MarketDataUnavailableException ex)
             {
@@ -69,15 +73,17 @@ public sealed class DailyReportService(
 
     /// <summary>
     /// Lập báo cáo của <paramref name="symbol"/> cho khoảng kết thúc lúc <paramref name="periodEndUtc"/>.
-    /// Trả false khi báo cáo đã có; ném lỗi khi sàn không trả nến nào trong khoảng.
+    /// Báo cáo đã đủ nến thì bỏ qua. Sàn mới trả một phần nến (thiếu nến, nến bị loại do sai dữ liệu) thì vẫn lưu
+    /// nhưng đánh dấu chưa đủ, và lần gọi sau lập lại cho đến khi đủ. Ném lỗi khi sàn không trả nến nào trong khoảng.
     /// </summary>
-    public async Task<bool> GenerateAsync(string symbol, DateTime periodEndUtc, CancellationToken ct)
+    public async Task<DailyReportOutcome> GenerateAsync(string symbol, DateTime periodEndUtc, CancellationToken ct)
     {
         await Gate.WaitAsync(ct);
         try
         {
-            if (await store.ExistsAsync(symbol, periodEndUtc, ct))
-                return false;
+            var existing = await store.FindAsync(symbol, periodEndUtc, ct);
+            if (existing is { IsComplete: true })
+                return DailyReportOutcome.AlreadyComplete;
 
             var interval = CandleInterval.Parse(options.Interval);
             var periodStart = periodEndUtc - options.Period;
@@ -95,12 +101,26 @@ public sealed class DailyReportService(
                 options.VolumeSpikeMultiplier) ?? throw new MarketDataUnavailableException(
                 $"Sàn chưa trả nến {interval} nào trong khoảng {periodStart:O} – {periodEndUtc:O}.");
 
-            store.Add(new DailyReport(symbol, interval.Code, periodStart, periodEndUtc, now,
-                JsonSerializer.Serialize(report, Json)));
+            // Nến đã đóng, hợp lệ, tăng dần và nằm trọn trong khoảng: đủ số lượng nghĩa là liên tục và đủ hai đầu.
+            var expected = (int)(options.Period / interval.Duration);
+            var complete = report.CandleCount == expected;
+            var json = JsonSerializer.Serialize(report, Json);
+            if (existing is null)
+                store.Add(new DailyReport(symbol, interval.Code, periodStart, periodEndUtc, now, json, complete));
+            else
+                existing.Refresh(now, json, complete);
             await store.SaveAsync(ct);
+
+            if (!complete)
+            {
+                logger.LogWarning("Daily report {Symbol} đến {PeriodEnd:O} mới có {Count}/{Expected} nến; sẽ lập lại",
+                    symbol, periodEndUtc, report.CandleCount, expected);
+                return DailyReportOutcome.SavedIncomplete;
+            }
+
             logger.LogInformation("Daily report {Symbol} đến {PeriodEnd:O}: {Change:+0.00;-0.00}%, biên độ {Range:0.00}%",
                 symbol, periodEndUtc, report.ChangePercent, report.RangePercent);
-            return true;
+            return DailyReportOutcome.Saved;
         }
         finally
         {
@@ -113,7 +133,7 @@ public sealed class DailyReportService(
         var saved = await store.GetRecentAsync(symbol, limit, ct);
         return saved
             .Select(report => new SavedDailyReport(report.Symbol, report.Interval, report.CreatedAtUtc,
-                JsonSerializer.Deserialize<DailyMoveReport>(report.ContentJson, Json)!))
+                JsonSerializer.Deserialize<DailyMoveReport>(report.ContentJson, Json)!, report.IsComplete))
             .ToList();
     }
 }
