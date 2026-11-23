@@ -27,11 +27,17 @@ public sealed class DailyReport
     /// <summary><see cref="DailyMoveReport"/> dạng JSON.</summary>
     public string ContentJson { get; private set; } = null!;
 
+    /// <summary>
+    /// Đủ mọi nến của khoảng. false khi sàn mới trả một phần (thiếu nến hoặc nến bị loại do sai dữ liệu): báo cáo
+    /// được lập lại cho đến khi đủ, còn báo cáo đủ thì không bao giờ bị ghi lại.
+    /// </summary>
+    public bool IsComplete { get; private set; }
+
     /// <summary>Dành cho EF Core khi đọc từ database.</summary>
     private DailyReport() { }
 
     public DailyReport(string symbol, string interval, DateTime periodStartUtc, DateTime periodEndUtc,
-        DateTime createdAtUtc, string contentJson)
+        DateTime createdAtUtc, string contentJson, bool isComplete = true)
     {
         if (string.IsNullOrWhiteSpace(symbol))
             throw new ArgumentException("Thiếu symbol.", nameof(symbol));
@@ -46,5 +52,19 @@ public sealed class DailyReport
         PeriodEndUtc = periodEndUtc;
         CreatedAtUtc = createdAtUtc;
         ContentJson = contentJson;
+        IsComplete = isComplete;
+    }
+
+    /// <summary>Lập lại báo cáo chưa đủ nến từ dữ liệu mới của sàn. Báo cáo đã đủ thì không được ghi lại.</summary>
+    public void Refresh(DateTime createdAtUtc, string contentJson, bool isComplete)
+    {
+        if (IsComplete)
+            throw new InvalidOperationException("Báo cáo đã đủ nến; không lập lại.");
+        if (string.IsNullOrWhiteSpace(contentJson))
+            throw new ArgumentException("Thiếu nội dung báo cáo.", nameof(contentJson));
+
+        CreatedAtUtc = createdAtUtc;
+        ContentJson = contentJson;
+        IsComplete = isComplete;
     }
 }
