@@ -223,6 +223,20 @@ public class AutoOrderServiceTests
         Assert.False((await _svc.CancelAsync(rule.Id, default)).Cancelled);
     }
 
+    [Fact]
+    public async Task Cancel_after_the_rule_fired_reports_the_opened_position()
+    {
+        var rule = await CreateRule();
+        SetMark(97_900m);
+        Assert.Equal(1, await _svc.EvaluateAsync(default));
+
+        var result = await _svc.CancelAsync(rule.Id, default);
+
+        Assert.False(result.Cancelled);
+        Assert.Equal(AutoRuleStatus.Triggered, result.Rule!.Status);
+        Assert.Equal(_paperStore.Positions.Single().Id, result.Rule.PositionId);
+    }
+
     [Theory]
     [InlineData(101_000, "đã thỏa điều kiện")]          // giá hiện tại 100000 đã ≤ 101000
     public async Task Create_rejects_trigger_that_is_already_true(decimal trigger, string expected)
